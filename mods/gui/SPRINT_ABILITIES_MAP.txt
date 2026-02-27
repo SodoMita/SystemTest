@@ -1,0 +1,177 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                      SPRINT/RUNNING ABILITIES MAP                             ║
+║                         (Movement Branch)                                     ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+Position Guide: (graph_x, graph_y)
+
+                               (-1, -1)
+                                  ⚡
+                          Sprint Efficiency
+                           (Stat, 3 lvls)
+                         Reduces stamina drain
+                           Requires: Sprint
+                              Stamina
+                                  │
+                                  │
+    (-1, 0)        (0, -1)       │         (1, -1)
+       📊            🫁  ─────────┘
+   Sprint HUD   Sprint Stamina
+   (Toggle)      (Stat, 5 lvls)
+   FREE!      Increases max stamina
+               Requires: Walk Speed
+                         │
+                         │
+    (0, 0)  ─────────────┤
+      🚶                 │
+  Walk Speed            │
+  (Base ability)        │
+                        │
+                        │
+    (1, 0)  ────────────┘
+      🏃                 
+   Run Speed             ─────────────┐
+ (Stat, 5 lvls)                       │
+Increases sprint                      │
+    speed                             │
+Requires: Walk                        │
+    Speed                             │
+                                      │
+                                      │
+                                  (2, 0)
+                                    💨
+                                  Dash
+                                (Toggle)
+                          Infinite stamina!
+                           Requires: Run
+                              Speed
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              UPGRADE PATHS
+═══════════════════════════════════════════════════════════════════════════════
+
+PATH 1: Speed Focus (Sprint Faster)
+────────────────────────────────────
+1. Walk Speed (0,0) - Base movement
+2. Run Speed (1,0) - +10% per level to sprint speed
+3. Dash (2,0) - Infinite stamina
+
+Cost: 1 + (1×5) + 2 = 8 stat points minimum
+Max Sprint Speed: 2.0x base speed (with level 5 Run Speed)
+
+
+PATH 2: Endurance Focus (Sprint Longer)
+────────────────────────────────────────
+1. Walk Speed (0,0) - Base movement
+2. Sprint Stamina (0,-1) - +20 max stamina per level
+3. Sprint Efficiency (1,-1) - -15% drain per level
+
+Cost: 1 + (1×5) + (2×3) = 12 stat points for max
+Max Stamina: 200 (base 100 + 100 from stamina levels)
+Min Drain: 0.275/sec (base 0.5 × 0.55 efficiency multiplier)
+
+
+PATH 3: Balanced Build
+──────────────────────
+1. Walk Speed (0,0) - Base
+2. Sprint Stamina (0,-1) - 2-3 levels for 140-160 max stamina
+3. Run Speed (1,0) - 2-3 levels for sprint speed boost
+4. Sprint Efficiency (1,-1) - 1-2 levels for reduced drain
+5. Dash (2,0) - Eventually unlock for infinite sprint
+
+Cost: ~10-15 stat points for balanced build
+
+
+PATH 4: Casual Player
+─────────────────────
+1. Walk Speed (0,0) - Just base movement
+2. Sprint HUD (-1,0) - FREE toggle to show/hide stamina
+3. (Optional) Sprint Stamina (0,-1) - 1-2 levels if needed
+
+Cost: 1-3 stat points, still functional sprint
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                            ABILITY DETAILS
+═══════════════════════════════════════════════════════════════════════════════
+
+Walk Speed (🚶) - Position: (0, 0)
+├─ Type: Stat (5 levels)
+├─ Cost: 1 point per level
+├─ Effect: +0.2 walk speed per level
+└─ Required for: Run Speed, Sprint Stamina
+
+Run Speed (🏃) - Position: (1, 0)
+├─ Type: Stat (5 levels)
+├─ Cost: 1 point per level
+├─ Effect: +0.1 sprint multiplier per level (+10% sprint speed)
+├─ Requires: Walk Speed
+└─ Required for: Dash
+
+Sprint Stamina (🫁) - Position: (0, -1)
+├─ Type: Stat (5 levels)
+├─ Cost: 1 point per level
+├─ Effect: +20 max stamina per level
+├─ Base: 100 stamina
+├─ Max: 200 stamina (at level 5)
+├─ Requires: Walk Speed
+└─ Required for: Sprint Efficiency
+
+Sprint Efficiency (⚡) - Position: (1, -1)
+├─ Type: Stat (3 levels)
+├─ Cost: 2 points per level
+├─ Effect: -15% stamina drain per level
+├─ Base drain: 0.5/sec
+├─ Max reduction: -45% (0.275/sec at level 3)
+└─ Requires: Sprint Stamina
+
+Dash (💨) - Position: (2, 0)
+├─ Type: Toggle (on/off)
+├─ Cost: 2 points (one-time)
+├─ Effect: 10x speed boost with 500x stamina drain
+├─ Note: HUD shows "DASH MODE" in orange
+├─ Warning: Burns stamina INSTANTLY (~0.4 sec at base!)
+└─ Requires: Run Speed
+
+Sprint HUD (📊) - Position: (-1, 0)
+├─ Type: Toggle (on/off)
+├─ Cost: 0 points (FREE!)
+├─ Effect: Show/hide sprint stamina HUD
+├─ Default: HUD visible
+└─ Requires: Nothing
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         PROGRESSION EXAMPLES
+═══════════════════════════════════════════════════════════════════════════════
+
+Early Game (Level 5, 15 stat points):
+• Walk Speed L1 (1pt)
+• Sprint Stamina L2 (2pts)
+• Run Speed L2 (2pts)
+= 120 max stamina, 1.7x sprint speed
+
+Mid Game (Level 10, 30 stat points):
+• Walk Speed L3 (3pts)
+• Sprint Stamina L4 (4pts)
+• Run Speed L4 (4pts)
+• Sprint Efficiency L2 (4pts)
+= 180 max stamina, 1.9x sprint speed, 30% less drain
+
+Late Game (Level 15, 45 stat points):
+• Walk Speed L5 (5pts)
+• Sprint Stamina L5 (5pts)
+• Run Speed L5 (5pts)
+• Sprint Efficiency L3 (6pts)
+• Dash (2pts)
+= Infinite stamina when Dash enabled, 2.0x sprint speed
+
+End Game (Level 20+, 60+ stat points):
+• All movement abilities maxed
+• Dash unlocked and toggled
+• Sprint HUD toggled (preference)
+= Ultimate mobility, unlimited sprint, fastest travel
+
+
+═══════════════════════════════════════════════════════════════════════════════

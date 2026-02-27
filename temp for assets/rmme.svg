@@ -1,0 +1,224 @@
+<svg width="1152" height="768" viewBox="0 0 1152 768"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <!-- Tile background gradient -->
+    <linearGradient id="tileBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#303338"/>
+      <stop offset="100%" stop-color="#15171a"/>
+    </linearGradient>
+
+    <!-- Outer frame effect -->
+    <linearGradient id="tileFrame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#555" />
+      <stop offset="100%" stop-color="#111" />
+    </linearGradient>
+
+    <!-- Glow filter for icons -->
+    <filter id="glow-cyan" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="0 0 0 0 0
+                0 1 1 0 0
+                0 1 1 0 0
+                0 0 0 1 0" result="colored"/>
+      <feMerge>
+        <feMergeNode in="colored"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="glow-yellow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feColorMatrix in="blur" type="matrix"
+        values="1 1 0 0 0
+                1 1 0 0 0
+                0 0 0 0 0
+                0 0 0 1 0" result="colored"/>
+      <feMerge>
+        <feMergeNode in="colored"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1152" height="768" fill="#050608"/>
+
+  <!-- GRID SETTINGS:
+       tile size: 160x160
+       gutter: 8
+       margin: 16
+       6 columns × 5 rows
+  -->
+
+  <!-- Generate tiles manually (you can script this if needed) -->
+  <!-- Row 1 -->
+  <g id="row1" transform="translate(16,16)">
+    <!-- Col 1 -->
+    <g id="tile-1-1">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+
+    <!-- Col 2 -->
+    <g id="tile-1-2" transform="translate(168,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+
+    <!-- Col 3 -->
+    <g id="tile-1-3" transform="translate(336,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+
+    <!-- Col 4 -->
+    <g id="tile-1-4" transform="translate(504,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+
+    <!-- Col 5 -->
+    <g id="tile-1-5" transform="translate(672,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+
+    <!-- Col 6 -->
+    <g id="tile-1-6" transform="translate(840,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+  </g>
+
+  <!-- Row 2 -->
+  <g id="row2" transform="translate(16,184)">
+    <g id="tile-2-1">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-2-2" transform="translate(168,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-2-3" transform="translate(336,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-2-4" transform="translate(504,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-2-5" transform="translate(672,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-2-6" transform="translate(840,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+  </g>
+
+  <!-- Row 3 -->
+  <g id="row3" transform="translate(16,352)">
+    <g id="tile-3-1">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-3-2" transform="translate(168,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-3-3" transform="translate(336,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-3-4" transform="translate(504,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-3-5" transform="translate(672,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-3-6" transform="translate(840,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+  </g>
+
+  <!-- Row 4 -->
+  <g id="row4" transform="translate(16,520)">
+    <g id="tile-4-1">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-4-2" transform="translate(168,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-4-3" transform="translate(336,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-4-4" transform="translate(504,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-4-5" transform="translate(672,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+    <g id="tile-4-6" transform="translate(840,0)">
+      <rect x="0" y="0" width="160" height="160" fill="url(#tileFrame)"/>
+      <rect x="6" y="6" width="148" height="148" fill="url(#tileBg)"/>
+    </g>
+  </g>
+
+  <!-- Row 5 is not used fully in the reference (black band), but we keep empty or for extra icons -->
+
+  <!-- === SAMPLE ICONS === -->
+
+  <!-- Helmet icon in tile 1-1 -->
+  <g transform="translate(16,16)">
+    <g transform="translate(0,0)">
+      <g transform="translate(80,80)" filter="url(#glow-cyan)">
+        <!-- Helmet base -->
+        <path d="
+          M -40 20
+          Q -40 -35 0 -50
+          Q 40 -35 40 20
+          L 25 40
+          L -25 40
+          Z"
+          fill="#0ff" stroke="#aef" stroke-width="3"/>
+        <!-- Visor -->
+        <rect x="-22" y="-10" width="44" height="16" rx="4"
+              fill="#021b22" stroke="#7df" stroke-width="2"/>
+        <!-- Glow strip -->
+        <rect x="-20" y="-4" width="40" height="6" rx="3"
+              fill="#55faff"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Yellow lightning in tile 1-3 -->
+  <g transform="translate(16,16)">
+    <g transform="translate(336,0)">
+      <g transform="translate(80,80)" filter="url(#glow-yellow)">
+        <path d="
+          M -10 -60
+          L 25 -10
+          L 0 -10
+          L 15 40
+          L -25 -10
+          L 0 -10
+          Z"
+          fill="#ffeb3b" stroke="#ffb300" stroke-width="4"
+          stroke-linejoin="round"/>
+      </g>
+    </g>
+  </g>
+
+</svg>

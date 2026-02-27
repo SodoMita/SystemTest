@@ -1,0 +1,13 @@
+minetest.register_on_joinplayer(function(player)
+	player:set_formspec_prepend([=[
+		style_type[button,image_button,button_exit,item_image_button;sound=""]
+		style_type[button,image_button;bgimg=tz_formspec_button.png;bgimg_middle=3;textcolor=#999999FF]
+		style_type[button:pressed,image_button:pressed;bgimg=tz_formspec_button_pressed.png;bgimg_middle=3;textcolor=#999999FF;content_offset=0]
+		style_type[button:hovered,image_button:hovered;bgimg=tz_formspec_button_hovered.png;bgimg_middle=3;textcolor=#999999FF]
+		style_type[label,vertlabel;font=regular;textcolor=#999999FF]
+		style_type[field,textarea;font=regular;textcolor=#999999FF]
+		bgcolor[#00000000]
+		background9[0,0;1,1;tz_formspec_bg.png;true;4]
+		listcolors[#666666ff;#333333a0;#000000;#999999;#999999]
+	]=])
+end)

@@ -1,0 +1,472 @@
+-- -- Workshop crafting stations for labyrinth
+-- workshops = {}
+--
+-- -- Advanced Workbench - for complex crafting
+-- minetest.register_node("workshops:advanced_workbench", {
+-- 	description = "Advanced Workbench",
+-- 	tiles = {"advanced_workbench_top.png", "advanced_workbench_bottom.png",
+-- 	         "advanced_workbench_side.png", "advanced_workbench_side.png",
+-- 	         "advanced_workbench_front.png", "advanced_workbench_front.png"},
+-- 	paramtype2 = "facedir",
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_wood_defaults(),
+-- 	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
+-- 		minetest.show_formspec(clicker:get_player_name(), "workshops:advanced_workbench",
+-- 			"size[8,9]" ..
+-- 			"label[0,0;Advanced Workbench - Craft Complex Items]" ..
+-- 			"list[current_player;craft;1,1;3,3;]" ..
+-- 			"list[current_player;craftpreview;5,2;1,1;]" ..
+-- 			"image[4,2;1,1;gui_furnace_arrow_bg.png^[transformR270]" ..
+-- 			"list[current_player;main;0,5;8,4;]" ..
+-- 			"listring[current_player;craft]" ..
+-- 			"listring[current_player;main]")
+-- 	end,
+-- })
+--
+-- -- Precision Anvil - for tool/weapon upgrades
+-- minetest.register_node("workshops:precision_anvil", {
+-- 	description = "Precision Anvil",
+-- 	tiles = {"precision_anvil_top.png", "precision_anvil_bottom.png",
+-- 	         "precision_anvil_side.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {
+-- 			{-0.5, -0.5, -0.3, 0.5, -0.4, 0.3},
+-- 			{-0.35, -0.4, -0.25, 0.35, -0.25, 0.25},
+-- 			{-0.3, -0.25, -0.15, 0.3, 0.1, 0.15},
+-- 			{-0.2, 0.1, -0.1, 0.2, 0.3, 0.1},
+-- 		}
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, -0.3, 0.5, 0.3, 0.3},
+-- 	},
+-- 	groups = {cracky = 1, level = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- 	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
+-- 		minetest.show_formspec(clicker:get_player_name(), "workshops:precision_anvil",
+-- 			"size[8,8]" ..
+-- 			"label[0,0;Precision Anvil - Upgrade Tools]" ..
+-- 			"list[current_player;main;0,4;8,4;]")
+-- 	end,
+-- })
+--
+-- -- Assembly Table - for building mechanisms
+-- minetest.register_node("workshops:assembly_table", {
+-- 	description = "Assembly Table",
+-- 	tiles = {"assembly_table_top.png", "assembly_table_bottom.png",
+-- 	         "assembly_table_side.png"},
+-- 	paramtype2 = "facedir",
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- 	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
+-- 		minetest.show_formspec(clicker:get_player_name(), "workshops:assembly_table",
+-- 			"size[8,9]" ..
+-- 			"label[0,0;Assembly Table - Build Mechanisms]" ..
+-- 			"list[current_player;craft;1,1;3,3;]" ..
+-- 			"list[current_player;craftpreview;5,2;1,1;]" ..
+-- 			"image[4,2;1,1;gui_furnace_arrow_bg.png^[transformR270]" ..
+-- 			"list[current_player;main;0,5;8,4;]" ..
+-- 			"listring[current_player;craft]" ..
+-- 			"listring[current_player;main]")
+-- 	end,
+-- })
+--
+-- -- Tool Rack - decorative storage
+-- minetest.register_node("workshops:tool_rack", {
+-- 	description = "Tool Rack",
+-- 	tiles = {"tool_rack_top.png", "tool_rack_top.png", "tool_rack_side.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {
+-- 			{-0.5, -0.5, 0.3, 0.5, 0.5, 0.5},
+-- 			{-0.4, -0.3, 0.2, -0.3, 0.3, 0.3},
+-- 			{0, -0.3, 0.2, 0.1, 0.3, 0.3},
+-- 			{0.3, -0.3, 0.2, 0.4, 0.3, 0.3},
+-- 		}
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, 0.2, 0.5, 0.5, 0.5},
+-- 	},
+-- 	groups = {choppy = 2, oddly_breakable_by_hand = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_wood_defaults(),
+-- })
+--
+-- -- Chemical Station - for potions/experiments
+-- minetest.register_node("workshops:chemical_station", {
+-- 	description = "Chemical Station",
+-- 	tiles = {"chemical_station_top.png", "chemical_station_bottom.png",
+-- 	         "chemical_station_side.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {
+-- 			{-0.5, -0.5, -0.5, 0.5, -0.3, 0.5},
+-- 			{-0.4, -0.3, -0.4, -0.2, 0.2, -0.2},
+-- 			{0.1, -0.3, 0.1, 0.3, 0.3, 0.3},
+-- 			{-0.1, -0.3, -0.1, 0, 0.1, 0},
+-- 		}
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, -0.5, 0.5, 0.3, 0.5},
+-- 	},
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	light_source = 3,
+-- 	sounds = default.node_sound_glass_defaults(),
+-- 	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
+-- 		minetest.show_formspec(clicker:get_player_name(), "workshops:chemical_station",
+-- 			"size[8,8]" ..
+-- 			"label[0,0;Chemical Station - Mix Substances]" ..
+-- 			"list[current_player;main;0,4;8,4;]")
+-- 	end,
+-- })
+--
+-- -- Blueprint Drawer - stores knowledge
+-- minetest.register_node("workshops:blueprint_drawer", {
+-- 	description = "Blueprint Drawer",
+-- 	tiles = {"blueprint_drawer_top.png", "blueprint_drawer_top.png",
+-- 	         "blueprint_drawer_side.png", "blueprint_drawer_side.png",
+-- 	         "blueprint_drawer_front.png", "blueprint_drawer_front.png"},
+-- 	paramtype2 = "facedir",
+-- 	groups = {choppy = 2, oddly_breakable_by_hand = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_wood_defaults(),
+-- 	on_construct = function(pos)
+-- 		local meta = minetest.get_meta(pos)
+-- 		meta:set_string("formspec",
+-- 			"size[8,9]" ..
+-- 			"label[0,0;Blueprint Drawer - Store Knowledge]" ..
+-- 			"list[context;main;0,1;8,3;]" ..
+-- 			"list[current_player;main;0,5;8,4;]" ..
+-- 			"listring[context;main]" ..
+-- 			"listring[current_player;main]")
+-- 		local inv = meta:get_inventory()
+-- 		inv:set_size("main", 8*3)
+-- 	end,
+-- 	can_dig = function(pos, player)
+-- 		local meta = minetest.get_meta(pos)
+-- 		local inv = meta:get_inventory()
+-- 		return inv:is_empty("main")
+-- 	end,
+-- })
+--
+-- -- DECORATIVE & FURNITURE NODES
+--
+-- -- Metal Locker - tall storage
+-- minetest.register_node("workshops:metal_locker", {
+-- 	description = "Metal Locker",
+-- 	tiles = {"metal_locker_top.png", "metal_locker_top.png", "metal_locker_side.png",
+-- 	         "metal_locker_side.png", "metal_locker_front.png", "metal_locker_front.png"},
+-- 	paramtype2 = "facedir",
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- 	on_construct = function(pos)
+-- 		local meta = minetest.get_meta(pos)
+-- 		meta:set_string("formspec",
+-- 			"size[8,9]" ..
+-- 			"label[0,0;Metal Locker]" ..
+-- 			"list[context;main;0,1;8,3;]" ..
+-- 			"list[current_player;main;0,5;8,4;]" ..
+-- 			"listring[context;main]" ..
+-- 			"listring[current_player;main]")
+-- 		local inv = meta:get_inventory()
+-- 		inv:set_size("main", 8*3)
+-- 	end,
+-- 	can_dig = function(pos, player)
+-- 		local meta = minetest.get_meta(pos)
+-- 		local inv = meta:get_inventory()
+-- 		return inv:is_empty("main")
+-- 	end,
+-- })
+--
+-- -- Filing Cabinet
+-- minetest.register_node("workshops:filing_cabinet", {
+-- 	description = "Filing Cabinet",
+-- 	tiles = {"filing_cabinet_top.png", "filing_cabinet_top.png",
+-- 	         "filing_cabinet_side.png", "filing_cabinet_side.png",
+-- 	         "filing_cabinet_front.png", "filing_cabinet_front.png"},
+-- 	paramtype2 = "facedir",
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- 	on_construct = function(pos)
+-- 		local meta = minetest.get_meta(pos)
+-- 		meta:set_string("formspec",
+-- 			"size[8,7]" ..
+-- 			"label[0,0;Filing Cabinet]" ..
+-- 			"list[context;main;0,1;8,2;]" ..
+-- 			"list[current_player;main;0,3;8,4;]" ..
+-- 			"listring[context;main]" ..
+-- 			"listring[current_player;main]")
+-- 		local inv = meta:get_inventory()
+-- 		inv:set_size("main", 8*2)
+-- 	end,
+-- 	can_dig = function(pos, player)
+-- 		local meta = minetest.get_meta(pos)
+-- 		local inv = meta:get_inventory()
+-- 		return inv:is_empty("main")
+-- 	end,
+-- })
+--
+-- -- Metal Desk
+-- minetest.register_node("workshops:metal_desk", {
+-- 	description = "Metal Desk",
+-- 	tiles = {"metal_desk_top.png", "metal_desk_bottom.png",
+-- 	         "metal_desk_side.png", "metal_desk_side.png",
+-- 	         "metal_desk_front.png", "metal_desk_back.png"},
+-- 	paramtype2 = "facedir",
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- -- Laboratory Shelf
+-- minetest.register_node("workshops:lab_shelf", {
+-- 	description = "Laboratory Shelf",
+-- 	tiles = {"lab_shelf_top.png", "lab_shelf_bottom.png", "lab_shelf_side.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {
+-- 			{-0.5, -0.5, 0.3, 0.5, 0.5, 0.5},
+-- 			{-0.5, 0.3, 0.25, 0.5, 0.4, 0.3},
+-- 			{-0.5, 0, 0.25, 0.5, 0.1, 0.3},
+-- 			{-0.5, -0.3, 0.25, 0.5, -0.2, 0.3},
+-- 		}
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, 0.25, 0.5, 0.5, 0.5},
+-- 	},
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- -- Server Rack
+-- minetest.register_node("workshops:server_rack", {
+-- 	description = "Server Rack",
+-- 	tiles = {"server_rack_top.png", "server_rack_top.png",
+-- 	         "server_rack_side.png", "server_rack_side.png",
+-- 	         "server_rack_front.png", "server_rack_back.png"},
+-- 	paramtype2 = "facedir",
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	light_source = 3,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- -- Control Panel (wall-mounted)
+-- minetest.register_node("workshops:control_panel", {
+-- 	description = "Control Panel",
+-- 	tiles = {"control_panel_side.png", "control_panel_side.png",
+-- 	         "control_panel_side.png", "control_panel_side.png",
+-- 	         "control_panel_back.png", "control_panel_front.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.3, 0.4, 0.4, 0.5},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.3, 0.4, 0.4, 0.5},
+-- 	},
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	light_source = 2,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- -- Ventilation Grate
+-- minetest.register_node("workshops:vent_grate", {
+-- 	description = "Ventilation Grate",
+-- 	tiles = {"vent_grate.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, 0.4, 0.5, 0.5, 0.5},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, 0.4, 0.5, 0.5, 0.5},
+-- 	},
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- 	climbable = true,
+-- })
+--
+-- -- Pipes (horizontal and vertical)
+-- minetest.register_node("workshops:pipe_horizontal", {
+-- 	description = "Horizontal Pipe",
+-- 	tiles = {"pipe_end.png", "pipe_end.png", "pipe_side.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.2, -0.2, 0.5, 0.2, 0.2},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.2, -0.2, 0.5, 0.2, 0.2},
+-- 	},
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- minetest.register_node("workshops:pipe_vertical", {
+-- 	description = "Vertical Pipe",
+-- 	tiles = {"pipe_end.png", "pipe_end.png", "pipe_side.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.2, -0.5, -0.2, 0.2, 0.5, 0.2},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.2, -0.5, -0.2, 0.2, 0.5, 0.2},
+-- 	},
+-- 	groups = {cracky = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- -- Caution Tape
+-- minetest.register_node("workshops:caution_tape", {
+-- 	description = "Caution Tape",
+-- 	tiles = {"caution_tape.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, -0.05, 0.5, 0.5, 0.05},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.5, -0.5, -0.05, 0.5, 0.5, 0.05},
+-- 	},
+-- 	groups = {snappy = 2, oddly_breakable_by_hand = 3},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_defaults(),
+-- 	walkable = false,
+-- })
+--
+-- -- Warning Signs
+-- minetest.register_node("workshops:warning_sign_hazard", {
+-- 	description = "Hazard Warning Sign",
+-- 	tiles = {"warning_sign_back.png", "warning_sign_back.png",
+-- 	         "warning_sign_back.png", "warning_sign_back.png",
+-- 	         "warning_sign_back.png", "warning_sign_hazard.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.45, 0.4, 0.4, 0.5},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.45, 0.4, 0.4, 0.5},
+-- 	},
+-- 	groups = {cracky = 3, oddly_breakable_by_hand = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- minetest.register_node("workshops:warning_sign_radiation", {
+-- 	description = "Radiation Warning Sign",
+-- 	tiles = {"warning_sign_back.png", "warning_sign_back.png",
+-- 	         "warning_sign_back.png", "warning_sign_back.png",
+-- 	         "warning_sign_back.png", "warning_sign_radiation.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.45, 0.4, 0.4, 0.5},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.45, 0.4, 0.4, 0.5},
+-- 	},
+-- 	groups = {cracky = 3, oddly_breakable_by_hand = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- minetest.register_node("workshops:warning_sign_biohazard", {
+-- 	description = "Biohazard Warning Sign",
+-- 	tiles = {"warning_sign_back.png", "warning_sign_back.png",
+-- 	         "warning_sign_back.png", "warning_sign_back.png",
+-- 	         "warning_sign_back.png", "warning_sign_biohazard.png"},
+-- 	drawtype = "nodebox",
+-- 	paramtype = "light",
+-- 	paramtype2 = "facedir",
+-- 	node_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.45, 0.4, 0.4, 0.5},
+-- 	},
+-- 	selection_box = {
+-- 		type = "fixed",
+-- 		fixed = {-0.4, -0.4, 0.45, 0.4, 0.4, 0.5},
+-- 	},
+-- 	groups = {cracky = 3, oddly_breakable_by_hand = 2},
+-- 	is_ground_content = false,
+-- 	sounds = default.node_sound_metal_defaults(),
+-- })
+--
+-- -- Window and Broken Window
+-- minetest.register_node("workshops:window", {
+-- 	description = "Industrial Window",
+-- 	tiles = {"window_frame.png", "window_frame.png", "window_frame.png",
+-- 	         "window_frame.png", "window_glass.png", "window_glass.png"},
+-- 	drawtype = "glasslike_framed",
+-- 	paramtype = "light",
+-- 	sunlight_propagates = true,
+-- 	use_texture_alpha = "blend",
+-- 	is_ground_content = false,
+-- 	groups = {cracky = 3, oddly_breakable_by_hand = 2},
+-- 	sounds = default.node_sound_glass_defaults(),
+-- })
+--
+-- minetest.register_node("workshops:window_broken", {
+-- 	description = "Broken Window",
+-- 	tiles = {"window_frame.png", "window_frame.png", "window_frame.png",
+-- 	         "window_frame.png", "window_broken.png", "window_broken.png"},
+-- 	drawtype = "glasslike_framed",
+-- 	paramtype = "light",
+-- 	sunlight_propagates = true,
+-- 	use_texture_alpha = "blend",
+-- 	is_ground_content = false,
+-- 	groups = {cracky = 3, oddly_breakable_by_hand = 2},
+-- 	sounds = default.node_sound_glass_defaults(),
+-- 	damage_per_second = 1,  -- Cuts you!
+-- })
+--
+-- minetest.log("action", "[workshops] Workshop crafting stations and decorative nodes loaded")
