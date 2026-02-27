@@ -7,7 +7,7 @@ local function random_vector(min, max)
 end
 
 -- Register the scary mob
-minetest.register_entity("scary:mob", {
+minetest.register_entity("sl_scary:mob", {
     initial_properties = {
         physical = true, -- The mob can physically interact with the world
         collide_with_objects = false, -- Can move through nodes/players
@@ -239,7 +239,7 @@ minetest.register_abm({
     action = function(pos, node)
         if #minetest.get_connected_players() > 0 and mobpop < maxmobpop then
             local mob_pos = vector.add(pos, {x = 0, y = 1, z = 0})
-            minetest.add_entity(mob_pos, "scary:mob")
+            minetest.add_entity(mob_pos, "sl_scary:mob")
         end
     end,
 })
@@ -277,7 +277,7 @@ local mob_config = {
 }
 
 -- Register the mob entity
-minetest.register_entity("scary:nerobot", {
+minetest.register_entity("sl_scary:nerobot", {
     initial_properties = {
         physical = true,
         collide_with_objects = true,
@@ -697,7 +697,7 @@ minetest.register_entity("scary:nerobot", {
     end,
 })
 
-minetest.register_node("scary:hide_spot", {
+minetest.register_node("sl_scary:hide_spot", {
     description = "Hiding Spot",
     drawtype = "nodebox",
 -- 	drawtype = "airlike",
@@ -710,5 +710,5 @@ minetest.register_node("scary:hide_spot", {
     groups = {cracky = 1},
 })
 
--- minetest.register_entity("scary:codop", {
+-- minetest.register_entity("sl_scary:codop", {
 
