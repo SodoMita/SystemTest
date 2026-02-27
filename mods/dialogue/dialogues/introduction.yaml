@@ -1,0 +1,12 @@
+title: "introduction"
+lines:
+  - id: start
+    speaker: Guide
+    text: "Welcome to the world."
+  - speaker: Guide
+    text: "Use WASD to move."
+  - speaker: Guide
+    text: "Press E to interact."
+  - id: end
+    speaker: Guide
+    text: "Good luck!"

@@ -1,0 +1,10 @@
+zash_infplace (Infinite node placement) enum auto true,false,auto
+
+# If enabled, new players receive some initial items when joining for the first time.
+zash_give_initial_stuff (Give initial stuff) bool true
+
+# If enabled, automated tests of the Lua API such as player health, crafting, and PseudoRandom will be performed on startup.
+zash_unittests_autostart (Perform unit tests) bool false
+
+# Adjust the volume of the background music
+zash_music_gain (Music gain) float 0.5 0.0 1.0

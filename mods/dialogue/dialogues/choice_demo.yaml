@@ -1,0 +1,17 @@
+title: "choice_demo"
+lines:
+  - id: start
+    speaker: NPC
+    text: "Do you want cookies?"
+    options:
+      - choice: "Yes"
+        next: got_cookies
+      - choice: "No"
+        next: no_cookies
+  - id: got_cookies
+    speaker: NPC
+    text: "Here you go!"
+    trigger: give_cookies
+  - id: no_cookies
+    speaker: NPC
+    text: "Maybe later."
