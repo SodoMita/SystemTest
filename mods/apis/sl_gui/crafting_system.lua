@@ -277,167 +277,167 @@ minetest.register_chatcommand("craft", {
 })
 
 -- ================================================================
--- RECIPES — aligned with System Looting's game design
+-- RECIPES — System Looting craftable content
 -- ================================================================
--- The loop: scavenge raw materials → craft components → craft
--- equipment/tactical items → craft the Objective Core to win.
--- Uses existing items from default (temporary MTG scaffolding).
+-- The loop: scavenge raw salvage → refine components → craft equipment
+-- and tactical gear → build the Objective Core and deliver it to your
+-- beacon to win.
 -- ================================================================
 
--- ===== SALVAGE: raw → basic components ==========================
+-- ===== SALVAGE: raw loot → refined components ==================
 
 register_craft_recipe({
-    output       = "default:steel_ingot",
+    output       = "sl_modebase:metal_ingot",
     output_count = 1,
-    ingredients  = {["default:stone"] = 4},
-    description  = "Salvaged Metal",
+    ingredients  = { ["sl_modebase:scrap_metal"] = 2 },
+    description  = "Metal Ingot",
     category     = "salvage",
 })
 
 register_craft_recipe({
-    output       = "default:copper_ingot",
+    output       = "sl_modebase:circuit_board",
     output_count = 1,
-    ingredients  = {["default:stone"] = 3, ["default:coal_lump"] = 1},
-    description  = "Salvaged Copper",
+    ingredients  = { ["sl_modebase:electronic_waste"] = 2 },
+    description  = "Circuit Board",
     category     = "salvage",
 })
 
 register_craft_recipe({
-    output       = "default:mese_crystal",
+    output       = "sl_modebase:energy_crystal",
     output_count = 1,
-    ingredients  = {["default:steel_ingot"] = 2, ["default:copper_ingot"] = 2},
+    ingredients  = { ["sl_modebase:raw_crystal"] = 2 },
     description  = "Energy Crystal",
     category     = "salvage",
 })
 
 register_craft_recipe({
-    output       = "default:gold_ingot",
-    output_count = 1,
-    ingredients  = {["default:copper_ingot"] = 3, ["default:coal_lump"] = 2},
-    description  = "Circuit Alloy",
+    output       = "sl_modebase:plastic_scrap",
+    output_count = 2,
+    ingredients  = { ["sl_modebase:electronic_waste"] = 2 },
+    description  = "Plastic Scrap",
     category     = "salvage",
 })
 
 register_craft_recipe({
-    output       = "default:glass",
+    output       = "sl_modebase:hardened_plate",
+    output_count = 1,
+    ingredients  = { ["sl_modebase:metal_ingot"] = 1 },
+    description  = "Hardened Plate",
+    category     = "salvage",
+})
+
+register_craft_recipe({
+    output       = "sl_modebase:reinforced_glass",
     output_count = 2,
-    ingredients  = {["default:sand"] = 4},
+    ingredients  = { ["sl_modebase:metal_ingot"] = 1, ["sl_modebase:plastic_scrap"] = 1 },
     description  = "Reinforced Glass",
     category     = "salvage",
 })
 
-register_craft_recipe({
-    output       = "default:obsidian",
-    output_count = 1,
-    ingredients  = {["default:steel_ingot"] = 4, ["default:coal_lump"] = 4},
-    description  = "Hardened Plating",
-    category     = "salvage",
-})
-
--- ===== EQUIPMENT: tools, weapons, armour ========================
+-- ===== EQUIPMENT: tools, weapons, consumables ===================
 
 register_craft_recipe({
-    output       = "default:sword_steel",
+    output       = "sl_modebase:combat_blade",
     output_count = 1,
-    ingredients  = {["default:steel_ingot"] = 3, ["default:stick"] = 1},
+    ingredients  = { ["sl_modebase:metal_ingot"] = 2 },
     description  = "Combat Blade",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "default:pick_steel",
+    output       = "sl_modebase:breaching_pick",
     output_count = 1,
-    ingredients  = {["default:steel_ingot"] = 3, ["default:stick"] = 2},
+    ingredients  = { ["sl_modebase:metal_ingot"] = 3, ["sl_modebase:plastic_scrap"] = 1 },
     description  = "Breaching Pick",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "default:axe_steel",
+    output       = "sl_modebase:tactical_axe",
     output_count = 1,
-    ingredients  = {["default:steel_ingot"] = 2, ["default:stick"] = 2},
+    ingredients  = { ["sl_modebase:metal_ingot"] = 2, ["sl_modebase:plastic_scrap"] = 1 },
     description  = "Tactical Axe",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "default:shovel_steel",
+    output       = "sl_modebase:trench_shovel",
     output_count = 1,
-    ingredients  = {["default:steel_ingot"] = 1, ["default:stick"] = 2},
+    ingredients  = { ["sl_modebase:metal_ingot"] = 1, ["sl_modebase:plastic_scrap"] = 1 },
     description  = "Trench Shovel",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "default:sword_mese",
+    output       = "sl_modebase:energy_blade",
     output_count = 1,
-    ingredients  = {["default:mese_crystal"] = 3, ["default:steel_ingot"] = 2, ["default:stick"] = 1},
+    ingredients  = { ["sl_modebase:energy_crystal"] = 2, ["sl_modebase:metal_ingot"] = 1 },
     description  = "Energy Blade",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "default:pick_mese",
+    output       = "sl_modebase:power_drill",
     output_count = 1,
-    ingredients  = {["default:mese_crystal"] = 3, ["default:steel_ingot"] = 2, ["default:stick"] = 2},
+    ingredients  = { ["sl_modebase:energy_crystal"] = 2, ["sl_modebase:metal_ingot"] = 2, ["sl_modebase:plastic_scrap"] = 1 },
     description  = "Power Drill",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "default:torch",
+    output       = "sl_modebase:flare",
     output_count = 4,
-    ingredients  = {["default:stick"] = 1, ["default:coal_lump"] = 1},
-    description  = "Flare Torch",
+    ingredients  = { ["sl_modebase:energy_crystal"] = 1, ["sl_modebase:plastic_scrap"] = 1 },
+    description  = "Flare",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "default:ladder_steel",
-    output_count = 4,
-    ingredients  = {["default:steel_ingot"] = 2},
-    description  = "Steel Ladder",
-    category     = "equipment",
-})
-
--- ===== TACTICAL: consumables, traps, team utilities =============
-
-register_craft_recipe({
-    output       = "default:mese_block",
+    output       = "sl_modebase:medkit",
     output_count = 1,
-    ingredients  = {["default:mese_crystal"] = 9},
+    ingredients  = { ["sl_modebase:plastic_scrap"] = 1, ["sl_modebase:energy_crystal"] = 1, ["sl_modebase:metal_ingot"] = 1 },
+    description  = "Medkit",
+    category     = "equipment",
+})
+
+-- ===== TACTICAL: team utilities and defenses ====================
+
+register_craft_recipe({
+    output       = "sl_modebase:power_cell",
+    output_count = 1,
+    ingredients  = { ["sl_modebase:energy_crystal"] = 9 },
     description  = "Power Cell",
     category     = "tactical",
 })
 
 register_craft_recipe({
-    output       = "default:obsidian_glass",
+    output       = "sl_modebase:blast_shield",
     output_count = 4,
-    ingredients  = {["default:obsidian"] = 1, ["default:glass"] = 2},
+    ingredients  = { ["sl_modebase:hardened_plate"] = 1, ["sl_modebase:reinforced_glass"] = 2 },
     description  = "Blast Shield",
     category     = "tactical",
 })
 
 register_craft_recipe({
-    output       = "default:steelblock",
+    output       = "sl_modebase:barricade",
     output_count = 1,
-    ingredients  = {["default:steel_ingot"] = 9},
-    description  = "Barricade Panel",
+    ingredients  = { ["sl_modebase:metal_ingot"] = 9 },
+    description  = "Barricade",
     category     = "tactical",
 })
 
 register_craft_recipe({
-    output       = "default:copperblock",
+    output       = "sl_modebase:signal_relay",
     output_count = 1,
-    ingredients  = {["default:copper_ingot"] = 9},
+    ingredients  = { ["sl_modebase:circuit_board"] = 9 },
     description  = "Signal Relay",
     category     = "tactical",
 })
 
 register_craft_recipe({
-    output       = "default:goldblock",
+    output       = "sl_modebase:sensor_array",
     output_count = 1,
-    ingredients  = {["default:gold_ingot"] = 9},
+    ingredients  = { ["sl_modebase:circuit_board"] = 4, ["sl_modebase:metal_ingot"] = 4, ["sl_modebase:energy_crystal"] = 1 },
     description  = "Sensor Array",
     category     = "tactical",
 })
@@ -448,10 +448,10 @@ register_craft_recipe({
     output       = "sl_modebase:objective_core",
     output_count = 1,
     ingredients  = {
-        ["default:mese_block"]   = 1,   -- Power Cell
-        ["default:goldblock"]    = 1,   -- Sensor Array
-        ["default:obsidian"]     = 2,   -- Hardened Plating
-        ["default:gold_ingot"]   = 4,   -- Circuit Alloy
+        ["sl_modebase:power_cell"]     = 1,
+        ["sl_modebase:sensor_array"]   = 1,
+        ["sl_modebase:hardened_plate"] = 2,
+        ["sl_modebase:circuit_board"]  = 4,
     },
     description  = "Objective Core",
     category     = "objective",

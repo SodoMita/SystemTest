@@ -106,7 +106,7 @@ minetest.register_node(game_mode.modname .. ":objective_core", {
 
 minetest.register_node(game_mode.modname .. ":loot_crate", {
 	description = S("Loot Crate"),
-	tiles = {"default_chest_top.png^[colorize:#4a9a4a:60"},
+	tiles = {"sl_loot_crate.png"},
 	paramtype2 = "facedir",
 	groups = {choppy = 2, oddly_breakable_by_hand = 1},
 	is_ground_content = false,
