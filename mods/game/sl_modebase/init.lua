@@ -25,7 +25,8 @@ include_files(
 	"spawn.lua",    -- spawn logic and join/respawn hooks
 	"match.lua",    -- match lifecycle and win conditions
 	"entities.lua", -- monster entities
-	"nodes.lua",    -- beacon nodes
+	"nodes.lua",    -- beacon nodes + loot crate
+	"content.lua",  -- craftable items, tools, tactical nodes, interactables
 	"commands.lua"  -- chat commands and privileges
 )
 
