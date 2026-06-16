@@ -1,13 +1,12 @@
 -- sl_characters
--- Holds custom character models for System Looting.
+-- Custom player character setup for System Looting.
 --
--- This mod currently only ships model assets (models/SimpleOutlinedBoxman.glb).
--- It is kept as a loadable mod so the model directory is registered in the media
--- system and can be referenced by player_api / entities once a model is wired in.
+-- The playable player mesh is the outlined boxman GLB shipped in this mod:
+--   models/SimpleOutlinedBoxman.glb
 --
--- TODO (Phase 1+): register the boxman model with player_api, e.g.:
---   player_api.register_model("SimpleOutlinedBoxman.glb", { ... })
--- and switch the default player model to it.
+-- player_api still provides animation/collision handling, but this mod registers
+-- the boxman and applies it on join so the game no longer uses Luanti/MTG's
+-- built-in character.b3d as the visible player model.
 
-local modname = minetest.get_current_modname()
-minetest.log("action", "[" .. modname .. "] loaded (model assets only; no models registered yet)")
+local modpath = minetest.get_modpath(minetest.get_current_modname())
+dofile(modpath .. "/model_boxman.lua")
