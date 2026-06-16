@@ -32,4 +32,3 @@ dofile(modpath .. "/character_outfit.lua")
 -- dofile(modpath .. "/player_gui.lua")
 
 minetest.log("action", "[gui] Custom GUI systems loaded! ✨")
-
