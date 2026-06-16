@@ -1,0 +1,23 @@
+# Editor / app working & backup files
+*~
+*.bak
+*.swp
+*.tmp
+
+# Blender working/backup files (keep .blend source, drop autosaves)
+*.blend1
+*.blend2
+
+# Krita working files
+*.kra
+*.kra~
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Luanti world/runtime data (should never be committed into a game)
+/worlds/
+/saves/
+debug.txt
