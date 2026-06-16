@@ -1,0 +1,5 @@
+newmtl generated_material
+Kd 0.600 0.800 1.000
+Ka 0.05 0.05 0.08
+Ks 0.2 0.2 0.25
+map_Kd ../textures/item_texture.png
