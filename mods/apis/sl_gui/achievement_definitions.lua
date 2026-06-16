@@ -212,6 +212,18 @@ register_achievement({
     graph_x = 2, graph_y = 6,
 })
 
+register_achievement({
+    id = "unlock_all_movement",
+    name = "Fleet Foot",
+    description = "Unlock every movement ability",
+    icon = "achievement_unlock_5_abilities.png",
+    category = "abilities",
+    max_progress = 1,
+    reward_xp = 200,
+    requires = {"max_ability"},
+    graph_x = 3, graph_y = 6,
+})
+
 -- ===== Team Play ===============================================
 
 register_achievement({
