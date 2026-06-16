@@ -17,7 +17,7 @@ dofile(modpath .. "/achievement_tracking.lua")
 dofile(modpath .. "/crafting_system.lua")
 
 -- Ability tree and stat points system 🌳
-dofile(modpath .. "/ability_system.lua")
+-- dofile(modpath .. "/ability_system.lua")
 
 -- NEW Advanced ability system with graph! ⚡
 dofile(modpath .. "/ability_system_new.lua")

@@ -6,7 +6,10 @@
 -- NO fly, noclip, teleport, invisibility (breaks competitive PvP)
 -- =============================================================
 
-local PAN_STEP = 150
+-- Configurable pan speed. Global default can be changed via minetest.conf:
+--   sl_gui.pan_step = 200
+-- Players can also override it per-player in the Abilities UI.
+local DEFAULT_PAN_STEP = tonumber(minetest.settings:get("sl_gui.pan_step")) or 150
 
 -- Define abilities and stat upgrades
 local abilities = {
@@ -255,6 +258,7 @@ local function get_ability_data(player)
     data.scroll_x = data.scroll_x or 0
     data.scroll_y = data.scroll_y or 0
     data.tooltip = data.tooltip or ""
+    data.pan_step = data.pan_step or DEFAULT_PAN_STEP
 
     return data
 end
@@ -450,6 +454,13 @@ function get_ability_formspec_new(player)
             end
         end
     end
+
+    -- Pan-step control (also configurable globally via sl_gui.pan_step)
+    y = y + 0.3
+    table.insert(formspec, string.format("label[0.5,%f;Graph Pan Step]", y))
+    table.insert(formspec, string.format("field[0.5,%f;1.8,0.5;pan_step;;%d]", y + 0.35, data.pan_step))
+    table.insert(formspec, "field_close_on_enter[pan_step;false]")
+    table.insert(formspec, string.format("button[2.4,%f;1,0.5;set_pan_step;Set]", y + 0.35))
 
     -- RIGHT SIDE: ability graph
     local graph_x = 4.9
@@ -680,23 +691,33 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         end
     end
 
-    -- D-pad navigation
+    -- D-pad navigation (uses per-player pan_step, default from sl_gui.pan_step)
+    local pan_step = data.pan_step or DEFAULT_PAN_STEP
     if fields.nav_up then
-        data.scroll_y = math.max(0, data.scroll_y - PAN_STEP)
+        data.scroll_y = math.max(0, data.scroll_y - pan_step)
         changed = true
     elseif fields.nav_down then
-        data.scroll_y = math.min(1000, data.scroll_y + PAN_STEP)
+        data.scroll_y = math.min(1000, data.scroll_y + pan_step)
         changed = true
     elseif fields.nav_left then
-        data.scroll_x = math.max(0, data.scroll_x - PAN_STEP)
+        data.scroll_x = math.max(0, data.scroll_x - pan_step)
         changed = true
     elseif fields.nav_right then
-        data.scroll_x = math.min(1000, data.scroll_x + PAN_STEP)
+        data.scroll_x = math.min(1000, data.scroll_x + pan_step)
         changed = true
     elseif fields.nav_reset then
         data.scroll_x = 0
         data.scroll_y = 0
         changed = true
+    end
+
+    -- Pan-step setting
+    if fields.set_pan_step and fields.pan_step then
+        local new_step = tonumber(fields.pan_step)
+        if new_step then
+            data.pan_step = math.max(10, math.min(1000, math.floor(new_step)))
+            changed = true
+        end
     end
 
     if changed then
