@@ -50,6 +50,19 @@ function gui_get_tab_buttons(current_tab, show_label)
     return table.concat(formspec, "")
 end
 
+-- Strip the header (formspec_version, size, bgcolor) from a full
+-- formspec string so its content can be embedded in the unified
+-- inventory which already provides those elements.
+local function strip_formspec_header(fs)
+    -- Remove formspec_version[...], size[...], bgcolor[...] at the start.
+    -- These always appear at the very beginning of the string.
+    local stripped = fs
+    stripped = stripped:gsub("^formspec_version%[[^%]]*%]", "")
+    stripped = stripped:gsub("^size%[[^%]]*%]", "")
+    stripped = stripped:gsub("^bgcolor%[[^%]]*%]", "")
+    return stripped
+end
+
 -- Build the full unified inventory formspec
 function get_unified_inventory(player)
     local current_tab = get_current_tab(player)
@@ -68,10 +81,7 @@ function get_unified_inventory(player)
             local cat = meta:get_string("crafting_category")
             if cat == "" then cat = "salvage" end
             local craft_fs = get_crafting_formspec(player, cat)
-            local content_start = craft_fs:find("field%[0%.3")
-            if content_start then
-                table.insert(formspec, craft_fs:sub(content_start))
-            end
+            table.insert(formspec, strip_formspec_header(craft_fs))
         else
             table.insert(formspec, "label[4,5;Crafting system loading...]")
         end
@@ -79,12 +89,7 @@ function get_unified_inventory(player)
     elseif current_tab == "abilities" then
         if get_ability_formspec_new then
             local ability_fs = get_ability_formspec_new(player)
-            local content_start = ability_fs:find("box%[0%.2,0%.3")
-            if content_start then
-                table.insert(formspec, ability_fs:sub(content_start))
-            else
-                table.insert(formspec, ability_fs)
-            end
+            table.insert(formspec, strip_formspec_header(ability_fs))
         else
             table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
             table.insert(formspec, "label[4,5;Ability system loading...]")
@@ -93,12 +98,7 @@ function get_unified_inventory(player)
     elseif current_tab == "achievements" then
         if get_achievement_formspec then
             local ach_fs = get_achievement_formspec(player)
-            local content_start = ach_fs:find("box%[0%.2")
-            if content_start then
-                table.insert(formspec, ach_fs:sub(content_start))
-            else
-                table.insert(formspec, ach_fs)
-            end
+            table.insert(formspec, strip_formspec_header(ach_fs))
         else
             table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
             table.insert(formspec, "label[4,5;Achievement system loading...]")
@@ -107,12 +107,7 @@ function get_unified_inventory(player)
     elseif current_tab == "player_info" then
         if get_player_info_formspec then
             local info_fs = get_player_info_formspec(player)
-            local content_start = info_fs:find("box%[0%.2,0%.3")
-            if content_start then
-                table.insert(formspec, info_fs:sub(content_start))
-            else
-                table.insert(formspec, info_fs)
-            end
+            table.insert(formspec, strip_formspec_header(info_fs))
         else
             table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
             table.insert(formspec, "label[4,5;Player info loading...]")
