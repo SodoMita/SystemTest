@@ -235,11 +235,12 @@ function handle_character_outfit_fields(player, formname, fields)
     local selected_slot = nil
 
     -- Tab switching: properly close this formspec and open unified inventory
-    if fields.tab_crafting or fields.tab_abilities or fields.tab_achievements then
+    if fields.tab_crafting or fields.tab_abilities or fields.tab_achievements or fields.tab_player_info then
         local meta = player:get_meta()
         local new_tab = "crafting"
         if fields.tab_abilities then new_tab = "abilities"
-        elseif fields.tab_achievements then new_tab = "achievements" end
+        elseif fields.tab_achievements then new_tab = "achievements"
+        elseif fields.tab_player_info then new_tab = "player_info" end
         
         meta:set_string("current_tab", new_tab)
         
@@ -287,3 +288,10 @@ function handle_character_outfit_fields(player, formname, fields)
     minetest.show_formspec(player:get_player_name(), "character_outfit", get_character_outfit_formspec(player, selected_slot))
     return true
 end
+
+-- Register the handler
+minetest.register_on_player_receive_fields(function(player, formname, fields)
+    return handle_character_outfit_fields(player, formname, fields)
+end)
+
+minetest.log("action", "[character_outfit] Outfit system loaded.")

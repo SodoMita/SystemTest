@@ -74,6 +74,11 @@ minetest.register_chatcommand("sl_be_monster_master", {
 
 		game_mode.set_monster_master(name)
 		game_mode.broadcast(S("@1 is now the Monster Master!", name))
+		-- Achievement
+		local player = minetest.get_player_by_name(name)
+		if player and achievement_progress then
+			achievement_progress(player, "play_monster_master", 1)
+		end
 		return true
 	end,
 })
@@ -174,10 +179,15 @@ minetest.register_chatcommand("sl_assign", {
 
 -- Match control commands
 minetest.register_chatcommand("sl_match_start", {
-	description = S("Start a new match (resets lives, keeps roles/teams)"),
+	params = "[elimination|objective]",
+	description = S("Start a new match. Optional mode: elimination (default) or objective."),
 	privs = { sl_admin = true },
-	func = function(name)
-		local ok, msg = game_mode.start_new_match(name)
+	func = function(name, param)
+		local win_mode = param ~= "" and param or "elimination"
+		if win_mode ~= "elimination" and win_mode ~= "objective" then
+			return false, S("Unknown mode. Use: elimination or objective")
+		end
+		local ok, msg = game_mode.start_new_match(name, win_mode)
 		if ok == false and msg then
 			return false, msg
 		end
