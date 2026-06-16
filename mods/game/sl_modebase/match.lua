@@ -1,7 +1,15 @@
 local S = game_mode.S
 local state = game_mode.state
 
--- Match / win handling
+-- ================================================================
+-- Match lifecycle and win conditions
+-- ================================================================
+-- Win modes:
+--   "elimination" — last team standing (default)
+--   "objective"   — craft and deliver the Objective Core to beacon
+-- ================================================================
+
+-- End match
 function game_mode.end_match(winner, reason)
 	if not state.match_active then
 		return
@@ -12,22 +20,40 @@ function game_mode.end_match(winner, reason)
 	if winner == "beacons" then
 		game_mode.broadcast(S("Beacon teams win! (@1)", reason or ""))
 	elseif state.teams[winner] then
-		game_mode.broadcast(S("@1 wins! (@2)", game_mode.get_team_label(winner), reason or ""))
+		game_mode.broadcast(S("@1 wins! (@2)",
+			game_mode.get_team_label(winner), reason or ""))
+
+		-- Grant win achievements to winning team members
+		if achievement_progress then
+			for pname, pdata in pairs(state.players) do
+				if pdata.team == winner then
+					local player = minetest.get_player_by_name(pname)
+					if player then
+						achievement_progress(player, "win_match", 1)
+						achievement_progress(player, "win_5_matches", 1)
+						-- Survivor check: not eliminated
+						if not pdata.eliminated then
+							achievement_progress(player, "survive_match", 1)
+						end
+					end
+				end
+			end
+		end
 	else
 		game_mode.broadcast(S("Match ended. (@1)", reason or ""))
 	end
 end
 
+-- Reset for new match
 local function reset_players_for_new_match()
 	for name, pl in pairs(state.players) do
 		pl.lives = game_mode.LIVES_PER_PLAYER
 		pl.eliminated = false
-
-		-- Do not change roles here; monster master / teams are persistent
 	end
 end
 
-function game_mode.start_new_match(initiator)
+-- Start match
+function game_mode.start_new_match(initiator, win_mode)
 	if state.match_active then
 		return false, S("Match is already running.")
 	end
@@ -39,15 +65,14 @@ function game_mode.start_new_match(initiator)
 
 	state.match_count = (state.match_count or 0) + 1
 	state.match_active = true
+	state.win_mode = win_mode or "elimination"
 
 	reset_players_for_new_match()
 
-	-- Respawn all connected players at their team / role spawns
 	for _, name in ipairs(connected) do
 		local player = minetest.get_player_by_name(name)
 		if player then
 			local pl = game_mode.get_player_state(name)
-			-- Ensure everyone has a team unless they are monster master
 			if not pl.team and pl.role ~= "monster_master" then
 				game_mode.assign_beacon_team(name)
 			end
@@ -55,18 +80,22 @@ function game_mode.start_new_match(initiator)
 		end
 	end
 
+	local mode_label = state.win_mode == "objective"
+		and S("Objective Delivery") or S("Elimination")
+
 	if initiator then
-		game_mode.broadcast(S("Match #@1 started by @2.", tostring(state.match_count), initiator))
+		game_mode.broadcast(S("Match #@1 started by @2. Mode: @3",
+			tostring(state.match_count), initiator, mode_label))
 	else
-		game_mode.broadcast(S("Match #@1 started.", tostring(state.match_count)))
+		game_mode.broadcast(S("Match #@1 started. Mode: @2",
+			tostring(state.match_count), mode_label))
 	end
 
 	return true
 end
 
+-- Elimination check
 local function check_team_elimination()
-	-- Check each beacon team: if all its players are eliminated (or have zero lives),
-	-- the other beacon team wins.
 	for _, team_id in ipairs(state.teams_order) do
 		local has_active = false
 		for name, pl in pairs(state.players) do
@@ -80,16 +109,17 @@ local function check_team_elimination()
 		end
 
 		if not has_active then
-			-- find opposing beacon team
 			local other = (team_id == "beacon_a") and "beacon_b" or "beacon_a"
 			if state.teams[other] then
-				game_mode.end_match(other, S("All players from @1 are out", game_mode.get_team_label(team_id)))
+				game_mode.end_match(other,
+					S("All players from @1 are out", game_mode.get_team_label(team_id)))
 				return
 			end
 		end
 	end
 end
 
+-- Death handling
 minetest.register_on_dieplayer(function(player, reason)
 	local name = player:get_player_name()
 	local pl = game_mode.get_player_state(name)
@@ -114,11 +144,12 @@ minetest.register_on_dieplayer(function(player, reason)
 	pl.lives = math.max(0, pl.lives - 1)
 	if pl.lives <= 0 then
 		pl.eliminated = true
-		game_mode.broadcast(S("@1 is out for @2!", name, game_mode.get_team_label(pl.team)))
+		game_mode.broadcast(S("@1 is out for @2!",
+			name, game_mode.get_team_label(pl.team)))
 	else
-		minetest.chat_send_player(name, S("You have @1 lives remaining.", tostring(pl.lives)))
+		minetest.chat_send_player(name,
+			S("You have @1 lives remaining.", tostring(pl.lives)))
 	end
 
 	check_team_elimination()
 end)
-

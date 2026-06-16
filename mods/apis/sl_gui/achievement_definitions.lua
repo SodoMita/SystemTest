@@ -1,9 +1,12 @@
--- Achievement Definitions! 🏆✨
--- Define all the achievements in your game~
+-- =============================================================
+-- System Looting — Achievement Definitions
+-- =============================================================
+-- Categories match the game's systems:
+--   getting_started, combat, crafting, abilities,
+--   exploration, team_play, challenge, secret
+-- =============================================================
 
--- ===============================
--- Getting Started Category
--- ===============================
+-- ===== Getting Started =========================================
 
 register_achievement({
     id = "first_dig",
@@ -13,8 +16,7 @@ register_achievement({
     category = "getting_started",
     max_progress = 1,
     reward_xp = 10,
-    graph_x = 0,
-    graph_y = 0,
+    graph_x = 0, graph_y = 0,
 })
 
 register_achievement({
@@ -26,21 +28,19 @@ register_achievement({
     max_progress = 10,
     reward_xp = 25,
     requires = {"first_dig"},
-    graph_x = 1,
-    graph_y = 0,
+    graph_x = 1, graph_y = 0,
 })
 
 register_achievement({
     id = "dig_100_blocks",
-    name = "Miner",
+    name = "Scavenger",
     description = "Break 100 blocks",
     icon = "achievement_dig_100_blocks.png",
     category = "getting_started",
     max_progress = 100,
     reward_xp = 50,
     requires = {"first_dig"},
-    graph_x = 1,
-    graph_y = 1,
+    graph_x = 1, graph_y = 1,
 })
 
 register_achievement({
@@ -51,106 +51,58 @@ register_achievement({
     category = "getting_started",
     max_progress = 1,
     reward_xp = 100,
-    requires = {},  -- No requirements - just reach the level!
-    graph_x = 2,
-    graph_y = 0,
+    graph_x = 2, graph_y = 0,
 })
 
--- ===============================
--- Exploration Category
--- ===============================
+-- ===== Combat ==================================================
 
 register_achievement({
-    id = "first_ghost",
-    name = "Spooked!",
-    description = "Encounter your first ghost in the labyrinth",
+    id = "first_kill",
+    name = "First Blood",
+    description = "Defeat your first enemy (player or monster)",
     icon = "achievement_first_ghost.png",
-    category = "exploration",
+    category = "combat",
     max_progress = 1,
     reward_xp = 25,
-    graph_x = 0,
-    graph_y = 2.5,
+    graph_x = 0, graph_y = 2,
 })
 
 register_achievement({
-    id = "ghost_hunter",
-    name = "Ghost Hunter",
-    description = "Trigger 10 ghosts",
+    id = "monster_slayer",
+    name = "Monster Slayer",
+    description = "Defeat 10 monsters",
     icon = "achievement_ghost_hunter.png",
-    category = "exploration",
+    category = "combat",
     max_progress = 10,
     reward_xp = 75,
-    requires = {"first_ghost"},
-    graph_x = 1,
-    graph_y = 2.5,
+    requires = {"first_kill"},
+    graph_x = 1, graph_y = 2,
 })
 
 register_achievement({
-    id = "ghost_veteran",
-    name = "Ghost Veteran",
-    description = "Trigger 50 ghosts",
+    id = "monster_veteran",
+    name = "Monster Veteran",
+    description = "Defeat 50 monsters",
     icon = "achievement_ghost_veteran.png",
-    category = "exploration",
+    category = "combat",
     max_progress = 50,
     reward_xp = 200,
-    requires = {"ghost_hunter"},
-    graph_x = 2,
-    graph_y = 2.5,
+    requires = {"monster_slayer"},
+    graph_x = 2, graph_y = 2,
 })
 
 register_achievement({
-    id = "visit_floating_island",
-    name = "Sky Explorer",
-    description = "Visit a floating island",
-    icon = "achievement_visit_floating_island.png",
-    category = "exploration",
+    id = "survive_match",
+    name = "Survivor",
+    description = "Survive an entire match without being eliminated",
+    icon = "achievement_reach_level_10.png",
+    category = "combat",
     max_progress = 1,
-    reward_xp = 75,
-    graph_x = 0,
-    graph_y = 2,
+    reward_xp = 150,
+    graph_x = 0, graph_y = 3,
 })
 
-register_achievement({
-    id = "find_city",
-    name = "Urban Explorer",
-    description = "Discover the ground-level city",
-    icon = "achievement_find_city.png",
-    category = "exploration",
-    max_progress = 1,
-    reward_xp = 50,
-    graph_x = 0,
-    graph_y = 3,
-})
-
-register_achievement({
-    id = "travel_1000_blocks",
-    name = "Wanderer",
-    description = "Travel 1000 blocks from spawn",
-    icon = "achievement_travel_1000_blocks.png",
-    category = "exploration",
-    max_progress = 1,
-    reward_xp = 100,
-    requires = {"find_city"},
-    graph_x = 1,
-    graph_y = 3,
-})
-
-register_achievement({
-    id = "visit_10_islands",
-    name = "Island Hopper",
-    description = "Visit 10 different floating islands",
-    icon = "achievement_visit_10_islands.png",
-    category = "exploration",
-    max_progress = 10,
-    reward_xp = 200,
-    requires = {"visit_floating_island"},
-    graph_x = 1,
-    graph_y = 2,
-})
-
--- ===============================
--- Crafting Category
--- ===============================
+-- ===== Crafting ================================================
 
 register_achievement({
     id = "first_craft",
@@ -160,8 +112,7 @@ register_achievement({
     category = "crafting",
     max_progress = 1,
     reward_xp = 20,
-    graph_x = 0,
-    graph_y = 4,
+    graph_x = 0, graph_y = 4,
 })
 
 register_achievement({
@@ -173,8 +124,7 @@ register_achievement({
     max_progress = 10,
     reward_xp = 50,
     requires = {"first_craft"},
-    graph_x = 1,
-    graph_y = 4,
+    graph_x = 1, graph_y = 4,
 })
 
 register_achievement({
@@ -186,39 +136,46 @@ register_achievement({
     max_progress = 100,
     reward_xp = 200,
     requires = {"craft_10_items"},
-    graph_x = 2,
-    graph_y = 4,
+    graph_x = 2, graph_y = 4,
 })
 
 register_achievement({
-    id = "craft_urban_item",
-    name = "Urban Designer",
-    description = "Craft an urban-category item",
+    id = "craft_equipment",
+    name = "Armed Up",
+    description = "Craft an equipment item",
     icon = "achievement_craft_urban_item.png",
-    category = "crafting",
-    max_progress = 1,
-    reward_xp = 75,
-    requires = {"first_craft"},
-    graph_x = 1,
-    graph_y = 5,
-})
-
-register_achievement({
-    id = "craft_glass",
-    name = "Glassmaker",
-    description = "Craft glass",
-    icon = "achievement_craft_glass.png",
     category = "crafting",
     max_progress = 1,
     reward_xp = 50,
     requires = {"first_craft"},
-    graph_x = 0,
-    graph_y = 5,
+    graph_x = 1, graph_y = 5,
 })
 
--- ===============================
--- Abilities Category
--- ===============================
+register_achievement({
+    id = "craft_tactical",
+    name = "Tactician",
+    description = "Craft a tactical item",
+    icon = "achievement_craft_glass.png",
+    category = "crafting",
+    max_progress = 1,
+    reward_xp = 75,
+    requires = {"first_craft"},
+    graph_x = 0, graph_y = 5,
+})
+
+register_achievement({
+    id = "craft_objective_core",
+    name = "Mission Complete",
+    description = "Craft the Objective Core",
+    icon = "achievement_reach_level_50.png",
+    category = "crafting",
+    max_progress = 1,
+    reward_xp = 500,
+    requires = {"craft_equipment", "craft_tactical"},
+    graph_x = 2, graph_y = 5,
+})
+
+-- ===== Abilities ===============================================
 
 register_achievement({
     id = "unlock_first_ability",
@@ -228,8 +185,7 @@ register_achievement({
     category = "abilities",
     max_progress = 1,
     reward_xp = 50,
-    graph_x = 0,
-    graph_y = 6,
+    graph_x = 0, graph_y = 6,
 })
 
 register_achievement({
@@ -241,8 +197,7 @@ register_achievement({
     max_progress = 5,
     reward_xp = 150,
     requires = {"unlock_first_ability"},
-    graph_x = 1,
-    graph_y = 6,
+    graph_x = 1, graph_y = 6,
 })
 
 register_achievement({
@@ -254,27 +209,46 @@ register_achievement({
     max_progress = 1,
     reward_xp = 200,
     requires = {"unlock_5_abilities"},
-    graph_x = 2,
-    graph_y = 6,
+    graph_x = 2, graph_y = 6,
+})
+
+-- ===== Team Play ===============================================
+
+register_achievement({
+    id = "win_match",
+    name = "Victory!",
+    description = "Win a match",
+    icon = "achievement_reach_level_25.png",
+    category = "team_play",
+    max_progress = 1,
+    reward_xp = 200,
+    graph_x = 3, graph_y = 0,
 })
 
 register_achievement({
-    id = "unlock_all_movement",
-    name = "Speed Demon",
-    description = "Unlock all movement abilities",
-    icon = "achievement_unlock_all_movement.png",
-    category = "abilities",
-    max_progress = 1,
-    reward_xp = 250,
-    requires = {"unlock_5_abilities"},
-    hidden = false,
-    graph_x = 1,
-    graph_y = 7,
+    id = "win_5_matches",
+    name = "Champion",
+    description = "Win 5 matches",
+    icon = "achievement_reach_level_50.png",
+    category = "team_play",
+    max_progress = 5,
+    reward_xp = 500,
+    requires = {"win_match"},
+    graph_x = 4, graph_y = 0,
 })
 
--- ===============================
--- Challenge Category
--- ===============================
+register_achievement({
+    id = "play_monster_master",
+    name = "Puppeteer",
+    description = "Play as the Monster Master",
+    icon = "achievement_secret_find_depths.png",
+    category = "team_play",
+    max_progress = 1,
+    reward_xp = 100,
+    graph_x = 3, graph_y = 1,
+})
+
+-- ===== Challenge ===============================================
 
 register_achievement({
     id = "reach_level_10",
@@ -284,9 +258,7 @@ register_achievement({
     category = "challenge",
     max_progress = 1,
     reward_xp = 250,
-    requires = {},  -- No requirements
-    graph_x = 3,
-    graph_y = 0,
+    graph_x = 3, graph_y = 3,
 })
 
 register_achievement({
@@ -297,22 +269,7 @@ register_achievement({
     category = "challenge",
     max_progress = 1,
     reward_xp = 500,
-    requires = {},  -- No requirements
-    graph_x = 4,
-    graph_y = 0,
-})
-
-register_achievement({
-    id = "reach_level_50",
-    name = "Legend",
-    description = "Reach level 50",
-    icon = "achievement_reach_level_50.png",
-    category = "challenge",
-    max_progress = 1,
-    reward_xp = 1000,
-    requires = {},  -- No requirements
-    graph_x = 5,
-    graph_y = 0,
+    graph_x = 4, graph_y = 3,
 })
 
 register_achievement({
@@ -324,8 +281,7 @@ register_achievement({
     max_progress = 1000,
     reward_xp = 300,
     requires = {"dig_100_blocks"},
-    graph_x = 2,
-    graph_y = 1,
+    graph_x = 2, graph_y = 1,
 })
 
 register_achievement({
@@ -337,25 +293,21 @@ register_achievement({
     max_progress = 1000,
     reward_xp = 300,
     requires = {"place_10_blocks"},
-    graph_x = 2,
-    graph_y = 2,
+    graph_x = 2, graph_y = 2,
 })
 
--- ===============================
--- Secret Category (Hidden)
--- ===============================
+-- ===== Secret ==================================================
 
 register_achievement({
     id = "secret_find_depths",
     name = "Into the Abyss",
-    description = "Discover the depths below the city",
+    description = "Descend below y=-100",
     icon = "achievement_secret_find_depths.png",
     category = "secret",
     max_progress = 1,
     reward_xp = 500,
     hidden = true,
-    graph_x = 3,
-    graph_y = 3,
+    graph_x = 4, graph_y = 4,
 })
 
 register_achievement({
@@ -367,8 +319,8 @@ register_achievement({
     max_progress = 1,
     reward_xp = 100,
     hidden = true,
-    graph_x = 4,
-    graph_y = 3,
+    graph_x = 5, graph_y = 4,
 })
 
-minetest.log("action", "[achievement_definitions] Loaded " .. get_achievement_count() .. " achievements! 🏆")
+minetest.log("action", "[achievement_definitions] Loaded "
+    .. get_achievement_count() .. " achievements.")
