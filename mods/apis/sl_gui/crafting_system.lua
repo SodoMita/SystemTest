@@ -192,7 +192,10 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
     -- Craft button handler
     for field, _ in pairs(fields) do
         if field:sub(1, 6) == "craft_" then
-            local recipe_id = tonumber(field:sub(7))
+            local id_str = field:sub(7)
+            local recipe_id = tonumber(id_str)
+            -- Skip non-numeric suffixes like "craft_scroll"
+            if not recipe_id then goto continue_craft end
             local recipe = crafting_recipes[recipe_id]
 
             local quantity_field = "qty_" .. recipe_id
@@ -243,6 +246,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
                         "Not enough ingredients for " .. quantity .. "x craft!")
                 end
             end
+            ::continue_craft::
         end
     end
 
