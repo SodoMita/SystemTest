@@ -105,7 +105,9 @@ minetest.register_entity(MONSTER_NAME, {
 	end,
 
 	on_death = function(self, killer)
-		minetest.sound_play("monster_chase", { pos = self.object:get_pos(), gain = 0.8, max_hear_distance = 14 })
+		local pos = self.object:get_pos()
+		minetest.sound_play("monster_chase", { pos = pos, gain = 0.8, max_hear_distance = 14 })
+		minetest.add_entity(pos, modname .. ":death_particle")
 	end,
 })
 
@@ -158,6 +160,33 @@ minetest.register_entity(modname .. ":flare_light", {
 	on_step = function(self, dtime)
 		self.timer = self.timer + dtime
 		if self.timer > 30 then
+			self.object:remove()
+		end
+	end,
+})
+
+-- Death particle: a brief expanding shatter used when agents or monsters die
+minetest.register_entity(modname .. ":death_particle", {
+	initial_properties = {
+		visual = "mesh",
+		mesh = "death_particle.obj",
+		textures = { "particle_texture.png" },
+		physical = false,
+		collide_with_objects = false,
+		collisionbox = { 0, 0, 0, 0, 0, 0 },
+		visual_size = { x = 1, y = 1 },
+		glow = 12,
+	},
+
+	timer = 0,
+
+	on_step = function(self, dtime)
+		self.timer = self.timer + dtime
+		local scale = 1 + self.timer * 3
+		self.object:set_properties({
+			visual_size = { x = scale, y = scale, z = scale }
+		})
+		if self.timer > 1.0 then
 			self.object:remove()
 		end
 	end,
