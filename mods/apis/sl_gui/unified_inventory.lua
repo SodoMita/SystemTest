@@ -1,7 +1,7 @@
 -- =============================================================
 -- System Looting — Unified Inventory (Tab System)
 -- =============================================================
--- Tabs: Crafting | Abilities | Achievements | Player Info
+-- Tabs: Crafting | Abilities | Achievements
 -- =============================================================
 
 local function get_current_tab(player)
@@ -15,13 +15,12 @@ local function set_current_tab(player, tab)
     player:get_meta():set_string("current_tab", tab)
 end
 
--- Tab button strip (reusable by outfit menu too)
+-- Tab button strip (reusable by the outfit menu too)
 function gui_get_tab_buttons(current_tab, show_label)
     local tabs = {
-        {id = "crafting",     icon_img = "gui_tab_crafting.png",     label = "Crafting",     x = 8.3},
-        {id = "abilities",    icon_img = "gui_tab_abilities.png",    label = "Abilities",    x = 9.1},
-        {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements", x = 9.9},
-        {id = "player_info",  icon_img = "gui_tab_player_info.png",  label = "Info",         x = 10.7},
+        {id = "crafting",     icon_img = "gui_tab_crafting.png",     label = "Crafting",     x = 9.5},
+        {id = "abilities",    icon_img = "gui_tab_abilities.png",    label = "Abilities",    x = 10.3},
+        {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements", x = 11.1},
     }
 
     local formspec = {}
@@ -54,8 +53,6 @@ end
 -- formspec string so its content can be embedded in the unified
 -- inventory which already provides those elements.
 local function strip_formspec_header(fs)
-    -- Remove formspec_version[...], size[...], bgcolor[...] at the start.
-    -- These always appear at the very beginning of the string.
     local stripped = fs
     stripped = stripped:gsub("^formspec_version%[[^%]]*%]", "")
     stripped = stripped:gsub("^size%[[^%]]*%]", "")
@@ -103,21 +100,12 @@ function get_unified_inventory(player)
             table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
             table.insert(formspec, "label[4,5;Achievement system loading...]")
         end
-
-    elseif current_tab == "player_info" then
-        if get_player_info_formspec then
-            local info_fs = get_player_info_formspec(player)
-            table.insert(formspec, strip_formspec_header(info_fs))
-        else
-            table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
-            table.insert(formspec, "label[4,5;Player info loading...]")
-        end
     end
 
     return table.concat(formspec, "")
 end
 
--- Handle tab switching
+-- Handle tab switching and the player preview overlay
 minetest.register_on_player_receive_fields(function(player, formname, fields)
     if formname ~= "" and formname ~= "crafting_system" and formname ~= "unified_inventory" then
         return
@@ -132,8 +120,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         set_current_tab(player, "abilities");    changed_tab = true
     elseif fields.tab_achievements then
         set_current_tab(player, "achievements"); changed_tab = true
-    elseif fields.tab_player_info then
-        set_current_tab(player, "player_info");  changed_tab = true
     end
 
     if changed_tab then
@@ -141,7 +127,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         return
     end
 
-    -- Clicking the player preview overlay from any tab
+    -- Clicking the player preview overlay opens the outfit/info screen
     if fields.open_outfit then
         if get_character_outfit_formspec then
             minetest.show_formspec(player:get_player_name(),
@@ -161,4 +147,4 @@ minetest.register_on_joinplayer(function(player)
     end)
 end)
 
-minetest.log("action", "[unified_inventory] Tab system loaded (4 tabs).")
+minetest.log("action", "[unified_inventory] Tab system loaded (3 tabs).")

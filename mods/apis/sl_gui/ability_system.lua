@@ -1,647 +1,410 @@
--- =============================================================
--- System Looting — Ability System (graph-based, PvP-appropriate)
--- =============================================================
--- Abilities are earned with stat points from levelling up.
--- Categories: movement, combat, survival, team
--- NO fly, noclip, teleport, invisibility (breaks competitive PvP)
--- =============================================================
+-- Ability Tree & Stat Point System! 🌟✨
 
-local PAN_STEP = 150
-
+-- Define abilities and stat upgrades
 local abilities = {
-    -- === MOVEMENT BRANCH ==========================================
+    -- Movement upgrades
     {
-        id = "walk_speed", name = "Quick Steps", type = "stat",
+        id = "speed_1",
+        name = "Quick Steps I",
+        description = "Increase movement speed by 20%",
         icon = "ability_speed.png",
-        description = "+15% walk speed per level",
-        category = "movement", cost = 1, max_level = 5,
+        category = "movement",
+        cost = 1,
+        max_level = 3,
         requires = nil,
-        graph_x = 0, graph_y = 0,
-        stat_key = "speed", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.15,
+        effect = function(player, level)
+            local physics = player:get_physics_override()
+            physics.speed = 1.0 + (0.2 * level)
+            player:set_physics_override(physics)
+        end
     },
     {
-        id = "run_speed", name = "Sprint Boost", type = "stat",
-        icon = "ability_speed.png",
-        description = "+10% sprint speed per level",
-        category = "movement", cost = 1, max_level = 5,
-        requires = "walk_speed",
-        graph_x = 1, graph_y = 0,
-        stat_key = "speed", unlock_per_level = 0.10,
-    },
-    {
-        id = "jump_height", name = "High Jump", type = "stat",
+        id = "jump_1",
+        name = "High Jump I",
+        description = "Increase jump height by 30%",
         icon = "ability_jump.png",
-        description = "+20% jump height per level",
-        category = "movement", cost = 1, max_level = 5,
-        requires = "walk_speed",
-        graph_x = 0, graph_y = 1,
-        stat_key = "jump", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.20,
+        category = "movement",
+        cost = 1,
+        max_level = 3,
+        requires = nil,
+        effect = function(player, level)
+            local physics = player:get_physics_override()
+            physics.jump = 1.0 + (0.3 * level)
+            player:set_physics_override(physics)
+        end
     },
     {
-        id = "sprint_stamina", name = "Endurance", type = "stat",
-        icon = "ability_breath.png",
-        description = "+20 max sprint stamina per level",
-        category = "movement", cost = 1, max_level = 5,
-        requires = "walk_speed",
-        graph_x = 0, graph_y = 2,
-        stat_key = "sprint_stamina", base_min = 100, base_max = 100,
-        unlock_per_level = 20,
-    },
-    {
-        id = "sprint_efficiency", name = "Efficient Runner", type = "stat",
-        icon = "ability_sprint_efficiency.png",
-        description = "-15% sprint stamina drain per level",
-        category = "movement", cost = 2, max_level = 3,
-        requires = "sprint_stamina",
-        graph_x = 1, graph_y = 2,
-        stat_key = "sprint_efficiency", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = -0.15,
-    },
-    {
-        id = "move_dash", name = "Dash", type = "toggle",
+        id = "speed_2",
+        name = "Quick Steps II",
+        description = "Further increase speed by 30%",
         icon = "ability_speed.png",
-        description = "Burst speed, massive stamina cost",
-        category = "movement", cost = 3, max_level = 1,
-        requires = "run_speed",
-        graph_x = 2, graph_y = 0,
-        priv = nil,
+        category = "movement",
+        cost = 2,
+        max_level = 2,
+        requires = "speed_1",
+        effect = function(player, level)
+            local physics = player:get_physics_override()
+            physics.speed = 1.6 + (0.3 * level)
+            player:set_physics_override(physics)
+        end
     },
     {
-        id = "light_body", name = "Light Body", type = "stat",
+        id = "jump_2",
+        name = "High Jump II",
+        description = "Further increase jump by 40%",
+        icon = "ability_jump.png",
+        category = "movement",
+        cost = 2,
+        max_level = 2,
+        requires = "jump_1",
+        effect = function(player, level)
+            local physics = player:get_physics_override()
+            physics.jump = 1.9 + (0.4 * level)
+            player:set_physics_override(physics)
+        end
+    },
+    
+    -- Utility upgrades
+    {
+        id = "gravity_1",
+        name = "Light Body",
+        description = "Reduce gravity by 20%",
         icon = "ability_gravity.png",
-        description = "-15% gravity per level",
-        category = "movement", cost = 2, max_level = 3,
-        requires = "jump_height",
-        graph_x = 1, graph_y = 1,
-        stat_key = "gravity", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = -0.15,
-    },
-    {
-        id = "sprint_hud", name = "Sprint HUD", type = "toggle",
-        icon = "ability_sprint_hud.png",
-        description = "Show stamina bar on screen",
-        category = "movement", cost = 0, max_level = 1,
+        category = "utility",
+        cost = 2,
+        max_level = 2,
         requires = nil,
-        graph_x = 3, graph_y = 0,
-        priv = nil,
-    },
-
-    -- === COMBAT BRANCH ============================================
-    {
-        id = "melee_damage", name = "Melee Power", type = "stat",
-        icon = "ability_attack.png",
-        description = "+15% melee damage per level",
-        category = "combat", cost = 1, max_level = 5,
-        requires = nil,
-        graph_x = 0, graph_y = 3,
-        stat_key = "melee_damage", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.15,
+        effect = function(player, level)
+            local physics = player:get_physics_override()
+            physics.gravity = 1.0 - (0.2 * level)
+            player:set_physics_override(physics)
+        end
     },
     {
-        id = "attack_speed", name = "Quick Strikes", type = "stat",
-        icon = "ability_attack.png",
-        description = "+10% attack speed per level",
-        category = "combat", cost = 2, max_level = 3,
-        requires = "melee_damage",
-        graph_x = 1, graph_y = 3,
-        stat_key = "attack_speed", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.10,
-    },
-    {
-        id = "defense", name = "Toughness", type = "stat",
-        icon = "ability_defense.png",
-        description = "+10% damage reduction per level",
-        category = "combat", cost = 1, max_level = 5,
-        requires = "melee_damage",
-        graph_x = 0, graph_y = 4,
-        stat_key = "defense", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.10,
-    },
-    {
-        id = "crit_chance", name = "Critical Hit", type = "stat",
-        icon = "ability_critical.png",
-        description = "+8% crit chance per level",
-        category = "combat", cost = 2, max_level = 3,
-        requires = "attack_speed",
-        graph_x = 2, graph_y = 3,
-        stat_key = "crit_chance", base_min = 0.0, base_max = 0.0,
-        unlock_per_level = 0.08,
-    },
-    {
-        id = "weapon_mastery", name = "Weapon Mastery", type = "stat",
-        icon = "ability_durability.png",
-        description = "+20% weapon durability per level",
-        category = "combat", cost = 1, max_level = 5,
-        requires = "defense",
-        graph_x = 1, graph_y = 4,
-        stat_key = "durability", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.20,
-    },
-
-    -- === SURVIVAL BRANCH ==========================================
-    {
-        id = "max_health", name = "Vitality", type = "stat",
-        icon = "ability_health.png",
-        description = "+2 max HP per level",
-        category = "survival", cost = 1, max_level = 5,
-        requires = nil,
-        graph_x = 4, graph_y = 0,
-        stat_key = "hp_max", base_min = 20, base_max = 20,
-        unlock_per_level = 2,
-    },
-    {
-        id = "health_regen", name = "Regeneration", type = "stat",
-        icon = "ability_health.png",
-        description = "+0.5 HP/s regen per level",
-        category = "survival", cost = 2, max_level = 3,
-        requires = "max_health",
-        graph_x = 5, graph_y = 0,
-        stat_key = "hp_regen", base_min = 0.0, base_max = 0.0,
-        unlock_per_level = 0.5,
-    },
-    {
-        id = "breath", name = "Deep Lungs", type = "stat",
+        id = "breath_1",
+        name = "Deep Breath",
+        description = "Increase breath by 5 seconds",
         icon = "ability_breath.png",
-        description = "+5s breath per level",
-        category = "survival", cost = 1, max_level = 3,
-        requires = "max_health",
-        graph_x = 4, graph_y = 1,
-        stat_key = "breath", base_min = 10, base_max = 10,
-        unlock_per_level = 5,
-    },
-    {
-        id = "armor_expert", name = "Armor Expert", type = "stat",
-        icon = "ability_armor_efficiency.png",
-        description = "+15% armor efficiency per level",
-        category = "survival", cost = 2, max_level = 3,
-        requires = "max_health",
-        graph_x = 5, graph_y = 1,
-        stat_key = "armor_eff", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.15,
-    },
-
-    -- === TEAM BRANCH ==============================================
-    {
-        id = "scavenger", name = "Scavenger", type = "stat",
-        icon = "ability_efficiency.png",
-        description = "+20% chance for bonus loot per level",
-        category = "team", cost = 1, max_level = 5,
+        category = "utility",
+        cost = 1,
+        max_level = 3,
         requires = nil,
-        graph_x = 4, graph_y = 3,
-        stat_key = "loot_bonus", base_min = 0.0, base_max = 0.0,
-        unlock_per_level = 0.20,
-    },
-    {
-        id = "fast_craft", name = "Quick Hands", type = "stat",
-        icon = "ability_craft_speed.png",
-        description = "+1 extra craft output per 2 levels",
-        category = "team", cost = 2, max_level = 4,
-        requires = "scavenger",
-        graph_x = 5, graph_y = 3,
-        stat_key = "craft_bonus", base_min = 0, base_max = 0,
-        unlock_per_level = 0.5,
-    },
-    {
-        id = "fast_dig", name = "Efficient Miner", type = "stat",
-        icon = "ability_fast_dig.png",
-        description = "+15% dig speed per level",
-        category = "team", cost = 1, max_level = 5,
-        requires = "scavenger",
-        graph_x = 4, graph_y = 4,
-        stat_key = "dig_speed", base_min = 1.0, base_max = 1.0,
-        unlock_per_level = 0.15,
-    },
-    {
-        id = "build_range", name = "Long Reach", type = "stat",
-        icon = "ability_reach.png",
-        description = "+1 block build range per level",
-        category = "team", cost = 2, max_level = 3,
-        requires = "fast_dig",
-        graph_x = 5, graph_y = 4,
-        stat_key = "reach", base_min = 4.0, base_max = 4.0,
-        unlock_per_level = 1.0,
+        effect = function(player, level)
+            player:set_properties({
+                breath_max = 10 + (5 * level)
+            })
+        end
     },
 }
 
--- Fast lookup
-local ability_by_id = {}
-for _, a in ipairs(abilities) do
-    ability_by_id[a.id] = a
-end
-
--- ---- persistence -----------------------------------------------
+-- Get player's ability data
 local function get_ability_data(player)
+    local name = player:get_player_name()
     local meta = player:get_meta()
-    local data_str = meta:get_string("abilities_v2")
+    local data_str = meta:get_string("abilities")
     if data_str == "" then data_str = "{}" end
     local data = minetest.deserialize(data_str) or {}
-    if not data.unlocked     then data.unlocked     = {} end
-    if not data.stat_points  then data.stat_points  = 0  end
-    if not data.stat_values  then data.stat_values  = {} end
-    if not data.toggles      then data.toggles      = {} end
-    if not data.scroll_x     then data.scroll_x     = 0  end
-    if not data.scroll_y     then data.scroll_y     = 0  end
-    if not data.tooltip      then data.tooltip       = "" end
+    
+    -- Initialize if needed
+    if not data.unlocked then
+        data.unlocked = {}
+        data.stat_points = 0
+    end
+    
     return data
 end
 
+-- Save ability data
 local function save_ability_data(player, data)
-    player:get_meta():set_string("abilities_v2", minetest.serialize(data))
+    local meta = player:get_meta()
+    meta:set_string("abilities", minetest.serialize(data))
 end
 
--- ---- stat range helper -----------------------------------------
-local function get_stat_range(player, stat_key)
+-- Apply all unlocked abilities
+local function apply_abilities(player)
     local data = get_ability_data(player)
-    local min_val, max_val = 0, 0
-    local unclamped = false
-    for _, a in ipairs(abilities) do
-        if a.stat_key == stat_key then
-            local level = data.unlocked[a.id] or 0
-            if a.base_min then min_val = a.base_min end
-            if a.base_max then max_val = a.base_max end
-            max_val = max_val + (a.unlock_per_level * level)
-            if a.unclamped then unclamped = true end
+    
+    -- Reset physics first
+    player:set_physics_override({
+        speed = 1.0,
+        jump = 1.0,
+        gravity = 1.0
+    })
+    
+    -- Apply each unlocked ability
+    for _, ability in ipairs(abilities) do
+        local level = data.unlocked[ability.id] or 0
+        if level > 0 and ability.effect then
+            ability.effect(player, level)
         end
     end
-    return min_val, max_val, unclamped
 end
 
--- ---- apply stats to physics ------------------------------------
-local function apply_stats(player)
-    if not player or not player:is_player() then return end
+-- Check if ability can be unlocked
+local function can_unlock(player, ability_id)
     local data = get_ability_data(player)
-
-    local speed   = data.stat_values.speed   or 1.0
-    local jump    = data.stat_values.jump    or 1.0
-    local gravity = data.stat_values.gravity or 1.0
-
-    -- Clamp
-    local _, max_speed = get_stat_range(player, "speed")
-    local _, max_jump  = get_stat_range(player, "jump")
-    local min_grav, _  = get_stat_range(player, "gravity")
-
-    speed   = math.min(speed,   max_speed)
-    jump    = math.min(jump,    max_jump)
-    gravity = math.max(gravity, min_grav)
-
-    player:set_physics_override({speed = speed, jump = jump, gravity = gravity})
-end
-
-local function apply_toggles(player)
-    if not player or not player:is_player() then return end
-    local data = get_ability_data(player)
-    -- toggles that grant privs
-    for _, a in ipairs(abilities) do
-        if a.type == "toggle" and a.priv then
-            local privs = minetest.get_player_privs(player:get_player_name())
-            if (data.unlocked[a.id] or 0) > 0 and data.toggles[a.id] then
-                privs[a.priv] = true
-            else
-                privs[a.priv] = nil
+    
+    for _, ability in ipairs(abilities) do
+        if ability.id == ability_id then
+            local current_level = data.unlocked[ability.id] or 0
+            
+            -- Check max level
+            if current_level >= ability.max_level then
+                return false, "Already at max level!"
             end
-            minetest.set_player_privs(player:get_player_name(), privs)
+            
+            -- Check stat points
+            if data.stat_points < ability.cost then
+                return false, "Not enough stat points!"
+            end
+            
+            -- Check requirements
+            if ability.requires then
+                local req_level = data.unlocked[ability.requires] or 0
+                if req_level <= 0 then
+                    return false, "Requires: " .. ability.requires
+                end
+            end
+            
+            return true
         end
     end
+    
+    return false, "Ability not found"
 end
 
--- ---- formspec --------------------------------------------------
-function get_ability_formspec_new(player)
-    local data   = get_ability_data(player)
-    local meta   = player:get_meta()
-    local exp    = tonumber(meta:get_string("experience")) or 0
-    local level  = math.floor(exp / 100) + 1
-
+-- Generate ability tree formspec
+local function get_ability_formspec(player)
+    local data = get_ability_data(player)
+    local meta = player:get_meta()
+    local exp = tonumber(meta:get_string("experience")) or 0
+    local level = math.floor(exp / 100) + 1
+    
     local formspec = {
         "formspec_version[4]",
-        "size[12,11.8]",
-        "bgcolor[#1a1a1aff;true]",
-
+        "size[14,10]",
+        "bgcolor[#0a0a0aff;true]",
+        
         -- Header
-        "box[0.2,1.1;11.6,0.6;#2a2a2aff]",
-        string.format("label[0.5,1.4;Abilities — Level %d]", level),
-        string.format("label[9,1.4;SP: %d]", data.stat_points),
+        "box[0.2,0.2;13.6,0.8;#2a2a2aff]",
+        "label[0.5,0.6;✨ Ability Tree - Level " .. level .. " ✨]",
+        "label[10,0.6;Stat Points: " .. data.stat_points .. "]",
+        
+        -- Movement category
+        "box[0.2,1.2;6.6,8.3;#1a1a1aff]",
+        "label[0.5,1.5;Movement Abilities]",
     }
-
-    -- Player preview
-    local player_textures = (player_api and player_api.get_textures and player_api.get_textures(player))
-        or {"character.png"}
-    table.insert(formspec, "box[0.2,0.3;1.5,1.5;#1a1a1aff]")
-    table.insert(formspec, string.format(
-        "model[0.3,0.4;1.3,1.3;player_preview;character.b3d;%s;0,170;false;false;0,0]",
-        table.concat(player_textures, ",")))
-    table.insert(formspec, "image_button[0.3,0.4;1.3,1.3;;open_outfit;]")
-
-    -- Graph area
-    local graph_x = 0.2
-    local graph_y = 1.9
-    local graph_w = 8.2
-    local graph_h = 8.8
-    table.insert(formspec, string.format("box[%f,%f;%f,%f;#0a0a0aff]",
-        graph_x, graph_y, graph_w, graph_h))
-
-    local grid_sx = 2.0
-    local grid_sy = 1.8
-    local offset_x = data.scroll_x / 100
-    local offset_y = data.scroll_y / 100
-
-    table.insert(formspec, string.format(
-        "scroll_container[%f,%f;%f,%f;ability_graph;vertical;0.1]",
-        graph_x, graph_y, graph_w, graph_h))
-
-    -- Connection lines first (using boxes)
-    for _, a in ipairs(abilities) do
-        if a.requires and ability_by_id[a.requires] then
-            local parent = ability_by_id[a.requires]
-            local x1 = parent.graph_x * grid_sx + 0.6
-            local y1 = parent.graph_y * grid_sy + 0.6
-            local x2 = a.graph_x * grid_sx + 0.6
-            local y2 = a.graph_y * grid_sy + 0.6
-            -- Horizontal then vertical L-connector
-            if math.abs(x2 - x1) > 0.1 then
-                local lx = math.min(x1, x2)
-                local lw = math.abs(x2 - x1)
-                table.insert(formspec, string.format(
-                    "box[%f,%f;%f,0.05;#4a4a4aff]", lx, y1, lw))
-            end
-            if math.abs(y2 - y1) > 0.1 then
-                local ly = math.min(y1, y2)
-                local lh = math.abs(y2 - y1)
-                table.insert(formspec, string.format(
-                    "box[%f,%f;0.05,%f;#4a4a4aff]", x2, ly, lh))
-            end
+    
+    local y_movement = 2
+    local y_utility = 2
+    
+    for _, ability in ipairs(abilities) do
+        local current_level = data.unlocked[ability.id] or 0
+        local can_buy, msg = can_unlock(player, ability.id)
+        
+        local x, y
+        if ability.category == "movement" then
+            x = 0.5
+            y = y_movement
+            y_movement = y_movement + 1.3
+        else
+            x = 7.3
+            y = y_utility
+            y_utility = y_utility + 1.3
+        end
+        
+        -- Ability box
+        local color = current_level > 0 and "#3a5a3a" or "#3a3a3a"
+        table.insert(formspec, string.format("box[%f,%f;6,1.2;%s]", x, y, color))
+        
+        -- Icon
+        if ability.icon then
+            table.insert(formspec, string.format("image[%f,%f;1,1;%s]", x + 0.1, y + 0.1, ability.icon))
+        end
+        
+        -- Name and level
+        table.insert(formspec, string.format("label[%f,%f;%s [%d/%d]]", 
+            x + 1.2, y + 0.25, ability.name, current_level, ability.max_level))
+        
+        -- Description
+        table.insert(formspec, string.format("label[%f,%f;%s]", 
+            x + 1.2, y + 0.6, ability.description))
+        
+        -- Cost and requirements
+        local info = "Cost: " .. ability.cost .. " SP"
+        if ability.requires then
+            info = info .. " | Requires: " .. ability.requires
+        end
+        table.insert(formspec, string.format("label[%f,%f;%s]", x + 1.2, y + 0.95, info))
+        
+        -- Unlock/upgrade button
+        if current_level < ability.max_level then
+            local btn_text = current_level > 0 and "Upgrade" or "Unlock"
+            table.insert(formspec, string.format("button[%f,%f;1.5,0.5;unlock_%s;%s]", 
+                x + 4.3, y + 0.1, ability.id, btn_text))
+        else
+            table.insert(formspec, string.format("label[%f,%f;MAX]", x + 5, y + 0.35))
         end
     end
-
-    -- Nodes
-    for _, a in ipairs(abilities) do
-        local nx = a.graph_x * grid_sx + 0.1
-        local ny = a.graph_y * grid_sy + 0.1
-        local nw, nh = 1.1, 1.1
-
-        local curr = data.unlocked[a.id] or 0
-        local maxl = a.max_level or 1
-        local has_req = true
-        if a.requires then
-            has_req = (data.unlocked[a.requires] or 0) > 0
-        end
-
-        local bg
-        if curr >= maxl then     bg = "#2a6a2aff"
-        elseif curr > 0 then     bg = "#3a5a3aff"
-        elseif has_req then      bg = "#3a3a3aff"
-        else                     bg = "#2a2a2aff"
-        end
-
-        table.insert(formspec, string.format("box[%f,%f;%f,%f;%s]", nx, ny, nw, nh, bg))
-        if a.icon then
-            table.insert(formspec, string.format("image[%f,%f;0.5,0.5;%s]", nx + 0.05, ny + 0.05, a.icon))
-        end
-        table.insert(formspec, string.format("label[%f,%f;%s]", nx + 0.6, ny + 0.25, a.name))
-        table.insert(formspec, string.format("label[%f,%f;%d/%d]", nx + 0.6, ny + 0.55, curr, maxl))
-
-        if a.type == "toggle" and curr > 0 then
-            local tog = data.toggles[a.id] and "ON" or "OFF"
-            table.insert(formspec, string.format(
-                "button[%f,%f;0.6,0.35;toggle_%s;%s]", nx + 0.45, ny + 0.75, a.id, tog))
-        end
-
-        table.insert(formspec, string.format(
-            "image_button[%f,%f;%f,%f;;node_%s;]", nx, ny, nw, nh, a.id))
-    end
-
-    table.insert(formspec, "scroll_container_end[]")
-
-    -- Stat sliders panel (right side)
-    local sp_x = 8.6
-    local sp_y = 1.9
-    table.insert(formspec, string.format("box[%f,%f;3.2,8.8;#1a1a1aff]", sp_x, sp_y))
-    table.insert(formspec, string.format("label[%f,%f;Stat Tuning]", sp_x + 0.2, sp_y + 0.3))
-
-    local stats_to_show = {
-        {key = "speed",   label = "Speed"},
-        {key = "jump",    label = "Jump"},
-        {key = "gravity", label = "Gravity"},
-    }
-    local sy_offset = 0.6
-    for _, st in ipairs(stats_to_show) do
-        local min_v, max_v = get_stat_range(player, st.key)
-        local cur = data.stat_values[st.key] or max_v
-        table.insert(formspec, string.format("label[%f,%f;%s: %.2f]",
-            sp_x + 0.2, sp_y + sy_offset + 0.15, st.label, cur))
-        table.insert(formspec, string.format(
-            "field[%f,%f;1.2,0.4;stat_%s;;%.2f]",
-            sp_x + 0.2, sp_y + sy_offset + 0.35, st.key, cur))
-        table.insert(formspec, string.format("field_close_on_enter[stat_%s;false]", st.key))
-        table.insert(formspec, string.format(
-            "button[%f,%f;0.8,0.4;set_%s;Set]",
-            sp_x + 1.5, sp_y + sy_offset + 0.35, st.key))
-        table.insert(formspec, string.format("label[%f,%f;(%.2f–%.2f)]",
-            sp_x + 0.2, sp_y + sy_offset + 0.75, min_v, max_v))
-        sy_offset = sy_offset + 1.2
-    end
-
-    -- D-pad navigation
-    local dp_x = sp_x + 0.5
-    local dp_y = sp_y + 5.5
-    local btn  = 0.6
-    table.insert(formspec, string.format("image_button[%f,%f;%f,%f;gui_button_nav_up.png;nav_up;]",
-        dp_x + btn, dp_y, btn, btn))
-    table.insert(formspec, string.format("image_button[%f,%f;%f,%f;gui_button_nav_left.png;nav_left;]",
-        dp_x, dp_y + btn, btn, btn))
-    table.insert(formspec, string.format("image_button[%f,%f;%f,%f;gui_button_nav_reset.png;nav_reset;]",
-        dp_x + btn, dp_y + btn, btn, btn))
-    table.insert(formspec, string.format("image_button[%f,%f;%f,%f;gui_button_nav_right.png;nav_right;]",
-        dp_x + btn * 2, dp_y + btn, btn, btn))
-    table.insert(formspec, string.format("image_button[%f,%f;%f,%f;gui_button_nav_down.png;nav_down;]",
-        dp_x + btn, dp_y + btn * 2, btn, btn))
-
-    -- Tooltip bar
-    table.insert(formspec, "box[0.2,10.9;11.6,0.3;#2a2a2aff]")
-    local tooltip_text = data.tooltip ~= "" and data.tooltip or "Click a node for info"
-    table.insert(formspec, string.format("label[0.5,11.05;%s]", minetest.formspec_escape(tooltip_text)))
-
+    
+    -- Utility category header
+    table.insert(formspec, "box[7.2,1.2;6.6,8.3;#1a1a1aff]")
+    table.insert(formspec, "label[7.5,1.5;Utility Abilities]")
+    
+    -- Reset button
+    table.insert(formspec, "button[11,0.3;2.5,0.6;reset_abilities;Reset (Cost: 5 SP)]")
+    
     return table.concat(formspec, "")
 end
 
--- ---- input handler ---------------------------------------------
+-- Handle formspec input
 minetest.register_on_player_receive_fields(function(player, formname, fields)
-    if formname ~= "ability_tree_new" and formname ~= "" and formname ~= "unified_inventory" then
+    if formname ~= "ability_tree" then
         return
     end
-    if (formname == "" or formname == "unified_inventory") then
-        local current_tab = player:get_meta():get_string("current_tab")
-        if current_tab ~= "abilities" then return end
+    
+    if fields.quit then
+        return
     end
-    if fields.quit then return end
-
+    
     local data = get_ability_data(player)
     local name = player:get_player_name()
-    local changed = false
-
-    -- Stat value changes
-    for _, stat in ipairs({"speed", "jump", "gravity"}) do
-        if fields["set_" .. stat] and fields["stat_" .. stat] then
-            local value = tonumber(fields["stat_" .. stat])
-            if value then
-                local min_val, max_val, unclamped = get_stat_range(player, stat)
-                if not unclamped then
-                    value = math.max(min_val, math.min(max_val, value))
+    
+    -- Handle unlock/upgrade buttons
+    for field, _ in pairs(fields) do
+        if field:sub(1, 7) == "unlock_" then
+            local ability_id = field:sub(8)
+            local can_buy, msg = can_unlock(player, ability_id)
+            
+            if can_buy then
+                -- Find the ability
+                for _, ability in ipairs(abilities) do
+                    if ability.id == ability_id then
+                        -- Unlock/upgrade
+                        data.unlocked[ability_id] = (data.unlocked[ability_id] or 0) + 1
+                        data.stat_points = data.stat_points - ability.cost
+                        
+                        save_ability_data(player, data)
+                        apply_abilities(player)
+                        
+                        -- Track achievements! 🏆
+                        if achievement_progress then
+                            achievement_progress(player, "unlock_first_ability", 1)
+                            
+                            -- Count total abilities unlocked
+                            local total_unlocked = 0
+                            for _, lvl in pairs(data.unlocked) do
+                                if lvl > 0 then
+                                    total_unlocked = total_unlocked + 1
+                                end
+                            end
+                            
+                            if total_unlocked >= 5 then
+                                achievement_progress(player, "unlock_5_abilities", 1)
+                            end
+                            
+                            -- Check if maxed out
+                            if data.unlocked[ability_id] >= ability.max_level then
+                                achievement_progress(player, "max_ability", 1)
+                            end
+                            
+                            -- Check if all movement abilities unlocked
+                            local all_movement = true
+                            for _, ab in ipairs(abilities) do
+                                if ab.category == "movement" and (data.unlocked[ab.id] or 0) == 0 then
+                                    all_movement = false
+                                    break
+                                end
+                            end
+                            if all_movement then
+                                achievement_progress(player, "unlock_all_movement", 1)
+                            end
+                        end
+                        
+                        minetest.chat_send_player(name, 
+                            "✨ Unlocked " .. ability.name .. " Level " .. data.unlocked[ability_id] .. "!")
+                        break
+                    end
                 end
-                data.stat_values[stat] = value
-                changed = true
-                apply_stats(player)
+            else
+                minetest.chat_send_player(name, "❌ " .. msg)
             end
         end
     end
-
-    -- Toggle abilities
-    for _, a in ipairs(abilities) do
-        if a.type == "toggle" and fields["toggle_" .. a.id] then
-            data.toggles[a.id] = not (data.toggles[a.id] or false)
-            changed = true
-            apply_toggles(player)
-        end
-    end
-
-    -- Node clicks (unlock / tooltip)
-    for _, a in ipairs(abilities) do
-        if fields["node_" .. a.id] then
-            local curr = data.unlocked[a.id] or 0
-            local maxl = a.max_level or 1
-
-            data.tooltip = string.format("%s | Cost: %d SP | Level: %d/%d | %s",
-                a.name, a.cost, curr, maxl, a.description)
-            if a.requires then
-                data.tooltip = data.tooltip .. " | Req: " .. ability_by_id[a.requires].name
+    
+    -- Handle reset
+    if fields.reset_abilities then
+        if data.stat_points >= 5 then
+            -- Refund all spent points
+            local refund = 0
+            for _, ability in ipairs(abilities) do
+                local level = data.unlocked[ability.id] or 0
+                refund = refund + (level * ability.cost)
             end
-            changed = true
-
-            if curr < maxl then
-                local can_unlock = true
-                if a.requires then
-                    if (data.unlocked[a.requires] or 0) == 0 then
-                        can_unlock = false
-                        minetest.chat_send_player(name, "Requires: " .. ability_by_id[a.requires].name)
-                    end
-                end
-                if data.stat_points < (a.cost or 1) then
-                    can_unlock = false
-                    minetest.chat_send_player(name, "Need " .. a.cost .. " stat points!")
-                end
-                if can_unlock then
-                    data.unlocked[a.id] = curr + 1
-                    data.stat_points = data.stat_points - (a.cost or 1)
-                    -- Auto-set stat value to new max
-                    if a.stat_key then
-                        local _, new_max = get_stat_range(player, a.stat_key)
-                        data.stat_values[a.stat_key] = new_max
-                    end
-                    changed = true
-                    minetest.chat_send_player(name,
-                        "Unlocked: " .. a.name .. " Level " .. (curr + 1) .. "!")
-                    data.tooltip = string.format("Unlocked %s to Level %d!", a.name, curr + 1)
-                    if achievement_progress then
-                        achievement_progress(player, "unlock_first_ability", 1)
-                    end
-                    apply_stats(player)
-                    apply_toggles(player)
-                end
-            end
+            
+            -- Reset
+            data.unlocked = {}
+            data.stat_points = data.stat_points - 5 + refund
+            
+            save_ability_data(player, data)
+            apply_abilities(player)
+            
+            minetest.chat_send_player(name, "✨ Abilities reset! Refunded " .. refund .. " stat points.")
+        else
+            minetest.chat_send_player(name, "❌ Need 5 stat points to reset!")
         end
     end
-
-    -- D-pad navigation
-    if fields.nav_up then
-        data.scroll_y = math.max(0, data.scroll_y - PAN_STEP); changed = true
-    elseif fields.nav_down then
-        data.scroll_y = math.min(1000, data.scroll_y + PAN_STEP); changed = true
-    elseif fields.nav_left then
-        data.scroll_x = math.max(0, data.scroll_x - PAN_STEP); changed = true
-    elseif fields.nav_right then
-        data.scroll_x = math.min(1000, data.scroll_x + PAN_STEP); changed = true
-    elseif fields.nav_reset then
-        data.scroll_x = 0; data.scroll_y = 0; changed = true
-    end
-
-    if changed then save_ability_data(player, data) end
-
-    if formname == "" or formname == "unified_inventory" then
-        if get_unified_inventory then
-            player:set_inventory_formspec(get_unified_inventory(player))
-        end
-    else
-        minetest.show_formspec(name, "ability_tree_new", get_ability_formspec_new(player))
-    end
+    
+    -- Refresh formspec
+    minetest.show_formspec(name, "ability_tree", get_ability_formspec(player))
 end)
 
--- Chat commands
-minetest.register_chatcommand("abilities", {
-    description = "Open abilities screen",
-    func = function(name)
-        local player = minetest.get_player_by_name(name)
-        if player then
-            minetest.show_formspec(name, "ability_tree_new", get_ability_formspec_new(player))
-            return true, "Opening abilities."
-        end
-        return false, "Player not found."
-    end
-})
-
-minetest.register_chatcommand("givestatpoints", {
-    params = "<player> <amount>",
-    description = "Give stat points to a player",
-    privs = {server = true},
-    func = function(name, param)
-        local target_name, amount_str = param:match("^(%S+)%s+(%S+)$")
-        if not target_name or not amount_str then
-            return false, "Usage: /givestatpoints <player> <amount>"
-        end
-        local amount = tonumber(amount_str)
-        if not amount then return false, "Invalid amount" end
-        local target = minetest.get_player_by_name(target_name)
-        if not target then return false, "Player not found" end
-        local data = get_ability_data(target)
-        data.stat_points = data.stat_points + amount
-        save_ability_data(target, data)
-        minetest.chat_send_player(target_name,
-            string.format("You received %d stat points!", amount))
-        return true, string.format("Gave %d stat points to %s", amount, target_name)
-    end
-})
-
--- Hook: grant stat points on level-up
+-- Hook into the give_experience function from experience_system
 local original_give_experience = give_experience
 if original_give_experience then
     function give_experience(player, amount)
+        local name = player:get_player_name()
         local meta = player:get_meta()
         local old_exp = tonumber(meta:get_string("experience")) or 0
         local old_level = math.floor(old_exp / 100) + 1
+        
+        -- Call original function
         local leveled_up = original_give_experience(player, amount)
+        
         if leveled_up then
+            -- Grant 2 stat points per level
             local data = get_ability_data(player)
-            data.stat_points = data.stat_points + 3
+            data.stat_points = data.stat_points + 2
             save_ability_data(player, data)
-            minetest.chat_send_player(player:get_player_name(),
-                "Gained 3 stat points! Open inventory (I) > Abilities tab to spend them.")
+            
+            minetest.chat_send_player(name, 
+                "🌟 Gained 2 stat points! Type /abilities to spend them!")
         end
+        
         return leveled_up
     end
 end
 
--- Apply on join
+-- Apply abilities on join
 minetest.register_on_joinplayer(function(player)
-    minetest.after(2, function()
-        pcall(function()
-            local p = minetest.get_player_by_name(player:get_player_name())
-            if p and p:is_player() then
-                apply_stats(p)
-                apply_toggles(p)
-            end
-        end)
+    minetest.after(1, function()
+        if minetest.get_player_by_name(player:get_player_name()) then
+            apply_abilities(player)
+        end
     end)
 end)
 
-minetest.log("action", "[ability_system] System Looting abilities loaded — "
-    .. #abilities .. " abilities.")
+-- Command to open ability tree
+minetest.register_chatcommand("abilities", {
+    description = "Open ability tree",
+    func = function(name)
+        local player = minetest.get_player_by_name(name)
+        if player then
+            minetest.show_formspec(name, "ability_tree", get_ability_formspec(player))
+            return true, "Opening ability tree!"
+        end
+        return false, "Player not found"
+    end
+})
+
+minetest.log("action", "[ability_system] Ability tree system loaded! 🌟")

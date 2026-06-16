@@ -1,11 +1,9 @@
 -- =============================================================
 -- System Looting — Button-based Crafting System
 -- =============================================================
--- Categories match the game's competitive survival loop:
---   salvage   – raw materials → basic components
---   equipment – tools, weapons, armour pieces
---   tactical  – traps, consumables, team utilities
---   objective – the final goal item that wins the match
+-- Categories: salvage, equipment, tactical, objective
+-- Uses only items that exist in this game (ground, construction,
+-- sl_clothing, sl_scary, sl_modebase).
 -- =============================================================
 
 local crafting_recipes = {}
@@ -15,13 +13,13 @@ function register_craft_recipe(def)
     table.insert(crafting_recipes, {
         output       = def.output,
         output_count = def.output_count or 1,
-        ingredients  = def.ingredients,    -- {["item:name"] = count, ...}
+        ingredients  = def.ingredients,
         description  = def.description or def.output,
         category     = def.category or "salvage",
     })
 end
 
--- Helpers -------------------------------------------------------
+-- Helpers
 local function has_ingredients(player, ingredients)
     local inv = player:get_inventory()
     for item_name, count in pairs(ingredients) do
@@ -39,7 +37,7 @@ local function take_ingredients(player, ingredients)
     end
 end
 
--- Formspec builder ----------------------------------------------
+-- Formspec builder
 function get_crafting_formspec(player, category)
     category = category or "salvage"
     local meta = player:get_meta()
@@ -63,7 +61,7 @@ function get_crafting_formspec(player, category)
         {id = "salvage",   label = "Salvage",   x = 0.3},
         {id = "equipment", label = "Equipment", x = 2.4},
         {id = "tactical",  label = "Tactical",  x = 4.5},
-        {id = "objective", label = "Objective",  x = 6.6},
+        {id = "objective", label = "Objective", x = 6.6},
     }
 
     for _, cat in ipairs(categories) do
@@ -79,7 +77,6 @@ function get_crafting_formspec(player, category)
     -- Recipe list area
     table.insert(formspec, "box[0.2,1.8;11.6,4.2;#0a0a0aff]")
 
-    -- Filter
     local filtered_recipes = {}
     for i, recipe in ipairs(crafting_recipes) do
         if recipe.category == category then
@@ -147,7 +144,7 @@ function get_crafting_formspec(player, category)
     return table.concat(formspec, "")
 end
 
--- Input handler -------------------------------------------------
+-- Input handler
 minetest.register_on_player_receive_fields(function(player, formname, fields)
     if formname ~= "crafting_system" and formname ~= "" then
         return
@@ -189,7 +186,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
     end
     meta:set_string("crafting_category", category)
 
-    -- Craft button handler
+    -- Crafting
     for field, _ in pairs(fields) do
         if field:sub(1, 6) == "craft_" then
             local id_str = field:sub(7)
@@ -250,7 +247,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         end
     end
 
-    -- Refresh
+    -- Refresh formspec
     if get_unified_inventory then
         player:set_inventory_formspec(get_unified_inventory(player))
     else
@@ -260,7 +257,18 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
     end
 end)
 
--- Crafting chat command
+-- Route /craft command through the unified inventory
+local old_show_formspec = minetest.show_formspec
+function minetest.show_formspec(player_name, formname, formspec)
+    if formname == "crafting_system" then
+        local player = minetest.get_player_by_name(player_name)
+        if player then
+            player:set_inventory_formspec(formspec)
+        end
+    end
+    return old_show_formspec(player_name, formname, formspec)
+end
+
 minetest.register_chatcommand("craft", {
     description = "Open crafting menu",
     func = function(name)
@@ -272,186 +280,169 @@ minetest.register_chatcommand("craft", {
             player:set_inventory_formspec(get_crafting_formspec(player, category))
             return true, "Crafting menu updated."
         end
-        return false, "Player not found."
+        return false, "Player not found"
     end
 })
 
 -- ================================================================
--- RECIPES — System Looting craftable content
--- ================================================================
--- The loop: scavenge raw salvage → refine components → craft equipment
--- and tactical gear → build the Objective Core and deliver it to your
--- beacon to win.
+-- RECIPES — System Looting items only
 -- ================================================================
 
--- ===== SALVAGE: raw loot → refined components ==================
-
+-- SALVAGE: raw neon ground blocks -> useful components
 register_craft_recipe({
-    output       = "sl_modebase:metal_ingot",
+    output       = "sl_modebase:loot_crate",
     output_count = 1,
-    ingredients  = { ["sl_modebase:scrap_metal"] = 2 },
-    description  = "Metal Ingot",
+    ingredients  = {["ground:square_neon"] = 4},
+    description  = "Salvage Crate",
     category     = "salvage",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:circuit_board",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:electronic_waste"] = 2 },
-    description  = "Circuit Board",
-    category     = "salvage",
-})
-
-register_craft_recipe({
-    output       = "sl_modebase:energy_crystal",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:raw_crystal"] = 2 },
-    description  = "Energy Crystal",
-    category     = "salvage",
-})
-
-register_craft_recipe({
-    output       = "sl_modebase:plastic_scrap",
+    output       = "construction:sparks",
     output_count = 2,
-    ingredients  = { ["sl_modebase:electronic_waste"] = 2 },
-    description  = "Plastic Scrap",
+    ingredients  = {["ground:rhombus_neon"] = 4},
+    description  = "Sparks Component",
     category     = "salvage",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:hardened_plate",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:metal_ingot"] = 1 },
-    description  = "Hardened Plate",
-    category     = "salvage",
-})
-
-register_craft_recipe({
-    output       = "sl_modebase:reinforced_glass",
+    output       = "construction:plasma",
     output_count = 2,
-    ingredients  = { ["sl_modebase:metal_ingot"] = 1, ["sl_modebase:plastic_scrap"] = 1 },
-    description  = "Reinforced Glass",
+    ingredients  = {["ground:x_neon"] = 4},
+    description  = "Plasma Component",
     category     = "salvage",
 })
 
--- ===== EQUIPMENT: tools, weapons, consumables ===================
-
 register_craft_recipe({
-    output       = "sl_modebase:combat_blade",
+    output       = "construction:fire",
+    output_count = 2,
+    ingredients  = {["ground:x2_neon"] = 4},
+    description  = "Fire Component",
+    category     = "salvage",
+})
+
+-- EQUIPMENT: clothing from the sl_clothing mod
+register_craft_recipe({
+    output       = "sl_clothing:hood_plain",
     output_count = 1,
-    ingredients  = { ["sl_modebase:metal_ingot"] = 2 },
-    description  = "Combat Blade",
+    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:sparks"] = 1},
+    description  = "Plain Hood",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:breaching_pick",
+    output       = "sl_clothing:cap_brim",
     output_count = 1,
-    ingredients  = { ["sl_modebase:metal_ingot"] = 3, ["sl_modebase:plastic_scrap"] = 1 },
-    description  = "Breaching Pick",
+    ingredients  = {["sl_clothing:hood_plain"] = 1, ["construction:plasma"] = 1},
+    description  = "Cap with Brim",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:tactical_axe",
+    output       = "sl_clothing:jacket_light",
     output_count = 1,
-    ingredients  = { ["sl_modebase:metal_ingot"] = 2, ["sl_modebase:plastic_scrap"] = 1 },
-    description  = "Tactical Axe",
+    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:smoke"] = 1},
+    description  = "Light Jacket",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:trench_shovel",
+    output       = "sl_clothing:coat_work",
     output_count = 1,
-    ingredients  = { ["sl_modebase:metal_ingot"] = 1, ["sl_modebase:plastic_scrap"] = 1 },
-    description  = "Trench Shovel",
+    ingredients  = {["sl_clothing:jacket_light"] = 1, ["construction:plasma"] = 1},
+    description  = "Work Coat",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:energy_blade",
+    output       = "sl_clothing:backpack_small",
     output_count = 1,
-    ingredients  = { ["sl_modebase:energy_crystal"] = 2, ["sl_modebase:metal_ingot"] = 1 },
-    description  = "Energy Blade",
+    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:fire"] = 1},
+    description  = "Small Backpack",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:power_drill",
+    output       = "sl_clothing:glove_fingerless",
     output_count = 1,
-    ingredients  = { ["sl_modebase:energy_crystal"] = 2, ["sl_modebase:metal_ingot"] = 2, ["sl_modebase:plastic_scrap"] = 1 },
-    description  = "Power Drill",
+    ingredients  = {["construction:sparks"] = 1, ["ground:square_neon"] = 2},
+    description  = "Fingerless Gloves",
     category     = "equipment",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:flare",
+    output       = "sl_clothing:glove_leather",
+    output_count = 1,
+    ingredients  = {["sl_clothing:glove_fingerless"] = 1, ["construction:plasma"] = 1},
+    description  = "Leather Gloves",
+    category     = "equipment",
+})
+
+register_craft_recipe({
+    output       = "sl_clothing:trousers_plain",
+    output_count = 1,
+    ingredients  = {["construction:smoke"] = 1, ["ground:rhombus_neon"] = 2},
+    description  = "Plain Trousers",
+    category     = "equipment",
+})
+
+register_craft_recipe({
+    output       = "sl_clothing:trousers_camo",
+    output_count = 1,
+    ingredients  = {["sl_clothing:trousers_plain"] = 1, ["construction:sparks"] = 1},
+    description  = "Camo Trousers",
+    category     = "equipment",
+})
+
+register_craft_recipe({
+    output       = "sl_clothing:boots_everyday",
+    output_count = 1,
+    ingredients  = {["construction:fire"] = 1, ["ground:x2_neon"] = 2},
+    description  = "Everyday Boots",
+    category     = "equipment",
+})
+
+register_craft_recipe({
+    output       = "sl_clothing:boots_combat",
+    output_count = 1,
+    ingredients  = {["sl_clothing:boots_everyday"] = 1, ["construction:plasma"] = 1},
+    description  = "Combat Boots",
+    category     = "equipment",
+})
+
+-- TACTICAL: traps and team utilities
+register_craft_recipe({
+    output       = "sl_scary:hide_spot",
+    output_count = 2,
+    ingredients  = {["construction:fire"] = 1, ["construction:smoke"] = 1},
+    description  = "Hiding Spot",
+    category     = "tactical",
+})
+
+register_craft_recipe({
+    output       = "construction:bubbles",
     output_count = 4,
-    ingredients  = { ["sl_modebase:energy_crystal"] = 1, ["sl_modebase:plastic_scrap"] = 1 },
-    description  = "Flare",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_modebase:medkit",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:plastic_scrap"] = 1, ["sl_modebase:energy_crystal"] = 1, ["sl_modebase:metal_ingot"] = 1 },
-    description  = "Medkit",
-    category     = "equipment",
-})
-
--- ===== TACTICAL: team utilities and defenses ====================
-
-register_craft_recipe({
-    output       = "sl_modebase:power_cell",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:energy_crystal"] = 9 },
-    description  = "Power Cell",
+    ingredients  = {["construction:plasma"] = 1, ["ground:x_neon"] = 1},
+    description  = "Smoke Screen",
     category     = "tactical",
 })
 
 register_craft_recipe({
-    output       = "sl_modebase:blast_shield",
+    output       = "construction:snowflake",
     output_count = 4,
-    ingredients  = { ["sl_modebase:hardened_plate"] = 1, ["sl_modebase:reinforced_glass"] = 2 },
-    description  = "Blast Shield",
+    ingredients  = {["construction:sparks"] = 1, ["ground:rhombus_neon"] = 1},
+    description  = "Distraction Flare",
     category     = "tactical",
 })
 
-register_craft_recipe({
-    output       = "sl_modebase:barricade",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:metal_ingot"] = 9 },
-    description  = "Barricade",
-    category     = "tactical",
-})
-
-register_craft_recipe({
-    output       = "sl_modebase:signal_relay",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:circuit_board"] = 9 },
-    description  = "Signal Relay",
-    category     = "tactical",
-})
-
-register_craft_recipe({
-    output       = "sl_modebase:sensor_array",
-    output_count = 1,
-    ingredients  = { ["sl_modebase:circuit_board"] = 4, ["sl_modebase:metal_ingot"] = 4, ["sl_modebase:energy_crystal"] = 1 },
-    description  = "Sensor Array",
-    category     = "tactical",
-})
-
--- ===== OBJECTIVE: the final win-condition item ==================
-
+-- OBJECTIVE: the win-condition item
 register_craft_recipe({
     output       = "sl_modebase:objective_core",
     output_count = 1,
     ingredients  = {
-        ["sl_modebase:power_cell"]     = 1,
-        ["sl_modebase:sensor_array"]   = 1,
-        ["sl_modebase:hardened_plate"] = 2,
-        ["sl_modebase:circuit_board"]  = 4,
+        ["sl_modebase:loot_crate"] = 1,
+        ["construction:plasma"]    = 1,
+        ["ground:x2_neon"]         = 4,
     },
     description  = "Objective Core",
     category     = "objective",
