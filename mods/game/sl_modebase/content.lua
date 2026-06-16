@@ -241,6 +241,47 @@ minetest.register_node(door_open, {
 	on_rightclick = toggle_door,
 })
 
+-- Hatch: floor/ceiling access using the MVP hatch mesh
+local hatch_closed = modname .. ":hatch"
+local hatch_open = modname .. ":hatch_open"
+
+local function toggle_hatch(pos, node, clicker)
+	if not clicker or not clicker:is_player() then return end
+	local new_name = (node.name == hatch_closed) and hatch_open or hatch_closed
+	minetest.set_node(pos, { name = new_name, param2 = node.param2 })
+	minetest.sound_play("place", { pos = pos, gain = 0.4, max_hear_distance = 8 })
+end
+
+minetest.register_node(hatch_closed, {
+	description = S("Hatch"),
+	drawtype = "mesh",
+	mesh = "hatch.obj",
+	tiles = { "door_texture.png" },
+	paramtype = "light",
+	paramtype2 = "facedir",
+	groups = { choppy = 2, oddly_breakable_by_hand = 1 },
+	is_ground_content = false,
+	walkable = true,
+	selection_box = { type = "fixed", fixed = { -0.5, -0.5, -0.5, 0.5, -0.38, 0.5 } },
+	collision_box = { type = "fixed", fixed = { -0.5, -0.5, -0.5, 0.5, -0.38, 0.5 } },
+	on_rightclick = toggle_hatch,
+})
+
+minetest.register_node(hatch_open, {
+	description = S("Hatch (Open)"),
+	drawtype = "nodebox",
+	tiles = { "door_texture.png" },
+	paramtype = "light",
+	paramtype2 = "facedir",
+	groups = { choppy = 2, oddly_breakable_by_hand = 1, not_in_creative_inventory = 1 },
+	is_ground_content = false,
+	walkable = false,
+	node_box = { type = "fixed", fixed = { -0.5, -0.5, -0.5, -0.4, -0.45, -0.4 } },
+	selection_box = { type = "fixed", fixed = { -0.5, -0.5, -0.5, -0.4, -0.45, -0.4 } },
+	drop = hatch_closed,
+	on_rightclick = toggle_hatch,
+})
+
 -- Platform: walkable building piece with the placeholder mesh
 minetest.register_node(modname .. ":platform", {
 	description = S("Platform"),
