@@ -177,6 +177,15 @@ for _, t in ipairs(tactical_nodes) do
 end
 
 -- ---------------------------------------------------------------
+-- Information items
+-- ---------------------------------------------------------------
+minetest.register_craftitem(modname .. ":data_pad_security", {
+	description = S("Decrypted Security Pad"),
+	inventory_image = "sl_circuit_board.png^[colorize:#00ff00:50",
+	groups = { information = 1 },
+})
+
+-- ---------------------------------------------------------------
 -- Interactable world nodes (terminal, door, platform, pickup)
 -- ---------------------------------------------------------------
 

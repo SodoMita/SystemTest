@@ -187,8 +187,8 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         category = "equipment"; meta:set_string("craft_scroll", "0")
     elseif fields.cat_tactical then
         category = "tactical";  meta:set_string("craft_scroll", "0")
-    elseif fields.cat_objective then
-        category = "objective"; meta:set_string("craft_scroll", "0")
+    elseif fields.cat_information then
+        category = "information"; meta:set_string("craft_scroll", "0")
     end
     meta:set_string("crafting_category", category)
 
