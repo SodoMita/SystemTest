@@ -42,6 +42,13 @@ function game_mode.end_match(winner, reason)
 	else
 		game_mode.broadcast(S("Match ended. (@1)", reason or ""))
 	end
+
+	-- Teleport everyone back to lobby and reset physics/armor
+	minetest.after(2, function()
+		for _, player in ipairs(minetest.get_connected_players()) do
+			game_mode.spawn_player(player)
+		end
+	end)
 end
 
 -- Reset for new match
