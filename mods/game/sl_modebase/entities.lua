@@ -77,6 +77,8 @@ minetest.register_entity(MONSTER_NAME, {
 
 			if #candidates > 0 then
 				self.current_target = candidates[math.random(1, #candidates)]
+				-- Small random delay to start moving so they don't all move in perfect sync
+				self.timer = -math.random() * 0.5
 			else
 				self.current_target = nil
 			end
@@ -91,8 +93,16 @@ minetest.register_entity(MONSTER_NAME, {
 				if p then
 					tpos = p:get_pos()
 					self.current_target.pos = tpos
+					
+					-- Check if player became ghost or eliminated
+					local pl = game_mode.get_player_state(self.current_target.name)
+					if not pl or pl.phase ~= "alive" or pl.eliminated then
+						self.current_target = nil
+						return
+					end
 				else
 					self.current_target = nil -- Lost player
+					return
 				end
 			end
 			
@@ -100,15 +110,19 @@ minetest.register_entity(MONSTER_NAME, {
 				local dist = vector.distance(pos, tpos)
 				local dir = vector.normalize(vector.subtract(tpos, pos))
 				
+				-- Add slight jitter to movement
+				local jitter = {x=(math.random()-0.5)*0.5, y=0, z=(math.random()-0.5)*0.5}
+				local move_dir = vector.add(dir, jitter)
+				
 				self.object:set_velocity({
-					x = dir.x * 2.5,
-					y = dir.y * 2.5,
-					z = dir.z * 2.5,
+					x = move_dir.x * 2.5,
+					y = move_dir.y * 2.5,
+					z = move_dir.z * 2.5,
 				})
 				self.object:set_rotation(vector.dir_to_rotation(dir))
 
 				-- Attack logic
-				if dist < 2.0 and self.attack_timer >= 1.0 then
+				if dist < 2.5 and self.attack_timer >= 1.2 then
 					self.attack_timer = 0
 					if self.current_target.type == "player" then
 						local p = minetest.get_player_by_name(self.current_target.name)
@@ -119,18 +133,8 @@ minetest.register_entity(MONSTER_NAME, {
 							}, nil)
 						end
 					else
-						-- Attack Beacon
-						local bpos = self.current_target.pos
-						local node = minetest.get_node_or_nil(bpos)
-						if node then
-							local def = minetest.registered_nodes[node.name]
-							if def and def.on_punch then
-								def.on_punch(bpos, node, self.object)
-							end
-						else
-							-- Beacon unloaded? Apply damage directly to state/broadcast
-							-- (Or just move closer until it loads)
-						end
+						-- Attack Beacon (uses state directly for unloaded nodes)
+						game_mode.damage_beacon(self.current_target.team_id, 5, "A Monster")
 					end
 					
 					minetest.sound_play("monster_chase", {
@@ -138,6 +142,12 @@ minetest.register_entity(MONSTER_NAME, {
 						gain = 0.8,
 						max_hear_distance = 12,
 					})
+				end
+
+				-- If stuck or taking too long, switch target
+				-- If further than 3 blocks and haven't reached in 7 seconds, pick new
+				if dist > 3 and self.target_change_timer > 7 then
+					self.current_target = nil
 				end
 			end
 		else
