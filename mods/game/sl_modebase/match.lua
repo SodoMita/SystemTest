@@ -133,6 +133,16 @@ function game_mode.start_new_match(initiator, win_mode)
 	return true
 end
 
+-- Protection override to prevent ghosts from digging/placing
+local old_is_protected = minetest.is_protected
+function minetest.is_protected(pos, name)
+	local pl = game_mode.get_player_state(name)
+	if pl and pl.phase == "ghost" then
+		return true
+	end
+	return old_is_protected(pos, name)
+end
+
 -- Elimination check
 local function check_team_elimination()
 	for _, team_id in ipairs(state.teams_order) do
