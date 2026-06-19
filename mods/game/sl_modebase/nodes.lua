@@ -5,6 +5,22 @@ local state = game_mode.state
 -- Beacon nodes (visual + spawn anchors)
 -- ================================================================
 
+local function handle_beacon_destruction(team_id)
+	game_mode.broadcast(S("@1 has been destroyed! Team eliminated.", game_mode.get_team_label(team_id)))
+	state.teams[team_id].spawn = nil -- Disable spawning
+	game_mode.save_spawns()
+
+	for _, player in ipairs(minetest.get_connected_players()) do
+		local name = player:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		if pl.team == team_id then
+			pl.lives = 0
+			pl.phase = "ghost"
+			player:set_hp(0)
+		end
+	end
+end
+
 minetest.register_node(game_mode.modname .. ":beacon_a", {
 	description = S("Beacon A"),
 	drawtype = "mesh",
@@ -12,9 +28,15 @@ minetest.register_node(game_mode.modname .. ":beacon_a", {
 	tiles = {"default_mese_block.png"},
 	paramtype = "light",
 	light_source = 10,
-	groups = {cracky = 1, oddly_breakable_by_hand = 1},
+	groups = {cracky = 1, oddly_breakable_by_hand = 1, beacon = 1},
 	selection_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
 	collision_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
+
+	on_construct = function(pos)
+		local meta = minetest.get_meta(pos)
+		meta:set_int("hp", 100)
+		meta:set_string("infotext", S("Beacon A (HP: 100)"))
+	end,
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_a.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
@@ -23,17 +45,21 @@ minetest.register_node(game_mode.modname .. ":beacon_a", {
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
 	end,
 
-	on_destruct = function(pos)
-		if state.match_active then
-			game_mode.broadcast(S("Beacon A has been destroyed! Team A eliminated."))
-			for _, player in ipairs(minetest.get_connected_players()) do
-				local name = player:get_player_name()
-				local pl = game_mode.get_player_state(name)
-				if pl.team == "beacon_a" and pl.phase == "alive" then
-					player:set_hp(0)
-				end
-			end
+	on_punch = function(pos, node, puncher, pointed_thing)
+		if not state.match_active then return end
+		local meta = minetest.get_meta(pos)
+		local hp = meta:get_int("hp") - 5
+		if hp <= 0 then
+			minetest.remove_node(pos)
+			handle_beacon_destruction("beacon_a")
+		else
+			meta:set_int("hp", hp)
+			meta:set_string("infotext", S("Beacon A (HP: @1)", tostring(hp)))
 		end
+	end,
+
+	can_dig = function(pos, player)
+		return not state.match_active
 	end,
 })
 
@@ -44,9 +70,15 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 	tiles = {"default_steel_block.png"},
 	paramtype = "light",
 	light_source = 10,
-	groups = {cracky = 1, oddly_breakable_by_hand = 1},
+	groups = {cracky = 1, oddly_breakable_by_hand = 1, beacon = 1},
 	selection_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
 	collision_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
+
+	on_construct = function(pos)
+		local meta = minetest.get_meta(pos)
+		meta:set_int("hp", 100)
+		meta:set_string("infotext", S("Beacon B (HP: 100)"))
+	end,
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_b.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
@@ -55,17 +87,21 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
 	end,
 
-	on_destruct = function(pos)
-		if state.match_active then
-			game_mode.broadcast(S("Beacon B has been destroyed! Team B eliminated."))
-			for _, player in ipairs(minetest.get_connected_players()) do
-				local name = player:get_player_name()
-				local pl = game_mode.get_player_state(name)
-				if pl.team == "beacon_b" and pl.phase == "alive" then
-					player:set_hp(0)
-				end
-			end
+	on_punch = function(pos, node, puncher, pointed_thing)
+		if not state.match_active then return end
+		local meta = minetest.get_meta(pos)
+		local hp = meta:get_int("hp") - 5
+		if hp <= 0 then
+			minetest.remove_node(pos)
+			handle_beacon_destruction("beacon_b")
+		else
+			meta:set_int("hp", hp)
+			meta:set_string("infotext", S("Beacon B (HP: @1)", tostring(hp)))
 		end
+	end,
+
+	can_dig = function(pos, player)
+		return not state.match_active
 	end,
 })
 

@@ -25,6 +25,7 @@ function game_mode.spawn_player(player)
 	minetest.log("action", string.format("[game_mode] Spawning %s at %s (match_active: %s)",
 		name, minetest.pos_to_string(pos), tostring(state.match_active)))
 	player:set_pos(pos)
+	player:set_hp(player:get_properties().hp_max or 20)
 
 	-- Default Boxman properties
 	local boxman_tex = "sl_boxman_neon.png"
