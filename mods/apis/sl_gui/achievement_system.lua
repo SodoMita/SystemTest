@@ -484,15 +484,15 @@ function get_achievement_formspec(player)
 
     -- Get player model info
     local model_name = "character.b3d"
-    local tex_str = "character.png,character.png,character.png,character.png,character.png"
+    local tex_str = "character.png,character.png,character.png,character.png,character.png,character.png,character.png,character.png"
     if sl_characters and sl_characters.default_model then
         model_name = sl_characters.default_model
         local tex = sl_characters.default_texture or "sl_boxman_neon.png"
-        tex_str = string.format("%s,%s,%s,%s,%s", tex, tex, tex, tex, tex)
+        tex_str = string.format("%s,%s,%s,%s,%s,%s,%s,%s", tex, tex, tex, tex, tex, tex, tex, tex)
     else
         local ptex = player_api.get_textures(player)
         if ptex and #ptex > 0 then
-            tex_str = string.format("%s,%s,%s,%s,%s", ptex[1], ptex[1], ptex[1], ptex[1], ptex[1])
+            tex_str = string.format("%s,%s,%s,%s,%s,%s,%s,%s", ptex[1], ptex[1], ptex[1], ptex[1], ptex[1], ptex[1], ptex[1], ptex[1])
         end
     end
 

@@ -60,8 +60,46 @@ function game_mode.start_new_match(initiator, win_mode)
 	end
 
 	local connected = game_mode.get_connected_player_names()
-	if #connected < 2 then
-		return false, S("Need at least 2 players to start a match.")
+	if #connected < 1 then
+		return false, S("Need at least 1 player to start a match.")
+	end
+
+	-- Auto-assign Monster Master if nobody has the role
+	local mm_exists = false
+	for _, name in ipairs(connected) do
+		local pl = game_mode.get_player_state(name)
+		if pl.role == "monster_master" then
+			mm_exists = true
+			state.monster_master.player = name
+			break
+		end
+	end
+
+	if not mm_exists then
+		-- Pick player from the biggest team
+		local team_counts = { beacon_a = 0, beacon_b = 0 }
+		for _, name in ipairs(connected) do
+			local pl = game_mode.get_player_state(name)
+			if pl.team then
+				team_counts[pl.team] = (team_counts[pl.team] or 0) + 1
+			end
+		end
+
+		local biggest_team = "beacon_a"
+		if team_counts.beacon_b > team_counts.beacon_a then
+			biggest_team = "beacon_b"
+		end
+
+		for _, name in ipairs(connected) do
+			local pl = game_mode.get_player_state(name)
+			if pl.team == biggest_team then
+				pl.role = "monster_master"
+				pl.team = nil
+				state.monster_master.player = name
+				game_mode.broadcast(S("@1 has been chosen as the Monster Master!", name))
+				break
+			end
+		end
 	end
 
 	state.match_count = (state.match_count or 0) + 1
@@ -143,6 +181,7 @@ minetest.register_on_dieplayer(function(player, reason)
 		pl.lives = math.max(0, pl.lives - 1)
 		if pl.lives <= 0 then
 			pl.phase = "ghost"
+			player:set_armor_groups({immortal = 1})
 			game_mode.broadcast(S("@1 has fallen and returned as a Ghost!", name))
 		else
 			minetest.chat_send_player(name,
@@ -150,9 +189,11 @@ minetest.register_on_dieplayer(function(player, reason)
 		end
 	elseif pl.phase == "ghost" then
 		pl.phase = "monster"
+		player:set_armor_groups({fleshy = 100})
 		game_mode.broadcast(S("@1's spirit has mutated into a Neutral Monster!", name))
 	elseif pl.phase == "monster" then
 		pl.phase = "master_monster"
+		player:set_armor_groups({fleshy = 100})
 		game_mode.broadcast(S("@1 has been bound to the Monster Master's will!", name))
 	elseif pl.phase == "master_monster" then
 		pl.eliminated = true

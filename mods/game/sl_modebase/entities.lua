@@ -54,13 +54,13 @@ minetest.register_entity(MONSTER_NAME, {
 			})
 		end
 
-		-- Find nearest beacon-team player
+		-- Find nearest beacon-team player who is alive
 		local nearest
 		local nearest_dist_sq = math.huge
 		for _, player in ipairs(minetest.get_connected_players()) do
 			local name = player:get_player_name()
-			local pl = state.players[name]
-			if pl and pl.team and game_mode.is_beacon_team(pl.team) then
+			local pl = game_mode.get_player_state(name)
+			if pl and pl.team and game_mode.is_beacon_team(pl.team) and pl.phase == "alive" then
 				local ppos = player:get_pos()
 				if ppos then
 					local dist_sq = vector.distance(pos, ppos) ^ 2
