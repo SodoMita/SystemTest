@@ -29,7 +29,7 @@ function game_mode.spawn_player(player)
 
 	-- Default Boxman properties
 	local boxman_tex = "sl_boxman_neon.png"
-	local boxman_textures = {boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex}
+	local boxman_textures = {boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex}
 
 	-- Globally hide nametags
 	player:set_nametag_attributes({color = {a = 0, r = 255, g = 255, b = 255}})
@@ -161,4 +161,3 @@ minetest.register_on_respawnplayer(function(player)
 	end
 	return false
 end)
-

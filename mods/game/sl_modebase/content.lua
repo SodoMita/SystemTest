@@ -329,6 +329,27 @@ minetest.register_node(modname .. ":item_pickup", {
 })
 
 -- ---------------------------------------------------------------
+-- Information & Lore Items
+-- ---------------------------------------------------------------
+local info_items = {
+	{ "data_pad_security", "Security Data Pad", "sl_circuit_board.png^[colorize:#ff0000:50", "ENCRYPTED: 'Section 7 seal critical... profit overrides safety...'" },
+	{ "data_pad_logistics", "Logistics Data Pad", "sl_circuit_board.png^[colorize:#00ff00:50", "LOG: '340k saved on inspections this month. Tell the families it was an accident.'" },
+	{ "data_pad_medical", "Medical Data Pad", "sl_circuit_board.png^[colorize:#0000ff:50", "BIO: 'Dredger Unit 7 confirmed as Maintenance Tech Kowalski. Personality mutated by hydraulic exposure.'" },
+}
+
+for _, it in ipairs(info_items) do
+	minetest.register_craftitem(modname .. ":" .. it[1], {
+		description = S(it[2] .. "\n(Information Item)"),
+		inventory_image = it[3],
+		groups = { information = 1 },
+		on_use = function(itemstack, user, pointed_thing)
+			minetest.chat_send_player(user:get_player_name(), minetest.colorize("#00ffff", it[4]))
+			return itemstack
+		end,
+	})
+end
+
+-- ---------------------------------------------------------------
 -- Monster Master Spawner Tools
 -- ---------------------------------------------------------------
 
