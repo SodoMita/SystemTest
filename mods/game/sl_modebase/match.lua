@@ -61,9 +61,14 @@ local function reset_players_for_new_match()
 end
 
 -- Start match
-function game_mode.start_new_match(initiator, win_mode)
+function game_mode.start_new_match(initiator)
 	if state.match_active then
 		return false, S("Match is already running.")
+	end
+
+	-- Verify at least one win condition is set
+	if not state.win_conditions.elimination and not state.win_conditions.objective then
+		return false, S("Cannot start match: No win conditions enabled.")
 	end
 
 	local connected = game_mode.get_connected_player_names()
@@ -111,7 +116,6 @@ function game_mode.start_new_match(initiator, win_mode)
 
 	state.match_count = (state.match_count or 0) + 1
 	state.match_active = true
-	state.win_mode = win_mode or "elimination"
 
 	reset_players_for_new_match()
 
@@ -126,8 +130,10 @@ function game_mode.start_new_match(initiator, win_mode)
 		end
 	end
 
-	local mode_label = state.win_mode == "objective"
-		and S("Objective Delivery") or S("Elimination")
+	local cond_list = {}
+	if state.win_conditions.elimination then table.insert(cond_list, S("Elimination")) end
+	if state.win_conditions.objective then table.insert(cond_list, S("Objective Delivery")) end
+	local mode_label = table.concat(cond_list, " + ")
 
 	if initiator then
 		game_mode.broadcast(S("Match #@1 started by @2. Mode: @3",
@@ -152,6 +158,8 @@ end
 
 -- Elimination check
 local function check_team_elimination()
+	if not state.win_conditions.elimination then return end
+
 	for _, team_id in ipairs(state.teams_order) do
 		local has_active = false
 		for name, pl in pairs(state.players) do

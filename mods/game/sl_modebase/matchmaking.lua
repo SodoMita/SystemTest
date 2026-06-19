@@ -21,22 +21,28 @@ local function get_matchmaking_formspec(player_name)
 	local status_text = state.match_active and minetest.colorize("#ff5555", "MATCH IN PROGRESS") or minetest.colorize("#55ff55", "LOBBY - READY TO START")
 	table.insert(fs, "label[0.5,1.0;Status: " .. status_text .. "]")
 
-	-- Mode Selection
+	-- Win Conditions
 	table.insert(fs, "box[0.5,1.5;4,3;#1a1a1aff]")
-	table.insert(fs, "label[0.7,1.8;Match Mode:]")
+	table.insert(fs, "label[0.7,1.8;Win Conditions:]")
 	
-	local mode = state.win_mode or "elimination"
-	local modes = {"elimination", "objective"}
-	local mode_idx = 1
-	for i, m in ipairs(modes) do if m == mode then mode_idx = i break end end
-
-	table.insert(fs, "dropdown[0.7,2.2;3.6,0.6;match_mode;Elimination,Objective Delivery;" .. mode_idx .. "]")
+	local win_conds = state.win_conditions or { elimination = true, objective = false }
 	
-	local desc = "Last team standing wins."
-	if mode == "objective" then
-		desc = "Craft and deliver the Core to win."
+	table.insert(fs, string.format("checkbox[0.7,2.2;cond_elimination;Last Team Standing;%s]", 
+		tostring(win_conds.elimination)))
+	table.insert(fs, string.format("checkbox[0.7,2.8;cond_objective;Item Delivery;%s]", 
+		tostring(win_conds.objective)))
+	
+	local desc = ""
+	if win_conds.elimination and win_conds.objective then
+		desc = "Hybrid: First team to eliminate others OR deliver the Core wins."
+	elseif win_conds.elimination then
+		desc = "Elimination: Last team standing wins."
+	elseif win_conds.objective then
+		desc = "Objective: First team to deliver the Core wins."
+	else
+		desc = minetest.colorize("#ff5555", "WARNING: No win conditions set!")
 	end
-	table.insert(fs, "textarea[0.7,3.0;3.6,1.2;;;" .. minetest.formspec_escape(desc) .. "]")
+	table.insert(fs, "textarea[0.7,3.5;3.6,1.0;;;" .. minetest.formspec_escape(desc) .. "]")
 
 	-- Role Selection
 	table.insert(fs, "box[5.0,1.5;4.5,3;#1a1a1aff]")
@@ -101,12 +107,12 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	elseif fields.leave_mm then
 		game_mode.set_monster_master(nil)
 		game_mode.broadcast(S("Monster Master has resigned."))
-	elseif fields.match_mode then
-		local modes = {"elimination", "objective"}
-		local idx = minetest.explode_textlist_event(fields.match_mode).index or 1
-		state.win_mode = modes[idx] or "elimination"
+	elseif fields.cond_elimination then
+		state.win_conditions.elimination = (fields.cond_elimination == "true")
+	elseif fields.cond_objective then
+		state.win_conditions.objective = (fields.cond_objective == "true")
 	elseif fields.start_match then
-		minetest.run_chatcommand("sl_match_start", state.win_mode or "elimination")
+		minetest.run_chatcommand("sl_match_start", "")
 	elseif fields.stop_match then
 		minetest.run_chatcommand("sl_match_stop", "")
 	end
