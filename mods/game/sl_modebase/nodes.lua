@@ -311,6 +311,53 @@ minetest.register_node(game_mode.modname .. ":spawn_lobby", {
 	end,
 })
 
+-- ================================================================
+-- Ghost & Task Nodes
+-- ================================================================
+
+minetest.register_node(game_mode.modname .. ":ghost_mutator", {
+	description = S("Ghost Mutator (Mutation to Neutral Monster)"),
+	tiles = {"sl_raw_crystal.png^[colorize:#ff00ff:80"},
+	paramtype = "light",
+	light_source = 12,
+	groups = {cracky = 1},
+	on_rightclick = function(pos, node, clicker)
+		if not clicker or not clicker:is_player() then return end
+		local name = clicker:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		if pl.phase == "ghost" then
+			pl.phase = "monster"
+			game_mode.broadcast(S("@1's ghost has mutated into a Neutral Monster!", name))
+			game_mode.spawn_player(clicker)
+		else
+			minetest.chat_send_player(name, S("Only ghosts can use the mutator."))
+		end
+	end,
+})
+
+minetest.register_node(game_mode.modname .. ":ghost_task_terminal", {
+	description = S("Ghost Task Terminal"),
+	drawtype = "mesh",
+	mesh = "terminal.obj",
+	tiles = { "terminal_texture.png^[colorize:#ff00ff:50" },
+	paramtype = "light",
+	light_source = 8,
+	groups = { cracky = 2 },
+	on_rightclick = function(pos, node, clicker)
+		if not clicker or not clicker:is_player() then return end
+		local name = clicker:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		if pl.phase == "ghost" then
+			local pads = {"sl_modebase:data_pad_security", "sl_modebase:data_pad_logistics", "sl_modebase:data_pad_medical"}
+			local pad = pads[math.random(1, #pads)]
+			clicker:get_inventory():add_item("main", pad)
+			minetest.chat_send_player(name, S("Task complete. Recovered encrypted data pad."))
+		else
+			minetest.chat_send_player(name, S("This terminal is for ghosts only."))
+		end
+	end,
+})
+
 -- Ensure existing spawn nodes in the world update the state when loaded
 minetest.register_lbm({
 	name = "sl_modebase:update_spawns",
