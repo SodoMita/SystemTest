@@ -32,13 +32,16 @@ minetest.register_entity(MONSTER_NAME, {
 	timer = 0,
 	sound_timer = 0,
 	attack_timer = 0,
+	target_change_timer = 0,
+	current_target = nil, -- {type = "player"|"beacon", name = ..., pos = ...}
 
 	on_step = function(self, dtime)
 		self.timer = self.timer + dtime
 		self.attack_timer = self.attack_timer + dtime
 		self.sound_timer = self.sound_timer + dtime
+		self.target_change_timer = self.target_change_timer + dtime
 
-		if self.timer < 0.5 then
+		if self.timer < 0.2 then
 			return
 		end
 		self.timer = 0
@@ -46,78 +49,99 @@ minetest.register_entity(MONSTER_NAME, {
 		local pos = self.object:get_pos()
 		if not pos then return end
 
-		-- Idle sound occasionally
-		if self.sound_timer > 4 then
-			self.sound_timer = 0
-			minetest.sound_play("monster_idle", {
-				pos = pos,
-				gain = 0.6,
-				max_hear_distance = 16,
-			})
-		end
+		-- Target picking logic (pick every 10 seconds or if target lost)
+		if self.target_change_timer > 10 or not self.current_target then
+			self.target_change_timer = 0
+			local candidates = {}
 
-		-- Find nearest beacon-team player who is alive
-		local nearest
-		local nearest_dist_sq = math.huge
-		for _, player in ipairs(minetest.get_connected_players()) do
-			local name = player:get_player_name()
-			local pl = game_mode.get_player_state(name)
-			if pl and pl.team and game_mode.is_beacon_team(pl.team) and pl.phase == "alive" then
-				local ppos = player:get_pos()
-				if ppos then
-					local dist_sq = vector.distance(pos, ppos) ^ 2
-					if dist_sq < nearest_dist_sq then
-						nearest = player
-						nearest_dist_sq = dist_sq
+			-- Candidate: Alive players
+			for _, player in ipairs(minetest.get_connected_players()) do
+				local name = player:get_player_name()
+				local pl = game_mode.get_player_state(name)
+				if pl and pl.team and game_mode.is_beacon_team(pl.team) and pl.phase == "alive" then
+					local ppos = player:get_pos()
+					if ppos then
+						table.insert(candidates, {type = "player", name = name, pos = ppos})
 					end
 				end
 			end
+
+			-- Candidate: Beacons (even if unloaded, use spawn pos from state)
+			for team_id, team_def in pairs(state.teams) do
+				if team_def.spawn then
+					-- Check if beacon node is actually there (if loaded)
+					local bpos = {x=team_def.spawn.x, y=team_def.spawn.y-1, z=team_def.spawn.z}
+					table.insert(candidates, {type = "beacon", team_id = team_id, pos = bpos})
+				end
+			end
+
+			if #candidates > 0 then
+				self.current_target = candidates[math.random(1, #candidates)]
+			else
+				self.current_target = nil
+			end
 		end
 
-		if nearest then
-			local ppos = nearest:get_pos()
-			local dir = vector.normalize(vector.subtract(ppos, pos))
-			self.object:set_velocity({
-				x = dir.x * 2.5,
-				y = dir.y * 2.5,
-				z = dir.z * 2.5,
-			})
-			self.object:set_rotation(vector.dir_to_rotation(dir))
-
-			local dist = math.sqrt(nearest_dist_sq)
-			if dist < 1.5 and self.attack_timer >= 1.0 then
-				self.attack_timer = 0
-				nearest:punch(self.object, 1.0, {
-					full_punch_interval = 1.0,
-					damage_groups = { fleshy = 4 },
-				}, nil)
-				minetest.sound_play("monster_chase", {
-					pos = pos,
-					gain = 0.8,
-					max_hear_distance = 12,
+		if self.current_target then
+			local tpos = self.current_target.pos
+			
+			-- Update player position if target is player
+			if self.current_target.type == "player" then
+				local p = minetest.get_player_by_name(self.current_target.name)
+				if p then
+					tpos = p:get_pos()
+					self.current_target.pos = tpos
+				else
+					self.current_target = nil -- Lost player
+				end
+			end
+			
+			if tpos then
+				local dist = vector.distance(pos, tpos)
+				local dir = vector.normalize(vector.subtract(tpos, pos))
+				
+				self.object:set_velocity({
+					x = dir.x * 2.5,
+					y = dir.y * 2.5,
+					z = dir.z * 2.5,
 				})
+				self.object:set_rotation(vector.dir_to_rotation(dir))
+
+				-- Attack logic
+				if dist < 2.0 and self.attack_timer >= 1.0 then
+					self.attack_timer = 0
+					if self.current_target.type == "player" then
+						local p = minetest.get_player_by_name(self.current_target.name)
+						if p then
+							p:punch(self.object, 1.0, {
+								full_punch_interval = 1.0,
+								damage_groups = { fleshy = 4 },
+							}, nil)
+						end
+					else
+						-- Attack Beacon
+						local bpos = self.current_target.pos
+						local node = minetest.get_node_or_nil(bpos)
+						if node then
+							local def = minetest.registered_nodes[node.name]
+							if def and def.on_punch then
+								def.on_punch(bpos, node, self.object)
+							end
+						else
+							-- Beacon unloaded? Apply damage directly to state/broadcast
+							-- (Or just move closer until it loads)
+						end
+					end
+					
+					minetest.sound_play("monster_chase", {
+						pos = pos,
+						gain = 0.8,
+						max_hear_distance = 12,
+					})
+				end
 			end
 		else
-			-- If no players, try attacking beacons
-			local beacon = minetest.find_node_near(pos, 5, {"group:beacon"})
-			if beacon then
-				local dir = vector.normalize(vector.subtract(beacon, pos))
-				self.object:set_velocity({
-					x = dir.x * 2.0,
-					y = dir.y * 2.0,
-					z = dir.z * 2.0,
-				})
-				if vector.distance(pos, beacon) < 2 and self.attack_timer >= 1.0 then
-					self.attack_timer = 0
-					local bnode = minetest.get_node(beacon)
-					local bdef = minetest.registered_nodes[bnode.name]
-					if bdef and bdef.on_punch then
-						bdef.on_punch(beacon, bnode, self.object)
-					end
-				end
-			else
-				self.object:set_velocity({ x = 0, y = 0, z = 0 })
-			end
+			self.object:set_velocity({ x = 0, y = 0, z = 0 })
 		end
 	end,
 
