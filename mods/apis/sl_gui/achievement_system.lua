@@ -501,12 +501,6 @@ function get_achievement_formspec(player)
         "size[12,11.8]",
         "bgcolor[#0a0a0aff;true]",
 
-        -- 3D Player Model Preview Box
-        "box[0.2,0.3;1.5,1.5;#1a1a1aff]",
-        string.format("model[0.3,0.4;1.3,1.3;player_preview;%s;%s;0,170;false;true;0,0]",
-            model_name, tex_str),
-        "image_button[0.3,0.4;1.3,1.3;;open_outfit;]",
-
         -- Header with stats
         "box[0.2,1.8;11.6,0.6;#2a2a2aff]",
         "label[0.5,2.1;🏆 Achievements]",

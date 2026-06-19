@@ -397,12 +397,6 @@ function get_ability_formspec_new(player)
         "size[12,11.8]",
         "bgcolor[#0a0a0aff;true]",
 
-        -- 3D Player preview (System Looting boxman model)
-        "box[0.2,0.3;1.5,1.5;#1a1a1aff]",
-        string.format("model[0.3,0.4;1.3,1.3;player_preview;%s;%s;0,170;false;true;0,0]",
-            model_name, tex_str),
-        "image_button[0.3,0.4;1.3,1.3;;open_outfit;]",
-
         -- Header
         "box[0.2,1.9;11.6,0.6;#2a2a2aff]",
         "label[0.5,2.2;Abilities — Level " .. level .. "]",
