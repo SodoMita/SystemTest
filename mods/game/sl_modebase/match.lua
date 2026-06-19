@@ -113,17 +113,22 @@ function game_mode.start_new_match(initiator)
 		if team_counts.beacon_b > team_counts.beacon_a then
 			biggest_team = "beacon_b"
 		elseif team_counts.beacon_a == 0 and team_counts.beacon_b == 0 then
-			-- If no teams (all in lobby), pick first connected
+			-- If no teams (all in lobby), pick from everyone
 			biggest_team = nil
 		end
 
+		local candidates = {}
 		for _, name in ipairs(connected) do
 			local pl = game_mode.get_player_state(name)
 			if not biggest_team or pl.team == biggest_team then
-				game_mode.set_monster_master(name)
-				game_mode.broadcast(S("@1 has been chosen as the Monster Master!", name))
-				break
+				table.insert(candidates, name)
 			end
+		end
+
+		if #candidates > 0 then
+			local chosen_name = candidates[math.random(1, #candidates)]
+			game_mode.set_monster_master(chosen_name)
+			game_mode.broadcast(S("@1 has been chosen as the Monster Master!", chosen_name))
 		end
 	end
 
