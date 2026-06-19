@@ -237,6 +237,9 @@ minetest.register_abm({
     interval = 30, -- Check every 30 seconds
     chance = 100, -- 1 in 100 chance to spawn
     action = function(pos, node)
+        if minetest.settings:get_bool("creative_mode") then
+            return
+        end
         if #minetest.get_connected_players() > 0 and mobpop < maxmobpop then
             local mob_pos = vector.add(pos, {x = 0, y = 1, z = 0})
             minetest.add_entity(mob_pos, "sl_scary:mob")
