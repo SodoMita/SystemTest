@@ -21,6 +21,9 @@ end
 
 -- Helpers
 local function has_ingredients(player, ingredients)
+    if minetest.settings:get_bool("creative_mode") then
+        return true -- Infinite materials in creative
+    end
     local inv = player:get_inventory()
     for item_name, count in pairs(ingredients) do
         if not inv:contains_item("main", ItemStack(item_name .. " " .. count)) then
@@ -31,6 +34,9 @@ local function has_ingredients(player, ingredients)
 end
 
 local function take_ingredients(player, ingredients)
+    if minetest.settings:get_bool("creative_mode") then
+        return -- Don't consume materials in creative
+    end
     local inv = player:get_inventory()
     for item_name, count in pairs(ingredients) do
         inv:remove_item("main", ItemStack(item_name .. " " .. count))

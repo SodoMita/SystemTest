@@ -93,7 +93,7 @@ local function reset_players_for_new_match()
 		
 		-- Clear inventory at start of match too
 		local player = minetest.get_player_by_name(name)
-		if player then
+		if player and not minetest.settings:get_bool("creative_mode") then
 			player:get_inventory():set_list("main", {})
 		end
 	end
@@ -195,6 +195,12 @@ end
 local old_is_protected = minetest.is_protected
 function minetest.is_protected(pos, name)
 	local pl = game_mode.get_player_state(name)
+	local is_creative = minetest.settings:get_bool("creative_mode") or minetest.check_player_privs(name, {all=true})
+	
+	if is_creative then
+		return false -- Creative/Admins can always build
+	end
+	
 	if pl and (pl.phase == "ghost" or not state.match_active) then
 		return true
 	end
@@ -229,6 +235,11 @@ local function check_team_elimination()
 end
 
 minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, tool_capabilities, dir, damage)
+	local is_creative = minetest.settings:get_bool("creative_mode")
+	if is_creative then
+		return true -- No damage in creative mode
+	end
+
 	if not state.match_active then
 		return true -- Block damage in lobby
 	end

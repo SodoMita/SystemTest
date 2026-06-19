@@ -59,7 +59,9 @@ function game_mode.spawn_player(player)
 		
 		-- Clear inventory for lobby
 		local inv = player:get_inventory()
-		inv:set_list("main", {})
+		if not minetest.settings:get_bool("creative_mode") then
+			inv:set_list("main", {})
+		end
 	elseif pl.phase == "ghost" then
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_physics_override({
