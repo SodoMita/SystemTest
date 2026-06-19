@@ -112,14 +112,15 @@ function game_mode.start_new_match(initiator)
 		local biggest_team = "beacon_a"
 		if team_counts.beacon_b > team_counts.beacon_a then
 			biggest_team = "beacon_b"
+		elseif team_counts.beacon_a == 0 and team_counts.beacon_b == 0 then
+			-- If no teams (all in lobby), pick first connected
+			biggest_team = nil
 		end
 
 		for _, name in ipairs(connected) do
 			local pl = game_mode.get_player_state(name)
-			if pl.team == biggest_team then
-				pl.role = "monster_master"
-				pl.team = nil
-				state.monster_master.player = name
+			if not biggest_team or pl.team == biggest_team then
+				game_mode.set_monster_master(name)
 				game_mode.broadcast(S("@1 has been chosen as the Monster Master!", name))
 				break
 			end
@@ -208,7 +209,14 @@ minetest.register_on_dieplayer(function(player, reason)
 		if not stack:is_empty() then
 			-- Don't drop MM summoning tool
 			if stack:get_name() ~= game_mode.modname .. ":summon_monster" then
-				minetest.add_item(pos, stack)
+				local obj = minetest.add_item(pos, stack)
+				if obj then
+					-- Random direction "fountain" effect
+					local rx = (math.random() - 0.5) * 4
+					local rz = (math.random() - 0.5) * 4
+					local ry = math.random() * 5
+					obj:set_velocity({x=rx, y=ry, z=rz})
+				end
 				inv:set_stack("main", i, ItemStack(""))
 			end
 		end
