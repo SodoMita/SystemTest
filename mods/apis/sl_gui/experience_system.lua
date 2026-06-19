@@ -36,7 +36,7 @@ local function update_hud(player)
         
         -- Level display
         huds[name].level = player:hud_add({
-            hud_elem_type = "text",
+            type = "text",
             position = {x = 1, y = 0},
             offset = {x = -120, y = 20},
             text = "Level " .. level,
@@ -47,7 +47,7 @@ local function update_hud(player)
         
         -- XP text (moved much higher to avoid HP/hunger bars)
         huds[name].xp_text = player:hud_add({
-            hud_elem_type = "text",
+            type = "text",
             position = {x = 0.5, y = 1},
             offset = {x = 0, y = -120},
             text = string.format("%d / %d XP", current_xp, xp_needed),
