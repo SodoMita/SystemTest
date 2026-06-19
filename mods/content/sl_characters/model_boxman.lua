@@ -11,22 +11,28 @@ local boxman_animations = {
 	stand     = {x = 0,  y = 0},
 	walk      = {x = 1/60,  y = 40/60},
 	mine      = {x = 41/60,  y = 60/60},
-	walk_mine = {x = 61/60,  y = 100/60},
+	walk_mine = {x = 61/60,  y = 99/60},
 	-- Used by the existing player_api crawl/zoom logic.
 	sit       = {
-		x = 0, y = 20,
+		x = 101/60, y = 101/60,
 		eye_height = 0.8,
 		override_local = true,
 		collisionbox = {-0.3, 0.0, -0.3, 0.3, 1.0, 0.3},
 	},
 	crawl     = {
-		x = 0, y = 20,
+		x = 100/60, y = 100/60,
 		eye_height = 0.55,
 		override_local = true,
 		collisionbox = {-0.3, 0.0, -0.3, 0.3, 0.8, 0.3},
 	},
-	lay       = {
-		x = 0, y = 20,
+	lay       = { -- death actually
+		x = 102/60, y = 102/60,
+		eye_height = 0.3,
+		override_local = true,
+		collisionbox = {-0.6, 0.0, -0.6, 0.6, 0.3, 0.6},
+	},
+	die       = {
+		x = 102/60, y = 102/60,
 		eye_height = 0.3,
 		override_local = true,
 		collisionbox = {-0.6, 0.0, -0.6, 0.6, 0.3, 0.6},
