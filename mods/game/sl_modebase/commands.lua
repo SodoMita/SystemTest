@@ -8,6 +8,13 @@ end
 
 function game_mode.set_monster_master(name)
 	if name == nil or name == "" then
+		-- Remove tool from old MM if they exist
+		if state.monster_master.player then
+			local old_p = minetest.get_player_by_name(state.monster_master.player)
+			if old_p then
+				old_p:get_inventory():remove_item("main", game_mode.modname .. ":summon_monster")
+			end
+		end
 		state.monster_master.player = nil
 		return
 	end
@@ -23,6 +30,11 @@ function game_mode.set_monster_master(name)
 	local player = minetest.get_player_by_name(name)
 	if player then
 		game_mode.spawn_player(player)
+		-- Gift the summoning tool
+		local inv = player:get_inventory()
+		if not inv:contains_item("main", game_mode.modname .. ":summon_monster") then
+			inv:add_item("main", game_mode.modname .. ":summon_monster")
+		end
 	end
 end
 

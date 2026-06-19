@@ -328,4 +328,43 @@ minetest.register_node(modname .. ":item_pickup", {
 	end,
 })
 
+-- ---------------------------------------------------------------
+-- Monster Master Spawner Tools
+-- ---------------------------------------------------------------
+
+minetest.register_tool(modname .. ":summon_monster", {
+	description = S("Summon Basic Monster\n(Monster Master Only)"),
+	inventory_image = "monster_texture.png^[resize:32x32",
+	groups = { not_in_creative_inventory = 1 },
+	on_use = function(itemstack, user, pointed_thing)
+		local name = user:get_player_name()
+		if not game_mode.is_monster_master(name) then
+			minetest.chat_send_player(name, S("Only the Monster Master can use this."))
+			return itemstack
+		end
+
+		local pos = user:get_pos()
+		if not pos then return itemstack end
+
+		-- Spawn monster a bit in front of player
+		local dir = user:get_look_dir()
+		local spawn_pos = vector.add(pos, vector.multiply(dir, 3))
+		spawn_pos.y = spawn_pos.y + 1
+
+		local obj = minetest.add_entity(spawn_pos, game_mode.MONSTER_NAME)
+		if obj then
+			local lua = obj:get_luaentity()
+			if lua then
+				lua.monster_owner = name
+			end
+			minetest.sound_play("monster_idle", { pos = spawn_pos, gain = 0.8 })
+		end
+
+		return itemstack -- Don't consume
+	end,
+	on_drop = function(itemstack, dropper, pos)
+		return itemstack -- Don't allow dropping
+	end,
+})
+
 minetest.log("action", "[sl_modebase] content items/nodes registered.")
