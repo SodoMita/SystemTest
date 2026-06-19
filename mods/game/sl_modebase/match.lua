@@ -17,7 +17,7 @@ function game_mode.end_match(winner, reason)
 
 	state.match_active = false
 
-	-- Teleport everyone to lobby after a short delay
+	-- Teleport all players back to lobby after a short delay to ensure state sync
 	minetest.after(0.5, function()
 		for _, player in ipairs(minetest.get_connected_players()) do
 			game_mode.spawn_player(player)
