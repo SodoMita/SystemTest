@@ -63,11 +63,25 @@ end
 -- Build the full unified inventory formspec
 function get_unified_inventory(player)
     local current_tab = get_current_tab(player)
+    local model_name = "character.b3d"
+    local tex_str = "character.png,character.png,character.png,character.png,character.png,character.png,character.png,character.png"
+    
+    if sl_characters and sl_characters.default_model then
+        model_name = sl_characters.default_model
+        local tex = sl_characters.default_texture or "sl_boxman_neon.png"
+        tex_str = string.format("%s,%s,%s,%s,%s,%s,%s,%s", tex, tex, tex, tex, tex, tex, tex, tex)
+    end
 
     local formspec = {
         "formspec_version[4]",
         "size[12,11.8]",
         "bgcolor[#1a1a1aff;true]",
+        
+        -- 3D Player preview (always visible to reach Information/Outfit menu)
+        "box[7.8,0.2;1.5,1.5;#2a2a2aff]",
+        string.format("model[7.9,0.3;1.3,1.3;player_preview;%s;%s;0,170;false;true;0,0]",
+            model_name, tex_str),
+        "image_button[7.9,0.3;1.3,1.3;;open_outfit;]",
     }
 
     table.insert(formspec, gui_get_tab_buttons(current_tab))
