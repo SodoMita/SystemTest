@@ -191,15 +191,11 @@ minetest.register_chatcommand("sl_set_lobby", {
 
 -- Match control commands
 minetest.register_chatcommand("sl_match_start", {
-	params = "[elimination|objective]",
-	description = S("Start a new match. Optional mode: elimination (default) or objective."),
+	params = "",
+	description = S("Start a new match based on configured win conditions."),
 	privs = { sl_admin = true },
 	func = function(name, param)
-		local win_mode = param ~= "" and param or "elimination"
-		if win_mode ~= "elimination" and win_mode ~= "objective" then
-			return false, S("Unknown mode. Use: elimination or objective")
-		end
-		local ok, msg = game_mode.start_new_match(name, win_mode)
+		local ok, msg = game_mode.start_new_match(name)
 		if ok == false and msg then
 			return false, msg
 		end

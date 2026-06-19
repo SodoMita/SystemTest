@@ -27,6 +27,12 @@ local state = {
 
 	match_active = false,
 	match_count = 0,
+
+	-- Win Conditions (Options)
+	win_conditions = {
+		elimination = true,
+		objective = false,
+	},
 }
 
 state.teams_order = { "beacon_a", "beacon_b" }

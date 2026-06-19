@@ -69,6 +69,12 @@ minetest.register_node(game_mode.modname .. ":objective_core", {
 		local name = placer:get_player_name()
 		local pl   = game_mode.get_player_state(name)
 
+		if not state.win_conditions.objective then
+			minetest.chat_send_player(name,
+				S("Objective Delivery win condition is not enabled for this match."))
+			return
+		end
+
 		if not pl.team or not game_mode.is_beacon_team(pl.team) then
 			minetest.chat_send_player(name,
 				S("You need to be on a beacon team to deliver the Objective Core."))
