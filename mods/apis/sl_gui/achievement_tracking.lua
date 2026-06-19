@@ -78,40 +78,83 @@ end)
 
 -- Check exploration achievements periodically
 local exploration_timer = 0
+local player_last_y = {}
+local player_highest_y = {}
+local player_looped = {}
+
 minetest.register_globalstep(function(dtime)
     exploration_timer = exploration_timer + dtime
-    if exploration_timer >= 10 then -- Check every 10 seconds
-        exploration_timer = 0
-        
+    if exploration_timer >= 1 then -- Check every 1 second for fall tracking
         for _, player in ipairs(minetest.get_connected_players()) do
             local name = player:get_player_name()
             local pos = player:get_pos()
-            local spawn = player_spawn_positions[name]
+            local last_y = player_last_y[name] or pos.y
             
-            if spawn then
-                local distance = vector.distance(pos, spawn)
-                
-                -- Travel 1000 blocks achievement
-                if distance >= 1000 then
-                    check_achievement(player, "travel_1000_blocks")
+            -- Detect world loop (sudden large Y jump)
+            if math.abs(pos.y - last_y) > 20000 then
+                check_achievement(player, "secret_world_loop")
+                player_looped[name] = true
+            end
+            
+            -- Fall tracking
+            local v = player:get_velocity()
+            local is_falling = v and v.y < -5
+            
+            if is_falling then
+                player_highest_y[name] = math.max(player_highest_y[name] or pos.y, pos.y)
+            else
+                -- Landed or moving up
+                if player_highest_y[name] then
+                    local fall_dist = player_highest_y[name] - pos.y
+                    if fall_dist >= 10000 then
+                        check_achievement(player, "challenge_fall_10k")
+                    elseif fall_dist >= 1000 then
+                        check_achievement(player, "challenge_fall_1k")
+                    elseif fall_dist >= 100 then
+                        check_achievement(player, "challenge_fall_100")
+                    end
+                    
+                    if player_looped[name] then
+                        check_achievement(player, "challenge_loop_land")
+                        player_looped[name] = nil
+                    end
+                    
+                    player_highest_y[name] = nil
                 end
             end
             
-            -- Check if player is on floating island (high Y coordinate)
-            if pos.y > 100 then
-                check_achievement(player, "visit_floating_island")
-            end
-            
-            -- Check if player is in city (around ground level)
-            if pos.y >= -10 and pos.y <= 50 then
-                check_achievement(player, "find_city")
-            end
-            
-            -- Check if in depths (below city)
-            if pos.y < -100 then
-                check_achievement(player, "secret_find_depths")
+            player_last_y[name] = pos.y
+
+            if exploration_timer >= 10 then
+                -- Check if in depths (multi-tier)
+                if pos.y < -20000 then
+                    check_achievement(player, "secret_depth_20k")
+                elseif pos.y < -10000 then
+                    check_achievement(player, "secret_depth_10k")
+                elseif pos.y < -5000 then
+                    check_achievement(player, "secret_depth_5k")
+                elseif pos.y < -1000 then
+                    check_achievement(player, "secret_depth_1k")
+                end
+
+                local spawn = player_spawn_positions[name]
+                if spawn then
+                    local distance = vector.distance(pos, spawn)
+                    if distance >= 1000 then
+                        check_achievement(player, "travel_1000_blocks")
+                    end
+                end
+                
+                if pos.y > 100 then
+                    check_achievement(player, "visit_floating_island")
+                end
+                
+                if pos.y >= -10 and pos.y <= 50 then
+                    check_achievement(player, "find_city")
+                end
             end
         end
+        if exploration_timer >= 10 then exploration_timer = 0 end
     end
 end)
 
