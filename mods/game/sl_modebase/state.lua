@@ -35,6 +35,34 @@ local state = {
 	},
 }
 
+-- Load persistent spawns from world storage
+local storage = minetest.get_mod_storage()
+local function load_spawns()
+	local spawns_str = storage:get_string("spawns")
+	if spawns_str ~= "" then
+		local data = minetest.deserialize(spawns_str)
+		if data then
+			if data.beacon_a then state.teams.beacon_a.spawn = data.beacon_a end
+			if data.beacon_b then state.teams.beacon_b.spawn = data.beacon_b end
+			if data.mm then state.monster_master.base_spawn = data.mm end
+			if data.ghost then state.ghost_spawn = data.ghost end
+			if data.lobby then state.lobby_spawn = data.lobby end
+		end
+	end
+end
+load_spawns()
+
+function game_mode.save_spawns()
+	local data = {
+		beacon_a = state.teams.beacon_a.spawn,
+		beacon_b = state.teams.beacon_b.spawn,
+		mm = state.monster_master.base_spawn,
+		ghost = state.ghost_spawn,
+		lobby = state.lobby_spawn,
+	}
+	storage:set_string("spawns", minetest.serialize(data))
+end
+
 state.teams_order = { "beacon_a", "beacon_b" }
 
 game_mode.state = state

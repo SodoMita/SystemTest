@@ -18,8 +18,22 @@ minetest.register_node(game_mode.modname .. ":beacon_a", {
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_a.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.save_spawns()
 		game_mode.broadcast(S("Beacon A spawn set to @1, @2, @3",
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
+	end,
+
+	on_destruct = function(pos)
+		if state.match_active then
+			game_mode.broadcast(S("Beacon A has been destroyed! Team A eliminated."))
+			for _, player in ipairs(minetest.get_connected_players()) do
+				local name = player:get_player_name()
+				local pl = game_mode.get_player_state(name)
+				if pl.team == "beacon_a" and pl.phase == "alive" then
+					player:set_hp(0)
+				end
+			end
+		end
 	end,
 })
 
@@ -36,8 +50,22 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_b.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.save_spawns()
 		game_mode.broadcast(S("Beacon B spawn set to @1, @2, @3",
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
+	end,
+
+	on_destruct = function(pos)
+		if state.match_active then
+			game_mode.broadcast(S("Beacon B has been destroyed! Team B eliminated."))
+			for _, player in ipairs(minetest.get_connected_players()) do
+				local name = player:get_player_name()
+				local pl = game_mode.get_player_state(name)
+				if pl.team == "beacon_b" and pl.phase == "alive" then
+					player:set_hp(0)
+				end
+			end
+		end
 	end,
 })
 
@@ -157,6 +185,7 @@ minetest.register_node(game_mode.modname .. ":spawn_mm", {
 	groups = {cracky = 1},
 	after_place_node = function(pos)
 		state.monster_master.base_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.save_spawns()
 		game_mode.broadcast(S("Monster Master spawn set to @1, @2, @3", pos.x, pos.y+1, pos.z))
 	end,
 })
@@ -167,6 +196,7 @@ minetest.register_node(game_mode.modname .. ":spawn_ghost", {
 	groups = {cracky = 1},
 	after_place_node = function(pos)
 		state.ghost_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.save_spawns()
 		game_mode.broadcast(S("Ghost spawn set to @1, @2, @3", pos.x, pos.y+1, pos.z))
 	end,
 })
@@ -177,6 +207,7 @@ minetest.register_node(game_mode.modname .. ":spawn_lobby", {
 	groups = {cracky = 1},
 	after_place_node = function(pos)
 		state.lobby_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.save_spawns()
 		game_mode.broadcast(S("Lobby spawn set to @1, @2, @3", pos.x, pos.y+1, pos.z))
 	end,
 })
