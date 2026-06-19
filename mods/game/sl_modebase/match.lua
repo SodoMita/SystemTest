@@ -4,10 +4,6 @@ local state = game_mode.state
 -- ================================================================
 -- Match lifecycle and win conditions
 -- ================================================================
--- Win modes:
---   "elimination" — last team standing (default)
---   "objective"   — craft and deliver the Objective Core to beacon
--- ================================================================
 
 -- End match
 function game_mode.end_match(winner, reason)
@@ -253,11 +249,11 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 	end
 end)
 
--- Chat restriction for ghosts
+-- Restrict ghost chat
 minetest.register_on_chat_message(function(name, message)
 	local pl = game_mode.get_player_state(name)
 	if pl and pl.phase == "ghost" then
-		minetest.chat_send_player(name, S("Ghosts cannot speak to the living."))
+		minetest.chat_send_player(name, minetest.colorize("#ff5555", S("Ghosts cannot speak to the living.")))
 		return true -- Block message
 	end
 end)
@@ -273,8 +269,9 @@ minetest.register_on_dieplayer(function(player, reason)
 	for i = 1, inv:get_size("main") do
 		local stack = inv:get_stack("main", i)
 		if not stack:is_empty() then
-			-- Don't drop MM summoning tool
-			if stack:get_name() ~= game_mode.modname .. ":summon_monster" then
+			-- Don't drop MM summoning tool or Reincarnate item
+			if stack:get_name() ~= game_mode.modname .. ":summon_monster" and
+			   stack:get_name() ~= game_mode.modname .. ":reincarnate" then
 				local obj = minetest.add_item(pos, stack)
 				if obj then
 					-- Random direction "fountain" effect

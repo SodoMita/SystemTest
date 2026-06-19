@@ -64,10 +64,10 @@ function get_crafting_formspec(player, category)
 
     -- Category tabs
     local categories = {
-        {id = "salvage",   label = "Salvage",   x = 0.3},
-        {id = "equipment", label = "Equipment", x = 2.4},
-        {id = "tactical",  label = "Tactical",  x = 4.5},
-        {id = "objective", label = "Objective", x = 6.6},
+        {id = "salvage",     label = "Salvage",     x = 0.3},
+        {id = "equipment",   label = "Equipment",   x = 2.4},
+        {id = "tactical",    label = "Tactical",    x = 4.5},
+        {id = "information", label = "Information", x = 6.6},
     }
 
     for _, cat in ipairs(categories) do
@@ -397,6 +397,15 @@ register_craft_recipe({
     category     = "tactical",
 })
 
+-- INFORMATION: Data Pads and Hacking
+register_craft_recipe({
+    output       = "sl_modebase:data_pad_security",
+    output_count = 1,
+    ingredients  = {["sl_modebase:electronic_waste"] = 2, ["ground:x_neon"] = 1},
+    description  = "Decrypted Security Pad",
+    category     = "information",
+})
+
 -- OBJECTIVE: the win-condition item
 register_craft_recipe({
     output       = "sl_modebase:objective_core",
@@ -408,7 +417,7 @@ register_craft_recipe({
         ["construction:sparks"]    = 5,
     },
     description  = "SYSTEM OBJECTIVE CORE",
-    category     = "objective",
+    category     = "information", -- Moved to information for now
 })
 
 minetest.log("action", "[crafting_system] System Looting crafting loaded — "
