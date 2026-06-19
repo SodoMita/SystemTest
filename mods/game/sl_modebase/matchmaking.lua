@@ -102,8 +102,11 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	local name = player:get_player_name()
 
 	if fields.take_mm then
-		minetest.chat_send_all("Fields take mm triggered")
-		minetest.run_chatcommand("sl_be_monster_master", "")
+		game_mode.set_monster_master(name)
+		game_mode.broadcast(S("@1 is now the Monster Master!", name))
+		if achievement_progress then
+			achievement_progress(player, "play_monster_master", 1)
+		end
 	elseif fields.leave_mm then
 		game_mode.set_monster_master(nil)
 		game_mode.broadcast(S("Monster Master has resigned."))
@@ -112,9 +115,14 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	elseif fields.cond_objective then
 		state.win_conditions.objective = (fields.cond_objective == "true")
 	elseif fields.start_match then
-		minetest.run_chatcommand("sl_match_start", "")
+		local ok, msg = game_mode.start_new_match(name)
+		if not ok and msg then
+			minetest.chat_send_player(name, "[System Looting] " .. msg)
+		end
 	elseif fields.stop_match then
-		minetest.run_chatcommand("sl_match_stop", "")
+		if state.match_active then
+			game_mode.end_match(nil, S("Stopped by @1", name))
+		end
 	end
 
 	-- Refresh for everyone near terminals or who has it open? 
