@@ -27,6 +27,9 @@ function game_mode.spawn_player(player)
 	player:set_pos(pos)
 	player:set_hp(player:get_properties().hp_max or 20)
 
+	-- Remove nametag for everyone
+	player:set_properties({ nametag = "" })
+
 	-- Default Boxman properties
 	local boxman_tex = "sl_boxman_neon.png"
 	local boxman_textures = {boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex}
@@ -69,10 +72,18 @@ function game_mode.spawn_player(player)
 			jump = 0.0,
 			gravity = 0.0,
 		})
-		local ghost_tex = boxman_tex .. "^[opacity:120"
+		
+		-- Ghost is invisible and has fly/noclip
+		local name = player:get_player_name()
+		local privs = minetest.get_player_privs(name)
+		privs.fly = true
+		privs.noclip = true
+		minetest.set_player_privs(name, privs)
+
 		player:set_properties({
-			textures = {ghost_tex, ghost_tex, ghost_tex, ghost_tex, ghost_tex},
-			visual_size = {x=10, y=10},
+			visual_size = {x=0, y=0, z=0}, -- Invisible
+			textures = {"gui_blank.png"},
+			collisionbox = {0,0,0,0,0,0}, -- No collision
 		})
 	elseif pl.phase == "monster" or pl.phase == "master_monster" then
 		player:set_properties({
@@ -88,6 +99,14 @@ function game_mode.spawn_player(player)
 		})
 	else
 		-- Normal "alive" phase
+		local name = player:get_player_name()
+		local privs = minetest.get_player_privs(name)
+		if not minetest.settings:get_bool("creative_mode") then
+			privs.fly = nil
+			privs.noclip = nil
+			minetest.set_player_privs(name, privs)
+		end
+
 		if sl_characters and sl_characters.apply_default_model then
 			sl_characters.apply_default_model(player)
 		else
