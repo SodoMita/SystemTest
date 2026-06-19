@@ -31,6 +31,9 @@ function game_mode.spawn_player(player)
 	local boxman_tex = "sl_boxman_neon.png"
 	local boxman_textures = {boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex}
 
+	-- Globally hide nametags
+	player:set_nametag_attributes({color = {a = 0, r = 255, g = 255, b = 255}})
+
 	if pl.role == "monster_master" then
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_physics_override({
@@ -65,21 +68,39 @@ function game_mode.spawn_player(player)
 	elseif pl.phase == "ghost" then
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_physics_override({
-			speed = 1.2,
+			speed = 1.5,
 			jump = 0.0,
 			gravity = 0.0,
 		})
-		local ghost_tex = boxman_tex .. "^[opacity:120"
+		-- Give Ghost flight and noclip privs
+		local privs = minetest.get_player_privs(name)
+		privs.fly = true
+		privs.noclip = true
+		minetest.set_player_privs(name, privs)
+
 		player:set_properties({
-			textures = {ghost_tex, ghost_tex, ghost_tex, ghost_tex, ghost_tex},
-			visual_size = {x=10, y=10},
+			visual_size = {x=0, y=0}, -- Invisibility
+			collisionbox = {0,0,0,0,0,0},
+			selectionbox = {0,0,0,0,0,0},
 		})
+		
+		-- Give Reincarnation item
+		local inv = player:get_inventory()
+		inv:set_list("main", {})
+		inv:add_item("main", "sl_modebase:reincarnate")
 	elseif pl.phase == "monster" or pl.phase == "master_monster" then
+		-- Remove flight/noclip when mutating
+		local privs = minetest.get_player_privs(name)
+		privs.fly = nil
+		privs.noclip = nil
+		minetest.set_player_privs(name, privs)
+
 		player:set_properties({
 			mesh = "monster.obj",
 			visual = "mesh",
 			textures = { pl.phase == "monster" and "monster_texture.png" or "monster_texture.png^[colorize:#ff0000:80" },
 			visual_size = {x=1, y=1},
+			collisionbox = { -0.4, 0.0, -0.4, 0.4, 1.8, 0.4 },
 		})
 		player:set_physics_override({
 			speed = 1.5,
@@ -88,6 +109,14 @@ function game_mode.spawn_player(player)
 		})
 	else
 		-- Normal "alive" phase
+		-- Remove flight/noclip
+		local privs = minetest.get_player_privs(name)
+		if not minetest.settings:get_bool("creative_mode") then
+			privs.fly = nil
+			privs.noclip = nil
+			minetest.set_player_privs(name, privs)
+		end
+
 		if sl_characters and sl_characters.apply_default_model then
 			sl_characters.apply_default_model(player)
 		else

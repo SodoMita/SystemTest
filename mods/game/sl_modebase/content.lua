@@ -367,4 +367,27 @@ minetest.register_tool(modname .. ":summon_monster", {
 	end,
 })
 
+-- Reincarnation item for ghosts to become neutral monsters
+minetest.register_craftitem(modname .. ":reincarnate", {
+	description = S("Reincarnate as Neutral Monster\n(Ghost Only)"),
+	inventory_image = "monster_texture.png^[resize:32x32^[colorize:#ffffff:50",
+	groups = { not_in_creative_inventory = 1 },
+	on_use = function(itemstack, user, pointed_thing)
+		local name = user:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		if pl.phase ~= "ghost" then
+			return itemstack
+		end
+
+		pl.phase = "monster"
+		game_mode.broadcast(S("@1 has reincarnated as a Neutral Monster!", name))
+		game_mode.spawn_player(user)
+
+		return ItemStack("") -- Consumed
+	end,
+	on_drop = function(itemstack, dropper, pos)
+		return itemstack -- Don't allow dropping
+	end,
+})
+
 minetest.log("action", "[sl_modebase] content items/nodes registered.")
