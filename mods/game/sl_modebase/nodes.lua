@@ -174,3 +174,29 @@ minetest.register_node(game_mode.modname .. ":spawn_lobby", {
 		game_mode.broadcast(S("Lobby spawn set to @1, @2, @3", pos.x, pos.y+1, pos.z))
 	end,
 })
+
+-- Ensure existing spawn nodes in the world update the state when loaded
+minetest.register_lbm({
+	name = "sl_modebase:update_spawns",
+	nodenames = {
+		"sl_modebase:spawn_mm",
+		"sl_modebase:spawn_ghost",
+		"sl_modebase:spawn_lobby",
+		"sl_modebase:beacon_a",
+		"sl_modebase:beacon_b"
+	},
+	run_at_every_load = true,
+	action = function(pos, node)
+		if node.name == "sl_modebase:spawn_mm" then
+			state.monster_master.base_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		elseif node.name == "sl_modebase:spawn_ghost" then
+			state.ghost_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		elseif node.name == "sl_modebase:spawn_lobby" then
+			state.lobby_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		elseif node.name == "sl_modebase:beacon_a" then
+			state.teams.beacon_a.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		elseif node.name == "sl_modebase:beacon_b" then
+			state.teams.beacon_b.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		end
+	end,
+})
