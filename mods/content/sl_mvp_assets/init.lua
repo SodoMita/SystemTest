@@ -1,0 +1,1 @@
+-- Asset-only mod for System Looting MVP.
