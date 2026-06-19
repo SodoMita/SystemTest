@@ -362,11 +362,16 @@ end
 -- Determine the correct player model and textures for previews
 local function get_preview_model(player)
     if sl_characters and sl_characters.default_model then
-        return sl_characters.default_model, {sl_characters.default_texture}
+        local tex = sl_characters.default_texture or "sl_boxman_neon.png"
+        return sl_characters.default_model, {tex, tex, tex, tex, tex}
     end
-    local tex = {"character.png"}
+    local tex = {"character.png", "character.png", "character.png", "character.png", "character.png"}
     if player_api and player_api.get_textures then
-        tex = player_api.get_textures(player) or tex
+        local ptex = player_api.get_textures(player)
+        if ptex and #ptex > 0 then
+            tex = {}
+            for i=1,5 do tex[i] = ptex[1] end
+        end
     end
     return "character.b3d", tex
 end

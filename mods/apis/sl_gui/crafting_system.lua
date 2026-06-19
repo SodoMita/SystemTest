@@ -285,15 +285,18 @@ minetest.register_chatcommand("craft", {
 })
 
 -- ================================================================
--- RECIPES — System Looting items only
+-- ACTUAL RECIPES — System Looting content
 -- ================================================================
+
+-- Clear default testing recipes
+crafting_recipes = {}
 
 -- SALVAGE: raw neon ground blocks -> useful components
 register_craft_recipe({
     output       = "sl_modebase:loot_crate",
     output_count = 1,
-    ingredients  = {["ground:square_neon"] = 4},
-    description  = "Salvage Crate",
+    ingredients  = {["ground:square_neon"] = 8},
+    description  = "Empty Loot Crate",
     category     = "salvage",
 })
 
@@ -301,7 +304,7 @@ register_craft_recipe({
     output       = "construction:sparks",
     output_count = 2,
     ingredients  = {["ground:rhombus_neon"] = 4},
-    description  = "Sparks Component",
+    description  = "Spark Core",
     category     = "salvage",
 })
 
@@ -309,7 +312,7 @@ register_craft_recipe({
     output       = "construction:plasma",
     output_count = 2,
     ingredients  = {["ground:x_neon"] = 4},
-    description  = "Plasma Component",
+    description  = "Plasma Cell",
     category     = "salvage",
 })
 
@@ -317,121 +320,74 @@ register_craft_recipe({
     output       = "construction:fire",
     output_count = 2,
     ingredients  = {["ground:x2_neon"] = 4},
-    description  = "Fire Component",
+    description  = "Thermal Unit",
     category     = "salvage",
 })
 
--- EQUIPMENT: clothing from the sl_clothing mod
+-- CONSTRUCTION: actual nodes for base building
 register_craft_recipe({
-    output       = "sl_clothing:hood_plain",
-    output_count = 1,
-    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:sparks"] = 1},
-    description  = "Plain Hood",
-    category     = "equipment",
+    output       = "construction:firenode",
+    output_count = 4,
+    ingredients  = {["construction:fire"] = 1, ["ground:square_neon"] = 2},
+    description  = "Thermal Barrier",
+    category     = "salvage",
 })
 
 register_craft_recipe({
-    output       = "sl_clothing:cap_brim",
+    output       = "construction:water",
+    output_count = 4,
+    ingredients  = {["construction:plasma"] = 1, ["ground:rhombus_neon"] = 2},
+    description  = "Hydro Flow",
+    category     = "salvage",
+})
+
+register_craft_recipe({
+    output       = "construction:snowflake2",
+    output_count = 4,
+    ingredients  = {["construction:sparks"] = 1, ["ground:x_neon"] = 2},
+    description  = "Cryo Spiker",
+    category     = "salvage",
+})
+
+-- EQUIPMENT: clothing and tools
+register_craft_recipe({
+    output       = "sl_clothing:backpack_small",
     output_count = 1,
-    ingredients  = {["sl_clothing:hood_plain"] = 1, ["construction:plasma"] = 1},
-    description  = "Cap with Brim",
+    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:fire"] = 2},
+    description  = "Survival Backpack",
     category     = "equipment",
 })
 
 register_craft_recipe({
     output       = "sl_clothing:jacket_light",
     output_count = 1,
-    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:smoke"] = 1},
-    description  = "Light Jacket",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_clothing:coat_work",
-    output_count = 1,
-    ingredients  = {["sl_clothing:jacket_light"] = 1, ["construction:plasma"] = 1},
-    description  = "Work Coat",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_clothing:backpack_small",
-    output_count = 1,
-    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:fire"] = 1},
-    description  = "Small Backpack",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_clothing:glove_fingerless",
-    output_count = 1,
-    ingredients  = {["construction:sparks"] = 1, ["ground:square_neon"] = 2},
-    description  = "Fingerless Gloves",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_clothing:glove_leather",
-    output_count = 1,
-    ingredients  = {["sl_clothing:glove_fingerless"] = 1, ["construction:plasma"] = 1},
-    description  = "Leather Gloves",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_clothing:trousers_plain",
-    output_count = 1,
-    ingredients  = {["construction:smoke"] = 1, ["ground:rhombus_neon"] = 2},
-    description  = "Plain Trousers",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_clothing:trousers_camo",
-    output_count = 1,
-    ingredients  = {["sl_clothing:trousers_plain"] = 1, ["construction:sparks"] = 1},
-    description  = "Camo Trousers",
-    category     = "equipment",
-})
-
-register_craft_recipe({
-    output       = "sl_clothing:boots_everyday",
-    output_count = 1,
-    ingredients  = {["construction:fire"] = 1, ["ground:x2_neon"] = 2},
-    description  = "Everyday Boots",
+    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:plasma"] = 2},
+    description  = "Hazard Jacket",
     category     = "equipment",
 })
 
 register_craft_recipe({
     output       = "sl_clothing:boots_combat",
     output_count = 1,
-    ingredients  = {["sl_clothing:boots_everyday"] = 1, ["construction:plasma"] = 1},
+    ingredients  = {["sl_modebase:loot_crate"] = 1, ["construction:sparks"] = 2},
     description  = "Combat Boots",
     category     = "equipment",
 })
 
--- TACTICAL: traps and team utilities
+-- TACTICAL: defense and utility
 register_craft_recipe({
     output       = "sl_scary:hide_spot",
+    output_count = 1,
+    ingredients  = {["construction:fire"] = 2, ["construction:plasma"] = 2},
+    description  = "Shadow Hideout",
+    category     = "tactical",
+})
+
+register_craft_recipe({
+    output       = "construction:plasma2",
     output_count = 2,
-    ingredients  = {["construction:fire"] = 1, ["construction:smoke"] = 1},
-    description  = "Hiding Spot",
-    category     = "tactical",
-})
-
-register_craft_recipe({
-    output       = "construction:bubbles",
-    output_count = 4,
-    ingredients  = {["construction:plasma"] = 1, ["ground:x_neon"] = 1},
-    description  = "Smoke Screen",
-    category     = "tactical",
-})
-
-register_craft_recipe({
-    output       = "construction:snowflake",
-    output_count = 4,
-    ingredients  = {["construction:sparks"] = 1, ["ground:rhombus_neon"] = 1},
-    description  = "Distraction Flare",
+    ingredients  = {["construction:plasma"] = 2, ["construction:sparks"] = 2},
+    description  = "High-Energy Plasma",
     category     = "tactical",
 })
 
@@ -440,11 +396,12 @@ register_craft_recipe({
     output       = "sl_modebase:objective_core",
     output_count = 1,
     ingredients  = {
-        ["sl_modebase:loot_crate"] = 1,
-        ["construction:plasma"]    = 1,
-        ["ground:x2_neon"]         = 4,
+        ["sl_modebase:loot_crate"] = 2,
+        ["construction:plasma"]    = 5,
+        ["construction:fire"]      = 5,
+        ["construction:sparks"]    = 5,
     },
-    description  = "Objective Core",
+    description  = "SYSTEM OBJECTIVE CORE",
     category     = "objective",
 })
 

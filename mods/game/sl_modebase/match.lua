@@ -49,6 +49,7 @@ local function reset_players_for_new_match()
 	for name, pl in pairs(state.players) do
 		pl.lives = game_mode.LIVES_PER_PLAYER
 		pl.eliminated = false
+		pl.phase = "alive"
 	end
 end
 
@@ -99,7 +100,7 @@ local function check_team_elimination()
 	for _, team_id in ipairs(state.teams_order) do
 		local has_active = false
 		for name, pl in pairs(state.players) do
-			if pl.team == team_id and not pl.eliminated and pl.lives > 0 then
+			if pl.team == team_id and pl.phase == "alive" and not pl.eliminated then
 				local player = minetest.get_player_by_name(name)
 				if player then
 					has_active = true
@@ -133,22 +134,29 @@ minetest.register_on_dieplayer(function(player, reason)
 		return
 	end
 
-	if not pl.team or not game_mode.is_beacon_team(pl.team) then
-		return
-	end
-
 	if pl.eliminated then
 		return
 	end
 
-	pl.lives = math.max(0, pl.lives - 1)
-	if pl.lives <= 0 then
+	-- Phase-based transition
+	if pl.phase == "alive" then
+		pl.lives = math.max(0, pl.lives - 1)
+		if pl.lives <= 0 then
+			pl.phase = "ghost"
+			game_mode.broadcast(S("@1 has fallen and returned as a Ghost!", name))
+		else
+			minetest.chat_send_player(name,
+				S("You have @1 lives remaining.", tostring(pl.lives)))
+		end
+	elseif pl.phase == "ghost" then
+		pl.phase = "monster"
+		game_mode.broadcast(S("@1's spirit has mutated into a Neutral Monster!", name))
+	elseif pl.phase == "monster" then
+		pl.phase = "master_monster"
+		game_mode.broadcast(S("@1 has been bound to the Monster Master's will!", name))
+	elseif pl.phase == "master_monster" then
 		pl.eliminated = true
-		game_mode.broadcast(S("@1 is out for @2!",
-			name, game_mode.get_team_label(pl.team)))
-	else
-		minetest.chat_send_player(name,
-			S("You have @1 lives remaining.", tostring(pl.lives)))
+		game_mode.broadcast(S("@1 is fully eliminated from the simulation!", name))
 	end
 
 	check_team_elimination()

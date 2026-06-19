@@ -40,6 +40,7 @@ function game_mode.get_player_state(name)
 			lives = game_mode.LIVES_PER_PLAYER,
 			eliminated = false,
 			role = nil,
+			phase = "alive", -- "alive", "ghost", "monster", "master_monster"
 		}
 		players[name] = pl
 	end
