@@ -8,7 +8,7 @@ core.register_node("ground:square_neon", {
 	-- Format is 0xRRGGBB (Red, Green, Blue in hexadecimal)
 -- 	color = 0x0000FF, -- Pure Blue
 	use_texture_alpha = "blend",
-	light_source = 15,
+	light_source = 14,
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { cracky = 3, oddly_breakable_by_hand = 3 },
@@ -25,7 +25,7 @@ core.register_node("ground:rhombus_neon", {
 -- 	color = 0x0000FF, -- Pure Blue
 -- 	color = 0xFFFFFF, -- Pure White
 	use_texture_alpha = "blend",
-	light_source = 15,
+	light_source = 14,
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { cracky = 3, oddly_breakable_by_hand = 3 },
@@ -42,7 +42,7 @@ core.register_node("ground:x_neon", {
 -- 	color = 0x0000FF, -- Pure Blue
 -- 	color = 0xFFFFFF, -- Pure White
 	use_texture_alpha = "blend",
-	light_source = 15,
+	light_source = 14,
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { cracky = 3, oddly_breakable_by_hand = 3 },
@@ -59,7 +59,7 @@ core.register_node("ground:x2_neon", {
 -- 	color = 0x0000FF, -- Pure Blue
 -- 	color = 0xFFFFFF, -- Pure White
 	use_texture_alpha = "blend",
-	light_source = 15,
+	light_source = 14,
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { cracky = 3, oddly_breakable_by_hand = 3 },

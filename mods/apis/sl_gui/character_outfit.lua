@@ -316,12 +316,9 @@ function handle_character_outfit_fields(player, formname, fields)
         elseif fields.tab_achievements then new_tab = "achievements" end
 
         meta:set_string("current_tab", new_tab)
-        minetest.close_formspec(player:get_player_name(), "character_outfit")
-
+        
         if get_unified_inventory then
-            minetest.after(0.1, function()
-                player:set_inventory_formspec(get_unified_inventory(player))
-            end)
+            minetest.show_formspec(player:get_player_name(), "", get_unified_inventory(player))
         end
         return true
     end
