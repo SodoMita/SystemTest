@@ -5,10 +5,13 @@ local state = game_mode.state
 -- Beacon nodes (visual + spawn anchors)
 -- ================================================================
 
-local function handle_beacon_destruction(team_id)
+local function handle_beacon_destruction(team_id, pos)
 	game_mode.broadcast(S("@1 has been destroyed! Team eliminated.", game_mode.get_team_label(team_id)))
-	state.teams[team_id].spawn = nil -- Disable spawning
-	game_mode.save_spawns()
+	state.teams[team_id].spawn = nil -- Disable spawning for this match
+	
+	if pos then
+		minetest.set_node(pos, {name = "sl_modebase:destroyed_beacon"})
+	end
 
 	for _, player in ipairs(minetest.get_connected_players()) do
 		local name = player:get_player_name()
@@ -20,6 +23,17 @@ local function handle_beacon_destruction(team_id)
 		end
 	end
 end
+
+minetest.register_node(game_mode.modname .. ":destroyed_beacon", {
+	description = S("Destroyed Beacon"),
+	drawtype = "mesh",
+	mesh = "beacon.obj",
+	tiles = {"default_obsidian.png^[colorize:#000000:150"},
+	paramtype = "light",
+	groups = {cracky = 3, oddly_breakable_by_hand = 1, not_in_creative_inventory = 1},
+	selection_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
+	collision_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
+})
 
 minetest.register_node(game_mode.modname .. ":beacon_a", {
 	description = S("Beacon A"),
@@ -50,8 +64,7 @@ minetest.register_node(game_mode.modname .. ":beacon_a", {
 		local meta = minetest.get_meta(pos)
 		local hp = meta:get_int("hp") - 5
 		if hp <= 0 then
-			minetest.remove_node(pos)
-			handle_beacon_destruction("beacon_a")
+			handle_beacon_destruction("beacon_a", pos)
 		else
 			meta:set_int("hp", hp)
 			meta:set_string("infotext", S("Beacon A (HP: @1)", tostring(hp)))
@@ -92,8 +105,7 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 		local meta = minetest.get_meta(pos)
 		local hp = meta:get_int("hp") - 5
 		if hp <= 0 then
-			minetest.remove_node(pos)
-			handle_beacon_destruction("beacon_b")
+			handle_beacon_destruction("beacon_b", pos)
 		else
 			meta:set_int("hp", hp)
 			meta:set_string("infotext", S("Beacon B (HP: @1)", tostring(hp)))
