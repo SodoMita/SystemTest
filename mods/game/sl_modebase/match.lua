@@ -88,6 +88,12 @@ local function reset_players_for_new_match()
 		pl.lives = game_mode.LIVES_PER_PLAYER
 		pl.eliminated = false
 		pl.phase = "alive"
+		
+		-- Clear inventory at start of match too
+		local player = minetest.get_player_by_name(name)
+		if player then
+			player:get_inventory():set_list("main", {})
+		end
 	end
 end
 
@@ -183,11 +189,11 @@ function game_mode.start_new_match(initiator)
 	return true
 end
 
--- Protection override to prevent ghosts from digging/placing
+-- Protection override to prevent ghosts and lobby players from digging/placing
 local old_is_protected = minetest.is_protected
 function minetest.is_protected(pos, name)
 	local pl = game_mode.get_player_state(name)
-	if pl and pl.phase == "ghost" then
+	if pl and (pl.phase == "ghost" or not state.match_active) then
 		return true
 	end
 	return old_is_protected(pos, name)
@@ -219,6 +225,20 @@ local function check_team_elimination()
 		end
 	end
 end
+
+minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, tool_capabilities, dir, damage)
+	if not state.match_active then
+		return true -- Block damage in lobby
+	end
+	
+	if hitter and hitter:is_player() then
+		local hname = hitter:get_player_name()
+		local hpl = game_mode.get_player_state(hname)
+		if hpl and hpl.phase == "ghost" then
+			return true -- Ghosts can't attack
+		end
+	end
+end)
 
 -- Death handling
 minetest.register_on_dieplayer(function(player, reason)

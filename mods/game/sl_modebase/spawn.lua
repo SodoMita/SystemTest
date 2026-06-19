@@ -44,7 +44,7 @@ function game_mode.spawn_player(player)
 		})
 		player:set_armor_groups({ fleshy = 100 })
 	elseif not state.match_active then
-		-- Lobby state: immortal and neutral
+		-- Lobby state: immortal, neutral, and empty inventory
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_properties({
 			textures = boxman_textures,
@@ -56,6 +56,10 @@ function game_mode.spawn_player(player)
 			jump = 1.0,
 			gravity = 1.0,
 		})
+		
+		-- Clear inventory for lobby
+		local inv = player:get_inventory()
+		inv:set_list("main", {})
 	elseif pl.phase == "ghost" then
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_physics_override({
