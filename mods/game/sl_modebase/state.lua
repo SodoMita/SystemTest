@@ -7,11 +7,13 @@ local state = {
 			label = "Beacon A",
 			color = "#ff5555",
 			spawn = { x = 0, y = 10, z = 0 },
+			hp = 100,
 		},
 		beacon_b = {
 			label = "Beacon B",
 			color = "#5555ff",
 			spawn = { x = 40, y = 10, z = 0 },
+			hp = 100,
 		},
 	},
 
@@ -36,8 +38,10 @@ local state = {
 }
 
 -- Load persistent spawns from world storage
-local storage = minetest.get_mod_storage()
+game_mode.storage = minetest.get_mod_storage()
 local function load_spawns()
+	local storage = game_mode.storage
+	if not storage then return end
 	local spawns_str = storage:get_string("spawns")
 	if spawns_str ~= "" then
 		local data = minetest.deserialize(spawns_str)
@@ -53,6 +57,8 @@ end
 load_spawns()
 
 function game_mode.save_spawns()
+	local storage = game_mode.storage
+	if not storage then return end
 	local data = {
 		beacon_a = state.teams.beacon_a.spawn,
 		beacon_b = state.teams.beacon_b.spawn,

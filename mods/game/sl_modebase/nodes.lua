@@ -43,6 +43,30 @@ minetest.register_node(game_mode.modname .. ":destroyed_beacon", {
 	collision_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
 })
 
+function game_mode.damage_beacon(team_id, amount, attacker_name)
+	local tdef = state.teams[team_id]
+	if not tdef or not tdef.spawn then return end
+	
+	tdef.hp = (tdef.hp or 100) - (amount or 5)
+	
+	game_mode.broadcast(S("@1 damaged @2! (HP: @3)", 
+		attacker_name or "A Monster", tdef.label, tostring(tdef.hp)))
+
+	local bpos = {x=tdef.spawn.x, y=tdef.spawn.y-1, z=tdef.spawn.z}
+	
+	-- Update node meta if loaded
+	local node = minetest.get_node_or_nil(bpos)
+	if node then
+		local meta = minetest.get_meta(bpos)
+		meta:set_int("hp", tdef.hp)
+		meta:set_string("infotext", S("@1 (HP: @2)", tdef.label, tostring(tdef.hp)))
+	end
+
+	if tdef.hp <= 0 then
+		handle_beacon_destruction(team_id, node and bpos or nil, attacker_name)
+	end
+end
+
 minetest.register_node(game_mode.modname .. ":beacon_a", {
 	description = S("Beacon A"),
 	drawtype = "mesh",
@@ -62,6 +86,7 @@ minetest.register_node(game_mode.modname .. ":beacon_a", {
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_a.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		state.teams.beacon_a.hp = 100
 		game_mode.save_spawns()
 		game_mode.broadcast(S("Beacon A spawn set to @1, @2, @3",
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
@@ -69,20 +94,7 @@ minetest.register_node(game_mode.modname .. ":beacon_a", {
 
 	on_punch = function(pos, node, puncher, pointed_thing)
 		if not state.match_active then return end
-		local attacker_name = puncher and puncher:get_player_name() or "A Monster"
-		local meta = minetest.get_meta(pos)
-		local hp = meta:get_int("hp") - 5
-		
-		game_mode.broadcast(S("@1 damaged @2! (HP: @3)", 
-			attacker_name, game_mode.get_team_label(node.name == "sl_modebase:beacon_a" and "beacon_a" or "beacon_b"), tostring(hp)))
-
-		if hp <= 0 then
-			handle_beacon_destruction(node.name == "sl_modebase:beacon_a" and "beacon_a" or "beacon_b", pos, attacker_name)
-		else
-			meta:set_int("hp", hp)
-			meta:set_string("infotext", S("@1 (HP: @2)", 
-				game_mode.get_team_label(node.name == "sl_modebase:beacon_a" and "beacon_a" or "beacon_b"), tostring(hp)))
-		end
+		game_mode.damage_beacon("beacon_a", 5, puncher and puncher:get_player_name())
 	end,
 
 	can_dig = function(pos, player)
@@ -109,6 +121,7 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_b.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		state.teams.beacon_b.hp = 100
 		game_mode.save_spawns()
 		game_mode.broadcast(S("Beacon B spawn set to @1, @2, @3",
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
@@ -116,20 +129,7 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 
 	on_punch = function(pos, node, puncher, pointed_thing)
 		if not state.match_active then return end
-		local attacker_name = puncher and puncher:get_player_name() or "A Monster"
-		local meta = minetest.get_meta(pos)
-		local hp = meta:get_int("hp") - 5
-
-		game_mode.broadcast(S("@1 damaged @2! (HP: @3)", 
-			attacker_name, game_mode.get_team_label(node.name == "sl_modebase:beacon_a" and "beacon_a" or "beacon_b"), tostring(hp)))
-
-		if hp <= 0 then
-			handle_beacon_destruction(node.name == "sl_modebase:beacon_a" and "beacon_a" or "beacon_b", pos, attacker_name)
-		else
-			meta:set_int("hp", hp)
-			meta:set_string("infotext", S("@1 (HP: @2)", 
-				game_mode.get_team_label(node.name == "sl_modebase:beacon_a" and "beacon_a" or "beacon_b"), tostring(hp)))
-		end
+		game_mode.damage_beacon("beacon_b", 5, puncher and puncher:get_player_name())
 	end,
 
 	can_dig = function(pos, player)
