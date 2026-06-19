@@ -98,7 +98,26 @@ minetest.register_entity(MONSTER_NAME, {
 				})
 			end
 		else
-			self.object:set_velocity({ x = 0, y = 0, z = 0 })
+			-- If no players, try attacking beacons
+			local beacon = minetest.find_node_near(pos, 5, {"group:beacon"})
+			if beacon then
+				local dir = vector.normalize(vector.subtract(beacon, pos))
+				self.object:set_velocity({
+					x = dir.x * 2.0,
+					y = dir.y * 2.0,
+					z = dir.z * 2.0,
+				})
+				if vector.distance(pos, beacon) < 2 and self.attack_timer >= 1.0 then
+					self.attack_timer = 0
+					local bnode = minetest.get_node(beacon)
+					local bdef = minetest.registered_nodes[bnode.name]
+					if bdef and bdef.on_punch then
+						bdef.on_punch(beacon, bnode, self.object)
+					end
+				end
+			else
+				self.object:set_velocity({ x = 0, y = 0, z = 0 })
+			end
 		end
 	end,
 

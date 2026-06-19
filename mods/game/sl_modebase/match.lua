@@ -17,6 +17,18 @@ function game_mode.end_match(winner, reason)
 
 	state.match_active = false
 
+	-- Remove all monsters
+	for _, obj in pairs(minetest.luaentities) do
+		if obj.name == game_mode.MONSTER_NAME then
+			obj.object:remove()
+		end
+	end
+
+	-- Clear Monster Master
+	if state.monster_master.player then
+		game_mode.set_monster_master(nil)
+	end
+
 	-- Teleport all players back to lobby after a short delay to ensure state sync
 	minetest.after(0.5, function()
 		for _, player in ipairs(minetest.get_connected_players()) do
@@ -187,6 +199,20 @@ end
 minetest.register_on_dieplayer(function(player, reason)
 	local name = player:get_player_name()
 	local pl = game_mode.get_player_state(name)
+
+	-- Drop items on death
+	local pos = player:get_pos()
+	local inv = player:get_inventory()
+	for i = 1, inv:get_size("main") do
+		local stack = inv:get_stack("main", i)
+		if not stack:is_empty() then
+			-- Don't drop MM summoning tool
+			if stack:get_name() ~= game_mode.modname .. ":summon_monster" then
+				minetest.add_item(pos, stack)
+				inv:set_stack("main", i, ItemStack(""))
+			end
+		end
+	end
 
 	if not state.match_active then
 		return
