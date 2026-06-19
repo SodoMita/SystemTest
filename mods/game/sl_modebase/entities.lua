@@ -24,6 +24,8 @@ minetest.register_entity(MONSTER_NAME, {
 		mesh = "monster.obj",
 		textures = { "monster_texture.png" },
 		visual_size = { x = 1, y = 1 },
+		backface_culling = false,
+		static_save = true,
 	},
 
 	monster_owner = nil,
