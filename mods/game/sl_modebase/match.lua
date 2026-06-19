@@ -253,6 +253,15 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 	end
 end)
 
+-- Chat restriction for ghosts
+minetest.register_on_chat_message(function(name, message)
+	local pl = game_mode.get_player_state(name)
+	if pl and pl.phase == "ghost" then
+		minetest.chat_send_player(name, S("Ghosts cannot speak to the living."))
+		return true -- Block message
+	end
+end)
+
 -- Death handling
 minetest.register_on_dieplayer(function(player, reason)
 	local name = player:get_player_name()
