@@ -83,7 +83,7 @@ end
 -- Reset for new match
 local function reset_players_for_new_match()
 	for name, pl in pairs(state.players) do
-		pl.lives = game_mode.LIVES_PER_PLAYER
+		pl.lives = state.settings.lives or 5
 		pl.eliminated = false
 		pl.phase = "alive"
 		
@@ -122,7 +122,7 @@ function game_mode.start_new_match(initiator)
 		end
 	end
 
-	if not mm_exists then
+	if not mm_exists and state.settings.mm_auto_assign then
 		-- Pick player from the biggest team
 		local team_counts = { beacon_a = 0, beacon_b = 0 }
 		for _, name in ipairs(connected) do

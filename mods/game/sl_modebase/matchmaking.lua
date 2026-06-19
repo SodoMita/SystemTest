@@ -22,7 +22,7 @@ local function get_matchmaking_formspec(player_name)
 	table.insert(fs, "label[0.5,1.0;Status: " .. status_text .. "]")
 
 	-- Win Conditions
-	table.insert(fs, "box[0.5,1.5;4,3;#1a1a1aff]")
+	table.insert(fs, "box[0.5,1.5;4,3.4;#1a1a1aff]")
 	table.insert(fs, "label[0.7,1.8;Win Conditions:]")
 	
 	local win_conds = state.win_conditions or { elimination = true, objective = false }
@@ -42,28 +42,40 @@ local function get_matchmaking_formspec(player_name)
 	else
 		desc = minetest.colorize("#ff5555", "WARNING: No win conditions set!")
 	end
-	table.insert(fs, "textarea[0.7,3.5;3.6,1.0;;;" .. minetest.formspec_escape(desc) .. "]")
+	table.insert(fs, "textarea[0.7,3.5;3.6,1.2;;;" .. minetest.formspec_escape(desc) .. "]")
 
 	-- Role Selection
-	table.insert(fs, "box[5.0,1.5;4.5,3;#1a1a1aff]")
-	table.insert(fs, "label[5.2,1.8;Monster Master:]")
+	table.insert(fs, "box[5.0,1.5;4.5,3.4;#1a1a1aff]")
+	table.insert(fs, "label[5.2,1.8;Match Settings:]")
 	
+	local sett = state.settings or { lives = 5, beacon_hp = 100, mm_auto_assign = true }
+	
+	table.insert(fs, "label[5.2,2.3;Initial Lives:]")
+	table.insert(fs, string.format("field[7.5,2.1;1.5,0.6;sett_lives;;%d]", sett.lives))
+	
+	table.insert(fs, "label[5.2,2.9;Beacon HP:]")
+	table.insert(fs, string.format("field[7.5,2.7;1.5,0.6;sett_beacon_hp;;%d]", sett.beacon_hp))
+	
+	table.insert(fs, string.format("checkbox[5.2,3.3;sett_mm_auto;MM Auto-Assign;%s]", tostring(sett.mm_auto_assign)))
+	
+	table.insert(fs, "button[5.2,4.0;4,0.6;save_settings;Apply Settings]")
+
+	-- Role Section
+	table.insert(fs, "box[0.5,5.1;9,1.5;#1a1a1aff]")
 	local mm_name = state.monster_master.player or "None"
-	table.insert(fs, "label[5.2,2.3;Current: " .. minetest.colorize("#ffaa00", mm_name) .. "]")
+	table.insert(fs, "label[0.7,5.4;Monster Master: " .. minetest.colorize("#ffaa00", mm_name) .. "]")
 	
 	if not state.match_active then
 		if mm_name == player_name then
-			table.insert(fs, "button[5.2,3.5;4,0.8;leave_mm;Resign Role]")
+			table.insert(fs, "button[5.2,5.6;4,0.8;leave_mm;Resign Role]")
 		elseif mm_name == "None" then
-			table.insert(fs, "button[5.2,3.5;4,0.8;take_mm;Become Monster Master]")
-		else
-			table.insert(fs, "label[5.2,3.5;Role is taken.]")
+			table.insert(fs, "button[5.2,5.6;4,0.8;take_mm;Become MM]")
 		end
 	end
 
 	-- Player List
-	table.insert(fs, "box[0.5,4.8;9,3;#1a1a1aff]")
-	table.insert(fs, "label[0.7,5.1;Connected Players:]")
+	table.insert(fs, "box[0.5,6.8;9,1.8;#1a1a1aff]")
+	table.insert(fs, "label[0.7,7.1;Connected Players:]")
 	
 	local connected = minetest.get_connected_players()
 	local names = {}
@@ -78,18 +90,18 @@ local function get_matchmaking_formspec(player_name)
 		end
 		table.insert(names, n .. role_str)
 	end
-	table.insert(fs, "textlist[0.7,5.5;8.6,2;player_list;" .. table.concat(names, ",") .. "]")
+	table.insert(fs, "textlist[0.7,7.5;8.6,0.8;player_list;" .. table.concat(names, ",") .. "]")
 
 	-- Control Buttons
 	if not state.match_active then
 		if is_admin then
-			table.insert(fs, "image_button[3,8;4,0.8;gui_button_next.png;start_match;START MATCH]")
+			table.insert(fs, "image_button[3,8.7;4,0.8;gui_button_next.png;start_match;START MATCH]")
 		else
-			table.insert(fs, "label[3,8;Waiting for admin to start...]")
+			table.insert(fs, "label[3,8.7;Waiting for admin to start...]")
 		end
 	else
 		if is_admin then
-			table.insert(fs, "button[3,8;4,0.8;stop_match;FORCE STOP MATCH]")
+			table.insert(fs, "button[3,8.7;4,0.8;stop_match;FORCE STOP MATCH]")
 		end
 	end
 
@@ -114,6 +126,11 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		state.win_conditions.elimination = (fields.cond_elimination == "true")
 	elseif fields.cond_objective then
 		state.win_conditions.objective = (fields.cond_objective == "true")
+	elseif fields.save_settings then
+		state.settings.lives = tonumber(fields.sett_lives) or 5
+		state.settings.beacon_hp = tonumber(fields.sett_beacon_hp) or 100
+		state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
+		minetest.chat_send_player(name, S("Match settings updated."))
 	elseif fields.start_match then
 		local ok, msg = game_mode.start_new_match(name)
 		if not ok and msg then
