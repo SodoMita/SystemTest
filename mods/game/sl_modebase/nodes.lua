@@ -111,13 +111,14 @@ minetest.register_node(game_mode.modname .. ":beacon_a", {
 
 	on_construct = function(pos)
 		local meta = minetest.get_meta(pos)
-		meta:set_int("hp", 100)
-		meta:set_string("infotext", S("Beacon A (HP: 100)"))
+		local hp = state.settings.beacon_hp or 100
+		meta:set_int("hp", hp)
+		meta:set_string("infotext", S("Beacon A (HP: @1)", tostring(hp)))
 	end,
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_a.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
-		state.teams.beacon_a.hp = 100
+		state.teams.beacon_a.hp = state.settings.beacon_hp or 100
 		game_mode.save_spawns()
 		game_mode.broadcast(S("Beacon A spawn set to @1, @2, @3",
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
@@ -146,13 +147,14 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 
 	on_construct = function(pos)
 		local meta = minetest.get_meta(pos)
-		meta:set_int("hp", 100)
-		meta:set_string("infotext", S("Beacon B (HP: 100)"))
+		local hp = state.settings.beacon_hp or 100
+		meta:set_int("hp", hp)
+		meta:set_string("infotext", S("Beacon B (HP: @1)", tostring(hp)))
 	end,
 
 	after_place_node = function(pos, placer)
 		state.teams.beacon_b.spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
-		state.teams.beacon_b.hp = 100
+		state.teams.beacon_b.hp = state.settings.beacon_hp or 100
 		game_mode.save_spawns()
 		game_mode.broadcast(S("Beacon B spawn set to @1, @2, @3",
 			tostring(pos.x), tostring(pos.y + 1), tostring(pos.z)))
@@ -249,7 +251,7 @@ minetest.register_node(game_mode.modname .. ":loot_crate", {
 	on_construct = function(pos)
 		local meta = minetest.get_meta(pos)
 		local inv  = meta:get_inventory()
-		inv:set_size("main", 8)
+		inv:set_size("main", 32)
 		meta:set_string("infotext", S("Loot Crate"))
 	end,
 
@@ -259,11 +261,11 @@ minetest.register_node(game_mode.modname .. ":loot_crate", {
 
 		minetest.show_formspec(name, "sl_modebase:loot_crate",
 			"formspec_version[4]" ..
-			"size[8,6]" ..
+			"size[8,9.5]" ..
 			"bgcolor[#1a1a1aff;true]" ..
-			"label[0.3,0.5;Loot Crate]" ..
-			"list[nodemeta:" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ";main;0.3,0.8;8,1;]" ..
-			"list[current_player;main;0.3,2.2;8,4;]" ..
+			"label[0.3,0.5;Loot Crate (32 slots)]" ..
+			"list[nodemeta:" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ";main;0.3,0.8;8,4;]" ..
+			"list[current_player;main;0.3,5.2;8,4;]" ..
 			"listring[nodemeta:" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ";main]" ..
 			"listring[current_player;main]")
 	end,

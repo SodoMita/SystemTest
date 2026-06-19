@@ -258,6 +258,7 @@ local function get_ability_data(player)
     data.scroll_x = data.scroll_x or 0
     data.scroll_y = data.scroll_y or 0
     data.tooltip = data.tooltip or ""
+    data.last_clicked = data.last_clicked or ""
     data.pan_step = data.pan_step or DEFAULT_PAN_STEP
 
     return data
@@ -655,10 +656,14 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
                 end
             end
             tooltip = tooltip .. " | " .. ability.description
+            
+            -- Only unlock if it was already clicked once (and thus showing this tooltip)
+            local was_already_selected = (data.last_clicked == ability.id)
+            data.last_clicked = ability.id
             data.tooltip = tooltip
             changed = true
 
-            if current_level < max_level then
+            if was_already_selected and current_level < max_level then
                 local can_unlock = true
                 if ability.requires then
                     local req_level = data.unlocked[ability.requires] or 0

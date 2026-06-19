@@ -35,6 +35,13 @@ local state = {
 		elimination = true,
 		objective = false,
 	},
+
+	-- Match Settings
+	settings = {
+		lives = 5,
+		beacon_hp = 100,
+		mm_auto_assign = true,
+	}
 }
 
 -- Load persistent spawns from world storage
