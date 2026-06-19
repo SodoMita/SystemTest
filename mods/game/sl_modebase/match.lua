@@ -17,6 +17,25 @@ function game_mode.end_match(winner, reason)
 
 	state.match_active = false
 
+	-- Restore beacons and spawns from persistent storage
+	local storage = minetest.get_mod_storage()
+	local spawns_str = storage:get_string("spawns")
+	if spawns_str ~= "" then
+		local data = minetest.deserialize(spawns_str)
+		if data then
+			if data.beacon_a then
+				local bpos = {x=data.beacon_a.x, y=data.beacon_a.y-1, z=data.beacon_a.z}
+				minetest.set_node(bpos, {name = "sl_modebase:beacon_a"})
+				state.teams.beacon_a.spawn = data.beacon_a
+			end
+			if data.beacon_b then
+				local bpos = {x=data.beacon_b.x, y=data.beacon_b.y-1, z=data.beacon_b.z}
+				minetest.set_node(bpos, {name = "sl_modebase:beacon_b"})
+				state.teams.beacon_b.spawn = data.beacon_b
+			end
+		end
+	end
+
 	-- Remove all monsters
 	for _, obj in pairs(minetest.luaentities) do
 		if obj.name == game_mode.MONSTER_NAME then
