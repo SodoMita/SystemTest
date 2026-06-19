@@ -233,7 +233,7 @@ local function update_sprint_hud(player)
     if not sprint_huds[name] then
         local success, hud_id = pcall(function()
             return player:hud_add({
-                hud_elem_type = "text",
+                type = "text",
                 position = {x = 0.5, y = 0.95},
                 offset = {x = 0, y = 0},
                 text = "🏃 Stamina: 100/100",

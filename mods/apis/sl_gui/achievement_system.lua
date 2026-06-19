@@ -168,7 +168,7 @@ local function show_achievement_popup(player, achievement)
     
     -- Create popup HUD background with border
     local popup_border = player:hud_add({
-        hud_elem_type = "image",
+        type = "image",
         position = {x = 0.5, y = 0.2},
         offset = {x = 0, y = 0},
         text = "gui_blank.png^[colorize:#000000:220",
@@ -178,7 +178,7 @@ local function show_achievement_popup(player, achievement)
     })
     
     local popup_bg = player:hud_add({
-        hud_elem_type = "image",
+        type = "image",
         position = {x = 0.5, y = 0.2},
         offset = {x = 0, y = 0},
         text = "gui_blank.png^[colorize:" .. tier.color .. ":180",
@@ -188,7 +188,7 @@ local function show_achievement_popup(player, achievement)
     })
     
     local popup_icon = player:hud_add({
-        hud_elem_type = "image",
+        type = "image",
         position = {x = 0.5, y = 0.18},
         offset = {x = 0, y = 0},
         text = achievement.icon,
@@ -198,7 +198,7 @@ local function show_achievement_popup(player, achievement)
     })
     
     local popup_title = player:hud_add({
-        hud_elem_type = "text",
+        type = "text",
         position = {x = 0.5, y = 0.2},
         offset = {x = 0, y = 0},
         text = "🏆 ACHIEVEMENT UNLOCKED! 🏆",
@@ -209,7 +209,7 @@ local function show_achievement_popup(player, achievement)
     })
     
     local popup_name = player:hud_add({
-        hud_elem_type = "text",
+        type = "text",
         position = {x = 0.5, y = 0.22},
         offset = {x = 0, y = 0},
         text = achievement.name,
@@ -220,7 +220,7 @@ local function show_achievement_popup(player, achievement)
     })
     
     local popup_desc = player:hud_add({
-        hud_elem_type = "text",
+        type = "text",
         position = {x = 0.5, y = 0.235},
         offset = {x = 0, y = 0},
         text = achievement.description,
@@ -244,7 +244,7 @@ local function show_achievement_popup(player, achievement)
         local start_y = math.random(y_min, y_max) / 100  -- Rarity-scaled Y spread!
         
         local hud_particle = player:hud_add({
-            hud_elem_type = "image",
+            type = "image",
             position = {x = start_x, y = start_y},
             offset = {x = 0, y = 0},
             text = "gui_achievement_star.png^[colorize:" .. tier.color .. ":220",
