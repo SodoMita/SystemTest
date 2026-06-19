@@ -20,16 +20,56 @@ function game_mode.spawn_player(player)
 
 	player:set_pos(pos)
 
-	-- Basic monster master movement: ghost-like (low gravity, slightly faster)
+	-- Default Boxman properties
+	local boxman_tex = "sl_boxman_neon.png"
+	local boxman_textures = {boxman_tex, boxman_tex, boxman_tex, boxman_tex, boxman_tex}
+
 	if pl.role == "monster_master" then
+		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_physics_override({
 			speed = 1.3,
 			jump = 1.0,
 			gravity = 0.1,
 		})
-		player:set_armor_groups({ immortal = 0, fleshy = 100 })
+		player:set_properties({
+			textures = boxman_textures,
+			visual_size = {x=10, y=10},
+		})
+	elseif pl.phase == "ghost" then
+		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
+		player:set_physics_override({
+			speed = 1.2,
+			jump = 0.0,
+			gravity = 0.0,
+		})
+		local ghost_tex = boxman_tex .. "^[opacity:120"
+		player:set_properties({
+			textures = {ghost_tex, ghost_tex, ghost_tex, ghost_tex, ghost_tex},
+			visual_size = {x=10, y=10},
+		})
+	elseif pl.phase == "monster" or pl.phase == "master_monster" then
+		player:set_properties({
+			mesh = "monster.obj",
+			visual = "mesh",
+			textures = { pl.phase == "monster" and "monster_texture.png" or "monster_texture.png^[colorize:#ff0000:80" },
+			visual_size = {x=1, y=1},
+		})
+		player:set_physics_override({
+			speed = 1.5,
+			jump = 1.1,
+			gravity = 1.0,
+		})
 	else
-		-- Normal physics
+		-- Normal "alive" phase
+		if sl_characters and sl_characters.apply_default_model then
+			sl_characters.apply_default_model(player)
+		else
+			player_api.set_model(player, "SimpleOutlinedBoxman.glb")
+			player:set_properties({
+				textures = boxman_textures,
+				visual_size = {x=10, y=10},
+			})
+		end
 		player:set_physics_override({
 			speed = 1.0,
 			jump = 1.0,

@@ -51,12 +51,13 @@ minetest.register_node(game_mode.modname .. ":beacon_b", {
 -- ================================================================
 
 minetest.register_node(game_mode.modname .. ":objective_core", {
-	description = S("Objective Core"),
+	description = S("SYSTEM OBJECTIVE CORE"),
+	inventory_image = "sl_objective_core_icon.png",
 	tiles = {
-		"default_mese_block.png^[colorize:#00ff00:80",
-		"default_mese_block.png^[colorize:#00ff00:80",
-		"default_mese_block.png^[colorize:#00ff00:120",
+		"sl_objective_core_icon.png",
 	},
+	drawtype = "mesh",
+	mesh = "item.obj", -- Use a mesh for the cube if possible
 	paramtype = "light",
 	light_source = 14,
 	groups = {cracky = 1, oddly_breakable_by_hand = 1},

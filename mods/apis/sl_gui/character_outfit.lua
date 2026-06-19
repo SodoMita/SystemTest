@@ -17,11 +17,16 @@ local outfit_slots = {
 -- Use the System Looting boxman model for previews
 local function get_preview_model(player)
     if sl_characters and sl_characters.default_model then
-        return sl_characters.default_model, {sl_characters.default_texture}
+        local tex = sl_characters.default_texture or "sl_boxman_neon.png"
+        return sl_characters.default_model, {tex, tex, tex, tex, tex}
     end
-    local tex = {"character.png"}
+    local tex = {"character.png", "character.png", "character.png", "character.png", "character.png"}
     if player_api and player_api.get_textures then
-        tex = player_api.get_textures(player) or tex
+        local ptex = player_api.get_textures(player)
+        if ptex and #ptex > 0 then
+            tex = {}
+            for i=1,5 do tex[i] = ptex[1] end
+        end
     end
     return "character.b3d", tex
 end
@@ -203,15 +208,19 @@ function get_character_outfit_formspec(player, selected_slot)
         "bgcolor[#1a1a1aff;true]",
     }
 
+    -- Background boxes FIRST
+    table.insert(fs, "box[0,0;12,0.6;#1a1a1aff]")
+    table.insert(fs, "box[0.2,1.0;3.5,3.5;#101010ff]")
+    table.insert(fs, "box[4.2,0.8;7.5,4.8;#101010ff]")
+    table.insert(fs, "box[0.2,6.2;5.6,4.8;#101010ff]")
+    table.insert(fs, "box[5.8,6.2;6.0,4.8;#151515ff]")
+
     -- Reuse the same tab strip as the unified inventory
     if gui_get_tab_buttons then
         table.insert(fs, gui_get_tab_buttons(current_tab, false))
     end
 
-    table.insert(fs, "box[0,0;12,0.6;#1a1a1aff]")
-
     -- 3D preview using the System Looting boxman model
-    table.insert(fs, "box[0.2,1.0;3.5,3.5;#101010ff]")
     table.insert(fs, string.format(
         "model[0.3,1.1;3.3,3.3;outfit_preview;%s;%s;0,170;false;true;0,0]",
         model_name, table.concat(tex, ",")
@@ -229,7 +238,6 @@ function get_character_outfit_formspec(player, selected_slot)
     table.insert(fs, "button[2.0,5.3;0.9,0.6;slot_R_FOOT;R ft]")
 
     -- Right side: item list for the selected slot
-    table.insert(fs, "box[4.2,0.8;7.5,4.8;#101010ff]")
     table.insert(fs, string.format("label[4.4,0.9;Select %s item:]", selected_slot))
 
     local list = get_player_outfit_items(player, selected_slot)
@@ -261,8 +269,7 @@ function get_character_outfit_formspec(player, selected_slot)
     end
 
     -- Bottom: split into equipped-item details (left) and player info (right)
-    table.insert(fs, "box[0.2,6.2;5.6,4.8;#101010ff]")
-    table.insert(fs, "box[5.8,6.2;6.0,4.8;#151515ff]")
+    -- (Boxes moved to top of fs)
 
     -- Equipped item details
     table.insert(fs, "label[0.5,6.5;Currently equipped:]")
@@ -295,6 +302,7 @@ function handle_character_outfit_fields(player, formname, fields)
     end
 
     if fields.outfit_close or fields.quit then
+        minetest.close_formspec(player:get_player_name(), "character_outfit")
         return true
     end
 

@@ -476,30 +476,41 @@ function get_achievement_formspec(player)
     -- Debug
     minetest.log("action", "[achievement_system] Generating formspec for player. Total achievements: " .. #achievements)
     
-    -- Get player model info
-    local player_name = player:get_player_name()
-    local player_textures = player_api.get_textures(player) or {"character.png"}
-    
-    local formspec = {
-        "formspec_version[4]",
-        "size[12,11.8]",
-        "bgcolor[#0a0a0aff;true]",
-        
-        -- 3D Player Model Preview Box (square, static)
-        "box[0.2,0.3;1.5,1.5;#1a1a1aff]",
-        "model[0.3,0.4;1.3,1.3;player_preview;character.b3d;" .. table.concat(player_textures, ",") .. ";0,170;false;false;0,0]",
-        "image_button[0.3,0.4;1.3,1.3;;open_outfit;]",
-        
-        -- Header with stats
-        "box[0.2,1.8;11.6,0.6;#2a2a2aff]",
-        "label[0.5,2.1;🏆 Achievements]",
-    }
-    
     -- Count unlocked achievements
     local unlocked_count = 0
     for _ in pairs(data.unlocked) do
         unlocked_count = unlocked_count + 1
     end
+
+    -- Get player model info
+    local model_name = "character.b3d"
+    local tex_str = "character.png,character.png,character.png,character.png,character.png"
+    if sl_characters and sl_characters.default_model then
+        model_name = sl_characters.default_model
+        local tex = sl_characters.default_texture or "sl_boxman_neon.png"
+        tex_str = string.format("%s,%s,%s,%s,%s", tex, tex, tex, tex, tex)
+    else
+        local ptex = player_api.get_textures(player)
+        if ptex and #ptex > 0 then
+            tex_str = string.format("%s,%s,%s,%s,%s", ptex[1], ptex[1], ptex[1], ptex[1], ptex[1])
+        end
+    end
+
+    local formspec = {
+        "formspec_version[4]",
+        "size[12,11.8]",
+        "bgcolor[#0a0a0aff;true]",
+
+        -- 3D Player Model Preview Box
+        "box[0.2,0.3;1.5,1.5;#1a1a1aff]",
+        string.format("model[0.3,0.4;1.3,1.3;player_preview;%s;%s;0,170;false;true;0,0]",
+            model_name, tex_str),
+        "image_button[0.3,0.4;1.3,1.3;;open_outfit;]",
+
+        -- Header with stats
+        "box[0.2,1.8;11.6,0.6;#2a2a2aff]",
+        "label[0.5,2.1;🏆 Achievements]",
+    }
     
     table.insert(formspec, string.format(
         "label[9,2.1;%d / %d Unlocked]", 
