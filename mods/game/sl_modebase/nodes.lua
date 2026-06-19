@@ -36,11 +36,42 @@ minetest.register_node(game_mode.modname .. ":destroyed_beacon", {
 	description = S("Destroyed Beacon"),
 	drawtype = "mesh",
 	mesh = "beacon.obj",
-	tiles = {"default_obsidian.png^[colorize:#000000:150"},
+	tiles = {"default_obsidian.png^[colorize:#00ffff:50"}, -- Tinted lobby-style cyan when in lobby? No, let's keep it dark.
 	paramtype = "light",
 	groups = {cracky = 3, oddly_breakable_by_hand = 1, not_in_creative_inventory = 1},
 	selection_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
 	collision_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
+})
+
+-- Auto-restore destroyed beacons in lobby
+minetest.register_abm({
+	label = "Restore Beacons in Lobby",
+	nodenames = {"sl_modebase:destroyed_beacon"},
+	interval = 5,
+	chance = 1,
+	action = function(pos, node)
+		if not state.match_active then
+			-- Identify which beacon this was
+			if state.teams.beacon_a.spawn then
+				local bpos = {x=state.teams.beacon_a.spawn.x, y=state.teams.beacon_a.spawn.y-1, z=state.teams.beacon_a.spawn.z}
+				if vector.equals(pos, bpos) then
+					minetest.set_node(pos, {name = "sl_modebase:beacon_a"})
+					state.teams.beacon_a.hp = 100
+					return
+				end
+			end
+			if state.teams.beacon_b.spawn then
+				local bpos = {x=state.teams.beacon_b.spawn.x, y=state.teams.beacon_b.spawn.y-1, z=state.teams.beacon_b.spawn.z}
+				if vector.equals(pos, bpos) then
+					minetest.set_node(pos, {name = "sl_modebase:beacon_b"})
+					state.teams.beacon_b.hp = 100
+					return
+				end
+			end
+			-- Fallback: just delete if it doesn't match known spawns
+			minetest.remove_node(pos)
+		end
+	end,
 })
 
 function game_mode.damage_beacon(team_id, amount, attacker_name)
