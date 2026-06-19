@@ -17,6 +17,13 @@ function game_mode.end_match(winner, reason)
 
 	state.match_active = false
 
+	-- Teleport everyone to lobby after a short delay
+	minetest.after(0.5, function()
+		for _, player in ipairs(minetest.get_connected_players()) do
+			game_mode.spawn_player(player)
+		end
+	end)
+
 	if winner == "beacons" then
 		game_mode.broadcast(S("Beacon teams win! (@1)", reason or ""))
 	elseif state.teams[winner] then

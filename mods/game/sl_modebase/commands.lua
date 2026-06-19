@@ -177,6 +177,18 @@ minetest.register_chatcommand("sl_assign", {
 	end,
 })
 
+minetest.register_chatcommand("sl_set_lobby", {
+	description = S("Set lobby spawn to your current position (admin)"),
+	privs = { sl_admin = true },
+	func = function(name)
+		local player = minetest.get_player_by_name(name)
+		if not player then return false end
+		local pos = player:get_pos()
+		state.lobby_spawn = vector.round(pos)
+		return true, S("Lobby spawn set to @1", minetest.pos_to_string(state.lobby_spawn))
+	end,
+})
+
 -- Match control commands
 minetest.register_chatcommand("sl_match_start", {
 	params = "[elimination|objective]",

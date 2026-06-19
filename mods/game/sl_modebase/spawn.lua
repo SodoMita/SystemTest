@@ -22,6 +22,8 @@ function game_mode.spawn_player(player)
 		return false
 	end
 
+	minetest.log("action", string.format("[game_mode] Spawning %s at %s (match_active: %s)",
+		name, minetest.pos_to_string(pos), tostring(state.match_active)))
 	player:set_pos(pos)
 
 	-- Default Boxman properties
@@ -38,6 +40,20 @@ function game_mode.spawn_player(player)
 		player:set_properties({
 			textures = boxman_textures,
 			visual_size = {x=10, y=10},
+		})
+		player:set_armor_groups({ fleshy = 100 })
+	elseif not state.match_active then
+		-- Lobby state: immortal and neutral
+		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
+		player:set_properties({
+			textures = boxman_textures,
+			visual_size = {x=10, y=10},
+		})
+		player:set_armor_groups({ immortal = 1 })
+		player:set_physics_override({
+			speed = 1.0,
+			jump = 1.0,
+			gravity = 1.0,
 		})
 	elseif pl.phase == "ghost" then
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
@@ -79,6 +95,7 @@ function game_mode.spawn_player(player)
 			jump = 1.0,
 			gravity = 1.0,
 		})
+		player:set_armor_groups({ fleshy = 100 })
 	end
 
 	return true
@@ -89,15 +106,8 @@ minetest.register_on_joinplayer(function(player)
 	local name = player:get_player_name()
 	local pl = game_mode.get_player_state(name)
 
-	if not pl.team and pl.role ~= "monster_master" then
-		local team_id = game_mode.assign_beacon_team(name)
-		local color = game_mode.get_team_color(team_id)
-		minetest.chat_send_player(name, minetest.colorize(color,
-			S("You were assigned to @1.", game_mode.get_team_label(team_id))))
-	end
-
-	-- Initial spawn
-	minetest.after(0.1, function()
+	-- Initial spawn at lobby (or beacon if match is active)
+	minetest.after(0.2, function()
 		local p = minetest.get_player_by_name(name)
 		if p then
 			game_mode.spawn_player(p)

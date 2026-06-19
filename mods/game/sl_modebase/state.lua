@@ -20,8 +20,8 @@ local state = {
 		player = nil, -- name of current monster master
 	},
 
-	ghost_spawn = { x = 0, y = 50, z = 0 },
-	lobby_spawn = { x = 0, y = 100, z = 0 },
+	ghost_spawn = { x = 0, y = 5, z = 0 },
+	lobby_spawn = { x = 0, y = 5, z = 0 },
 
 	players = {}, -- [name] = { team=..., lives=..., eliminated=bool, role="monster_master"|nil, phase=... }
 
