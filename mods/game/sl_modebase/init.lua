@@ -24,6 +24,7 @@ include_files(
 	"state.lua",    -- persistent state, teams, helpers
 	"spawn.lua",    -- spawn logic and join/respawn hooks
 	"match.lua",    -- match lifecycle and win conditions
+	"matchmaking.lua", -- matchmaking UI and lobby terminal
 	"entities.lua", -- monster entities
 	"nodes.lua",    -- beacon nodes + loot crate
 	"content.lua",  -- craftable items, tools, tactical nodes, interactables
