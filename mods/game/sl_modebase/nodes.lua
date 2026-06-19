@@ -140,3 +140,37 @@ minetest.register_node(game_mode.modname .. ":loot_crate", {
 		return meta:get_inventory():is_empty("main")
 	end,
 })
+
+-- ================================================================
+-- Spawn Setting Nodes
+-- ================================================================
+
+minetest.register_node(game_mode.modname .. ":spawn_mm", {
+	description = S("Monster Master Spawn Point"),
+	tiles = {"sl_boxman_neon.png^[colorize:#ff0000:120"},
+	groups = {cracky = 1},
+	after_place_node = function(pos)
+		state.monster_master.base_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.broadcast(S("Monster Master spawn set to @1, @2, @3", pos.x, pos.y+1, pos.z))
+	end,
+})
+
+minetest.register_node(game_mode.modname .. ":spawn_ghost", {
+	description = S("Ghost Spawn Point"),
+	tiles = {"sl_boxman_neon.png^[opacity:100"},
+	groups = {cracky = 1},
+	after_place_node = function(pos)
+		state.ghost_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.broadcast(S("Ghost spawn set to @1, @2, @3", pos.x, pos.y+1, pos.z))
+	end,
+})
+
+minetest.register_node(game_mode.modname .. ":spawn_lobby", {
+	description = S("Lobby Spawn Point"),
+	tiles = {"sl_boxman_neon.png^[colorize:#00ffff:120"},
+	groups = {cracky = 1},
+	after_place_node = function(pos)
+		state.lobby_spawn = { x = pos.x, y = pos.y + 1, z = pos.z }
+		game_mode.broadcast(S("Lobby spawn set to @1, @2, @3", pos.x, pos.y+1, pos.z))
+	end,
+})

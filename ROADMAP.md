@@ -123,3 +123,14 @@ match ends correctly and announces the winner.
 > Biggest leverage: **Phase 1 item 4** (objective win condition). It turns the existing
 > crafting UI from a sandbox feature into an actual *way to win*, which is the whole point
 > of "a crafting loop toward the final goal."
+
+## Phase 4 — Lobby & Matchmaking
+- [ ] Implement Lobby Room mechanics:
+    - [ ] Add `sl_modebase:lobby_terminal` node for match settings and voting.
+    - [ ] Create Matchmaking UI (Formspec) for starting matches, choosing modes, and roles.
+    - [ ] Add "Waiting for Players" HUD when match is not active.
+- [ ] Enhance Monster Master Role:
+    - [ ] Add RTS-style unit deployment UI.
+    - [ ] Implement income system based on damage dealt by monsters.
+- [ ] Lore Integration:
+    - [ ] Add readable data pads/terminals with AI-generated horror logs.
