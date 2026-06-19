@@ -8,12 +8,12 @@ function game_mode.spawn_player(player)
 
 	local pos
 
-	if pl.role == "monster_master" then
+	if not state.match_active then
+		pos = table.copy(state.lobby_spawn)
+	elseif pl.role == "monster_master" then
 		pos = table.copy(state.monster_master.base_spawn)
 	elseif pl.phase == "ghost" then
 		pos = table.copy(state.ghost_spawn)
-	elseif not state.match_active then
-		pos = table.copy(state.lobby_spawn)
 	elseif pl.team and state.teams[pl.team] then
 		pos = table.copy(state.teams[pl.team].spawn)
 	end
