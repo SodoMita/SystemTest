@@ -17,6 +17,11 @@ function game_mode.end_match(winner, reason)
 
 	state.match_active = false
 
+	-- Teleport all players back to lobby
+	for _, player in ipairs(minetest.get_connected_players()) do
+		game_mode.spawn_player(player)
+	end
+
 	if winner == "beacons" then
 		game_mode.broadcast(S("Beacon teams win! (@1)", reason or ""))
 	elseif state.teams[winner] then
