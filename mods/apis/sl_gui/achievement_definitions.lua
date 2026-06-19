@@ -167,7 +167,7 @@ register_achievement({
     id = "craft_objective_core",
     name = "Mission Complete",
     description = "Craft the Objective Core",
-    icon = "achievement_mission_complete.png",
+    icon = "sl_objective_core_icon.png",
     category = "crafting",
     max_progress = 1,
     reward_xp = 500,
@@ -311,15 +311,66 @@ register_achievement({
 -- ===== Secret ==================================================
 
 register_achievement({
-    id = "secret_find_depths",
+    id = "secret_depth_1k",
     name = "Into the Abyss",
-    description = "Descend below y=-100",
-    icon = "achievement_abyss.png",
+    description = "Descend below y=-1000",
+    icon = "achievement_depth_1k.png",
     category = "secret",
     max_progress = 1,
     reward_xp = 500,
     hidden = true,
     graph_x = 4, graph_y = 4,
+})
+
+register_achievement({
+    id = "secret_depth_5k",
+    name = "Deep Scavenger",
+    description = "Descend below y=-5000",
+    icon = "achievement_depth_5k.png",
+    category = "secret",
+    max_progress = 1,
+    reward_xp = 750,
+    requires = {"secret_depth_1k"},
+    hidden = true,
+    graph_x = 5, graph_y = 4,
+})
+
+register_achievement({
+    id = "secret_depth_10k",
+    name = "Void Walker",
+    description = "Descend below y=-10000",
+    icon = "achievement_depth_10k.png",
+    category = "secret",
+    max_progress = 1,
+    reward_xp = 1000,
+    requires = {"secret_depth_5k"},
+    hidden = true,
+    graph_x = 6, graph_y = 4,
+})
+
+register_achievement({
+    id = "secret_depth_20k",
+    name = "Bottomless",
+    description = "Descend below y=-20000",
+    icon = "achievement_depth_20k.png",
+    category = "secret",
+    max_progress = 1,
+    reward_xp = 2000,
+    requires = {"secret_depth_10k"},
+    hidden = true,
+    graph_x = 7, graph_y = 4,
+})
+
+register_achievement({
+    id = "secret_world_loop",
+    name = "Up is Down",
+    description = "Cross the bottom of the world and emerge from the sky",
+    icon = "achievement_up_is_down.png",
+    category = "secret",
+    max_progress = 1,
+    reward_xp = 1000,
+    hidden = true,
+    graph_x = 6, graph_y = 5,
 })
 
 register_achievement({
@@ -331,7 +382,56 @@ register_achievement({
     max_progress = 1,
     reward_xp = 100,
     hidden = true,
-    graph_x = 5, graph_y = 4,
+    graph_x = 5, graph_y = 5,
+})
+
+-- ===== Challenges ==============================================
+
+register_achievement({
+    id = "challenge_fall_100",
+    name = "Leap of Faith",
+    description = "Survive a fall of 100 nodes",
+    icon = "achievement_fall_100.png",
+    category = "challenge",
+    max_progress = 1,
+    reward_xp = 150,
+    graph_x = 5, graph_y = 2,
+})
+
+register_achievement({
+    id = "challenge_fall_1k",
+    name = "Terminal Velocity",
+    description = "Survive a fall of 1000 nodes",
+    icon = "achievement_fall_1k.png",
+    category = "challenge",
+    max_progress = 1,
+    reward_xp = 500,
+    requires = {"challenge_fall_100"},
+    graph_x = 6, graph_y = 2,
+})
+
+register_achievement({
+    id = "challenge_fall_10k",
+    name = "Orbital Drop",
+    description = "Survive a fall of 10000 nodes",
+    icon = "achievement_fall_10k.png",
+    category = "challenge",
+    max_progress = 1,
+    reward_xp = 1500,
+    requires = {"challenge_fall_1k"},
+    graph_x = 7, graph_y = 2,
+})
+
+register_achievement({
+    id = "challenge_loop_land",
+    name = "Perfect Re-entry",
+    description = "Successfully land after looping from bottom to top",
+    icon = "achievement_loop_land.png",
+    category = "challenge",
+    max_progress = 1,
+    reward_xp = 2000,
+    requires = {"secret_world_loop"},
+    graph_x = 7, graph_y = 3,
 })
 
 minetest.log("action", "[achievement_definitions] Loaded "
