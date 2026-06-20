@@ -1,4 +1,4 @@
-Now let's imagine a match of this game with 7 players. This way we would iterate over everything that exist in game and imagine missing parts along the way. Here what other AI imagined about this:
+Now let's imagine a match of this game with 5 players. This way we would iterate over everything that exist in game and imagine missing parts along the way. Here what other AI imagined about this:
 
 ```
 
