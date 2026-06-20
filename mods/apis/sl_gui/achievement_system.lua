@@ -374,6 +374,9 @@ end
 
 -- Unlock achievement
 function unlock_achievement(player, achievement_id)
+    if not game_mode or not game_mode.state or not game_mode.state.match_active then
+        return false -- Only gainable during match
+    end
     local achievement = achievement_by_id[achievement_id]
     if not achievement then return false end
     
@@ -420,6 +423,9 @@ end
 
 -- Add progress to achievement
 function achievement_progress(player, achievement_id, amount)
+    if not game_mode or not game_mode.state or not game_mode.state.match_active then
+        return -- Only gainable during match
+    end
     amount = amount or 1
     local achievement = achievement_by_id[achievement_id]
     if not achievement then 
