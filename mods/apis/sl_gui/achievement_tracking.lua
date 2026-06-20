@@ -146,7 +146,9 @@ minetest.register_globalstep(function(dtime)
             player_highest_y[name] = math.max(player_highest_y[name] or pos.y, pos.y)
         elseif player_highest_y[name] then
             -- Stopped falling or moving up. Check for landing.
-            local wrap_detected = (pos.y - last_y) > 10000 -- World wrap
+            -- A teleport wrap often results in a massive Y difference. 
+            -- We don't want teleports to trigger fall distance calculations.
+            local wrap_detected = math.abs(pos.y - last_y) > 5000 
             
             if not wrap_detected then
                 if is_on_real_ground(player) then
