@@ -1,0 +1,89 @@
+Now let's imagine a match of this game with 7 players. This way we would iterate over everything that exist in game and imagine missing parts along the way. Here what other AI imagined about this:
+
+```
+
+Operator A: So, I see that infiltration was successful beacon allowed us to descend into this system. Where be the enemy? We must prepare until nobody is here.
+
+Operator B: Alright, seems like nobody is here. Let's descend into depth to get resources because currently we have nothing.
+
+*Descended into hole in the ground and there reached mining site together.*
+
+Chat says that beacon is under attack.
+
+Operator B: Keep mining, I'll go up to kill them with bare hands. My skill level is higher than yours.
+
+Operator A: OK. But we didn't reach any structures, yet. Only some walls for scrap metal.
+
+Operator B: Fine. You may find loot crates in some rooms for more valuables. Bye.
+
+*Operator A continue mining. It got 50 scrap metals. Then it found a loot crate with power armor set of 2 boots, 2 leggings, jacket, backpack, helmet, gloves. It fits well.*
+
+*It returns to Beacon A.*
+
+Operator B: Meanwhile I gained scrap from monsters as well. Enough to craft a knife to kill them more efficiently. Oh, I see you found new armor!
+
+Operator A: Yeah. Also enough scrap for basic walls. They are good against stupid mobs, but for smart enemies they are useful for stealth.
+
+Operator B: Enemy base is too far away. Chat didn't say that anyone died yet. I doubt that would be a trouble.
+
+*Operator A crafted barricades. Then constructed walls around beacon.
+
+Operator A: Next thing to do is getting other resources. I'll go explore other places while you can keep getting resources from mobs.
+
+Operator B: OK. My knife is ready for anything.
+
+*From hole a dredger came. It leaped on Operator B.*
+
+*Operator A punched dredger. With bare hands it would damage, but power gloves caused damage.*
+
+*Operator B tried to fight back, but caused some damage and was downed.*
+
+*Operator A activated haste mode and punched dredger to death at cost of stamina.*
+
+*Operator B was rescued.*
+
+Operator B: Thanks, but bigger are coming soon. I'll rather go loot myself and you protect the base.
+
+Operator A: OK.
+
+*Operator A protect the base. Operator B gone to get metal, plastic scrap. It found laser blaster, that is too heavy to carry. Then found lots of resources. Then found crate of grenades.*
+
+*While returning, it decided to visit vent. Suddenly a shadow of something was seen through vent holes. It had an idea to distract that something to enemy base. For that it waited until that thing goes away and sneaked to operator room. There it found login and password on sticker and used. Then used that to close all doors, except those that go towards other team.*
+
+*It didn't work. It only angered something. Operator B ran towards vent and gone through it, but something destroyed vent along the way. Operator B was instantly killed.*
+
+Operator A: Oh no, i'm alone now without anything. These scraps from basic mobs are just enough for maintenance. We are not getting anything that way. I can craft spikes and bear traps, which are cheap way to slow down monsters.
+
+*After doing that, Operator A ran to the opposite to previous side. Now there is neon forest. There are loot crates with all resources to create a defence tower with circular blade.*
+
+Operator A: Now I can have basic security. Here we place it and all basic mobs just die. Their loot is gathered by VC robot. Now I can go to richer loot places deep underground.
+
+*Operator A returned to hole. It passed previous location and descended into dangerous underground rooms with mobs. They are partially flooded. By punching through enemies it descended further and further. It got achievement for passing -1000. Suddenly, dredger catched it from behind, injected something and started talking.*
+
+Dredger B: Hi. I'm former Operator B. Now we are same team again - neutrals. Normally that would mean betrayal, but now you are alone in team.
+
+Operator Impostor A: Splendid. Not alone now. But how is that going to help anything?
+
+Dredger B: I can boost you. Also I know that central building has some very dangerous monster. So no easy money for us. You are correct to go to depths. But MM has very strong monsters and as soon as it understands that base is unprotected, it will rush into it. I was at other team base, there is just 1 Operator, but it is better than both of us and advanced very rapidly. MM is rushing their base, which also is good for us. Our hope now is to find crypto vault and extract loot on beacon.
+
+*Eventually they found crypto vault. It was very well guarded. So by quick running around pillars and taking needed items, that B used for crafting, while A running, they got what needed and entered the vault. In there servers. After completing minigame, entering codes, they acquired crypto wallet.*
+
+Dredger B: Something is wrong. Previously monster got me similar way. Hiding will not work, just run. Do not enable haste mode yet, that race is going to be long.
+
+*Nothing out of ordinary is happening, but A does as suggested. Exited vault. Vault guards are neutral to them now because they authorized into vault security system and turned to their side.*
+
+*Half way to base, shadow of something became visible. It is not that fast, but still manage to come closer. Security robots do not attack it, they turned against them.*
+
+*Message in chat says that other team is eliminated, so they must survive for 1 minute.*
+
+Dredger B: Now it's time to use haste mode. I'll give you my energy and boost.
+
+*A uses haste. Places blocks and objects behind, but these are all unprocessed valuables. Security bots mine these quickly and something barely slows down.*
+
+*On return to beacon, all mobs that was going to other beacon are now approaching this. Beacon is almost here, A just need to approach it. But something dug through neon ground and now is between A,B and beacon. Sniper mob just killed B. A Jumped to hole that something just did. A mined to other side of beacon, right clicked on it and escaped.*
+
+*Operator A individual victory.*
+
+```
+
+So you knowing design can imagine other match with better details.
