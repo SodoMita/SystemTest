@@ -368,7 +368,7 @@ register_achievement({
     icon = "achievement_up_is_down.png",
     category = "secret",
     max_progress = 1,
-    reward_xp = 1000,
+    reward_xp = 3200,
     hidden = true,
     graph_x = 6, graph_y = 5,
 })

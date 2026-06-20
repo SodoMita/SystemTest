@@ -76,30 +76,56 @@ minetest.register_on_joinplayer(function(player)
     end
 end)
 
+-- ========================================================
+-- Reliable world-loop detection via sl_teleport callback
+-- Uses the SAME function/logic the teleport mod uses, so
+-- the trigger can no longer "miss" Nyaa~ (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄)
+-- ========================================================
+minetest.register_on_mods_loaded(function()
+    if sl_teleport and sl_teleport.register_on_teleport then
+        sl_teleport.register_on_teleport(function(entity, old_pos, new_pos, looped)
+            if not entity or not entity:is_player() then return end
+            local name = entity:get_player_name()
+
+            -- World loop achievement — fires on ANY axis wrap
+            if looped.x or looped.y or looped.z then
+                check_achievement(entity, "secret_world_loop")
+                player_looped[name] = true
+                minetest.log("action",
+                    string.format("[achievement_tracking] %s world-looped via teleport "
+                                  .. "(x:%s y:%s z:%s)", name,
+                                  tostring(looped.x), tostring(looped.y), tostring(looped.z)))
+            end
+        end)
+        minetest.log("action",
+            "[achievement_tracking] Hooked into sl_teleport for world-loop detection ✅")
+    else
+        minetest.log("warning",
+            "[achievement_tracking] sl_teleport API not found — "
+            .. "world-loop achievements will be unreliable!")
+    end
+end)
+
 -- Check exploration achievements periodically
 local exploration_timer = 0
-local player_last_y = {}
+-- NOTE: player_last_y removed — world-loop detection now comes from
+--       the sl_teleport callback above, which is 100% reliable.
 local player_highest_y = {}
 local player_looped = {}
 
 minetest.register_globalstep(function(dtime)
     exploration_timer = exploration_timer + dtime
-    if exploration_timer >= 1 then -- Check every 1 second for fall tracking
+    if exploration_timer >= 1 then  -- every 1 second for fall tracking
         for _, player in ipairs(minetest.get_connected_players()) do
             local name = player:get_player_name()
-            local pos = player:get_pos()
-            local last_y = player_last_y[name] or pos.y
-            
-            -- Detect world loop (sudden large Y jump)
-            if math.abs(pos.y - last_y) > 20000 then
-                check_achievement(player, "secret_world_loop")
-                player_looped[name] = true
-            end
-            
+            local pos  = player:get_pos()
+
+            -- (World-loop detection removed — handled by sl_teleport callback)
+
             -- Fall tracking
             local v = player:get_velocity()
             local is_falling = v and v.y < -5
-            
+
             if is_falling then
                 player_highest_y[name] = math.max(player_highest_y[name] or pos.y, pos.y)
             else
@@ -113,20 +139,19 @@ minetest.register_globalstep(function(dtime)
                     elseif fall_dist >= 100 then
                         check_achievement(player, "challenge_fall_100")
                     end
-                    
+
+                    -- player_looped is now set by the sl_teleport callback
                     if player_looped[name] then
                         check_achievement(player, "challenge_loop_land")
                         player_looped[name] = nil
                     end
-                    
+
                     player_highest_y[name] = nil
                 end
             end
-            
-            player_last_y[name] = pos.y
 
             if exploration_timer >= 10 then
-                -- Check if in depths (multi-tier)
+                -- Depth achievements (multi-tier)
                 if pos.y < -20000 then
                     check_achievement(player, "secret_depth_20k")
                 elseif pos.y < -10000 then
@@ -144,11 +169,11 @@ minetest.register_globalstep(function(dtime)
                         check_achievement(player, "travel_1000_blocks")
                     end
                 end
-                
+
                 if pos.y > 100 then
                     check_achievement(player, "visit_floating_island")
                 end
-                
+
                 if pos.y >= -10 and pos.y <= 50 then
                     check_achievement(player, "find_city")
                 end
