@@ -77,10 +77,11 @@ minetest.register_on_mods_loaded(function()
             if not entity or not entity:is_player() then return end
             local name = entity:get_player_name()
 
-            if looped.x or looped.y or looped.z then
+            -- "Up is Down" specifically for bottom-to-top wrap (negative to positive Y)
+            if looped.y and new_pos.y > old_pos.y then
                 unlock_achievement(entity, "secret_world_loop")
                 player_looped[name] = true
-                minetest.log("action", "[achievement_tracking] World loop detected for " .. name)
+                minetest.log("action", "[achievement_tracking] Bottom-to-Top world loop detected for " .. name)
             end
         end)
     end
@@ -150,13 +151,11 @@ minetest.register_globalstep(function(dtime)
             if not wrap_detected then
                 if is_on_real_ground(player) then
                     local fall_dist = player_highest_y[name] - pos.y
-                    if fall_dist >= 10000 then
-                        unlock_achievement(player, "challenge_fall_10k")
-                    elseif fall_dist >= 1000 then
-                        unlock_achievement(player, "challenge_fall_1k")
-                    elseif fall_dist >= 100 then
-                        unlock_achievement(player, "challenge_fall_100")
-                    end
+                    -- Grant in sequence or separately? 
+                    -- unlock_achievement handles requirements, so we must try lower ones first.
+                    if fall_dist >= 100 then unlock_achievement(player, "challenge_fall_100") end
+                    if fall_dist >= 1000 then unlock_achievement(player, "challenge_fall_1k") end
+                    if fall_dist >= 10000 then unlock_achievement(player, "challenge_fall_10k") end
 
                     if player_looped[name] then
                         unlock_achievement(player, "challenge_loop_land")
@@ -175,16 +174,11 @@ minetest.register_globalstep(function(dtime)
         player_last_y[name] = pos.y
 
         if check_exploration then
-            -- Depth achievements
-            if pos.y < -20000 then
-                unlock_achievement(player, "secret_depth_20k")
-            elseif pos.y < -10000 then
-                unlock_achievement(player, "secret_depth_10k")
-            elseif pos.y < -5000 then
-                unlock_achievement(player, "secret_depth_5k")
-            elseif pos.y < -1000 then
-                unlock_achievement(player, "secret_depth_1k")
-            end
+            -- Depth achievements - Check thresholds in sequence
+            if pos.y < -1000 then unlock_achievement(player, "secret_depth_1k") end
+            if pos.y < -5000 then unlock_achievement(player, "secret_depth_5k") end
+            if pos.y < -10000 then unlock_achievement(player, "secret_depth_10k") end
+            if pos.y < -20000 then unlock_achievement(player, "secret_depth_20k") end
 
             local spawn = player_spawn_positions[name]
             if spawn then
