@@ -63,17 +63,32 @@ end
 -- Track position for exploration achievements
 local player_spawn_positions = {}
 
+-- Check exploration achievements periodically
+local exploration_timer = 0
+local player_last_y = {}
+local player_highest_y = {}
+local player_looped = {}
+local visited_islands = {}
+
 minetest.register_on_joinplayer(function(player)
     local name = player:get_player_name()
+    local pos = player:get_pos()
+    player_last_y[name] = pos.y
+    player_highest_y[name] = nil
+    player_looped[name] = nil
+
     local meta = player:get_meta()
     local spawn_str = meta:get_string("spawn_pos")
     if spawn_str == "" then
-        local pos = player:get_pos()
         meta:set_string("spawn_pos", minetest.serialize(pos))
         player_spawn_positions[name] = pos
     else
         player_spawn_positions[name] = minetest.deserialize(spawn_str)
     end
+
+    local visited_str = meta:get_string("visited_islands")
+    if visited_str == "" then visited_str = "{}" end
+    visited_islands[name] = minetest.deserialize(visited_str) or {}
 end)
 
 -- ========================================================
@@ -89,7 +104,7 @@ minetest.register_on_mods_loaded(function()
 
             -- World loop achievement — fires on ANY axis wrap
             if looped.x or looped.y or looped.z then
-                check_achievement(entity, "secret_world_loop")
+                unlock_achievement(entity, "secret_world_loop")
                 player_looped[name] = true
                 minetest.log("action",
                     string.format("[achievement_tracking] %s world-looped via teleport "
@@ -106,92 +121,81 @@ minetest.register_on_mods_loaded(function()
     end
 end)
 
--- Check exploration achievements periodically
-local exploration_timer = 0
--- NOTE: player_last_y removed — world-loop detection now comes from
---       the sl_teleport callback above, which is 100% reliable.
-local player_highest_y = {}
-local player_looped = {}
-
 minetest.register_globalstep(function(dtime)
     exploration_timer = exploration_timer + dtime
-    if exploration_timer >= 1 then  -- every 1 second for fall tracking
-        for _, player in ipairs(minetest.get_connected_players()) do
-            local name = player:get_player_name()
-            local pos  = player:get_pos()
+    local check_exploration = (exploration_timer >= 10)
+    if check_exploration then exploration_timer = 0 end
 
-            -- (World-loop detection removed — handled by sl_teleport callback)
+    for _, player in ipairs(minetest.get_connected_players()) do
+        local name = player:get_player_name()
+        local pos  = player:get_pos()
+        if not pos then goto next_player end
 
-            -- Fall tracking
-            local v = player:get_velocity()
-            local is_falling = v and v.y < -5
-
-            if is_falling then
-                player_highest_y[name] = math.max(player_highest_y[name] or pos.y, pos.y)
-            else
-                -- Landed or moving up
-                if player_highest_y[name] then
+        local last_y = player_last_y[name] or pos.y
+        
+        -- Fall tracking
+        if pos.y < last_y then
+            -- Falling
+            player_highest_y[name] = math.max(player_highest_y[name] or last_y, last_y)
+        else
+            -- Not falling (hit ground, jumping up, or looped)
+            if player_highest_y[name] then
+                -- Check if it was a world loop (very large jump up)
+                local wrap_detected = (pos.y - last_y) > 10000 
+                
+                if not wrap_detected then
+                    -- Normal landing
                     local fall_dist = player_highest_y[name] - pos.y
                     if fall_dist >= 10000 then
-                        check_achievement(player, "challenge_fall_10k")
+                        unlock_achievement(player, "challenge_fall_10k")
                     elseif fall_dist >= 1000 then
-                        check_achievement(player, "challenge_fall_1k")
+                        unlock_achievement(player, "challenge_fall_1k")
                     elseif fall_dist >= 100 then
-                        check_achievement(player, "challenge_fall_100")
+                        unlock_achievement(player, "challenge_fall_100")
                     end
 
-                    -- player_looped is now set by the sl_teleport callback
+                    -- Check if we landed after a loop
                     if player_looped[name] then
-                        check_achievement(player, "challenge_loop_land")
+                        unlock_achievement(player, "challenge_loop_land")
                         player_looped[name] = nil
                     end
-
-                    player_highest_y[name] = nil
                 end
-            end
-
-            if exploration_timer >= 10 then
-                -- Depth achievements (multi-tier)
-                if pos.y < -20000 then
-                    check_achievement(player, "secret_depth_20k")
-                elseif pos.y < -10000 then
-                    check_achievement(player, "secret_depth_10k")
-                elseif pos.y < -5000 then
-                    check_achievement(player, "secret_depth_5k")
-                elseif pos.y < -1000 then
-                    check_achievement(player, "secret_depth_1k")
-                end
-
-                local spawn = player_spawn_positions[name]
-                if spawn then
-                    local distance = vector.distance(pos, spawn)
-                    if distance >= 1000 then
-                        check_achievement(player, "travel_1000_blocks")
-                    end
-                end
-
-                if pos.y > 100 then
-                    check_achievement(player, "visit_floating_island")
-                end
-
-                if pos.y >= -10 and pos.y <= 50 then
-                    check_achievement(player, "find_city")
-                end
+                player_highest_y[name] = nil
             end
         end
-        if exploration_timer >= 10 then exploration_timer = 0 end
+
+        player_last_y[name] = pos.y
+
+        if check_exploration then
+            -- Depth achievements (multi-tier)
+            if pos.y < -20000 then
+                unlock_achievement(player, "secret_depth_20k")
+            elseif pos.y < -10000 then
+                unlock_achievement(player, "secret_depth_10k")
+            elseif pos.y < -5000 then
+                unlock_achievement(player, "secret_depth_5k")
+            elseif pos.y < -1000 then
+                unlock_achievement(player, "secret_depth_1k")
+            end
+
+            local spawn = player_spawn_positions[name]
+            if spawn then
+                local distance = vector.distance(pos, spawn)
+                if distance >= 1000 then
+                    unlock_achievement(player, "travel_1000_blocks")
+                end
+            end
+
+            if pos.y > 100 then
+                unlock_achievement(player, "visit_floating_island")
+            end
+
+            if pos.y >= -10 and pos.y <= 50 then
+                unlock_achievement(player, "find_city")
+            end
+        end
+        ::next_player::
     end
-end)
-
--- Track island visits (simplified - you can expand this)
-local visited_islands = {}
-
-minetest.register_on_joinplayer(function(player)
-    local name = player:get_player_name()
-    local meta = player:get_meta()
-    local visited_str = meta:get_string("visited_islands")
-    if visited_str == "" then visited_str = "{}" end
-    visited_islands[name] = minetest.deserialize(visited_str) or {}
 end)
 
 -- Helper to mark island visit (call this when player lands on island)
@@ -220,7 +224,7 @@ function mark_island_visit(player, island_id)
             meta:set_string("achievements", minetest.serialize(ach_data))
             
             if count >= 10 then
-                check_achievement(player, "visit_10_islands")
+                unlock_achievement(player, "visit_10_islands")
             end
         end
     end
