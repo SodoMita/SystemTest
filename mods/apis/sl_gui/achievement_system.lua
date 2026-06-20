@@ -373,7 +373,7 @@ local function queue_achievement_popup(player, achievement)
 end
 
 -- Unlock achievement
-local function unlock_achievement(player, achievement_id)
+function unlock_achievement(player, achievement_id)
     local achievement = achievement_by_id[achievement_id]
     if not achievement then return false end
     

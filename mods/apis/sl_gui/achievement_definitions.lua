@@ -54,6 +54,50 @@ register_achievement({
     graph_x = 2, graph_y = 0,
 })
 
+register_achievement({
+    id = "travel_1000_blocks",
+    name = "World Traveler",
+    description = "Travel 1000 blocks from your starting point",
+    icon = "achievement_travel_1000_blocks.png",
+    category = "exploration",
+    max_progress = 1,
+    reward_xp = 50,
+    graph_x = 0, graph_y = 1,
+})
+
+register_achievement({
+    id = "visit_floating_island",
+    name = "Sky High",
+    description = "Visit a floating island (y > 100)",
+    icon = "achievement_visit_floating_island.png",
+    category = "exploration",
+    max_progress = 1,
+    reward_xp = 75,
+    graph_x = 1, graph_y = 2,
+})
+
+register_achievement({
+    id = "find_city",
+    name = "Urban Explorer",
+    description = "Discover the main city area",
+    icon = "achievement_find_city.png",
+    category = "exploration",
+    max_progress = 1,
+    reward_xp = 100,
+    graph_x = 0, graph_y = 2,
+})
+
+register_achievement({
+    id = "visit_10_islands",
+    name = "Island Hopper",
+    description = "Visit 10 different islands",
+    icon = "achievement_visit_10_islands.png",
+    category = "exploration",
+    max_progress = 10,
+    reward_xp = 250,
+    graph_x = 1, graph_y = 1,
+})
+
 -- ===== Combat ==================================================
 
 register_achievement({
