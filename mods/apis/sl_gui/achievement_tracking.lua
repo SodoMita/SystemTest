@@ -36,39 +36,20 @@ function give_experience(player, amount)
     local exp = tonumber(meta:get_string("experience")) or 0
     local level = math.floor(exp / 100) + 1
     
-    minetest.log("action", string.format("[achievement_tracking] Player %s gained XP. Level: %d, Leveled up: %s", 
-        player:get_player_name(), level, tostring(leveled_up)))
-    
     -- Trigger ALL level milestones (achievement_progress handles duplicates and requirements)
-    if level >= 5 then
-        minetest.log("action", "[achievement_tracking] Attempting reach_level_5")
-        achievement_progress(player, "reach_level_5", 1)
-    end
-    if level >= 10 then
-        minetest.log("action", "[achievement_tracking] Attempting reach_level_10")
-        achievement_progress(player, "reach_level_10", 1)
-    end
-    if level >= 25 then
-        minetest.log("action", "[achievement_tracking] Attempting reach_level_25")
-        achievement_progress(player, "reach_level_25", 1)
-    end
-    if level >= 50 then
-        minetest.log("action", "[achievement_tracking] Attempting reach_level_50")
-        achievement_progress(player, "reach_level_50", 1)
-    end
+    if level >= 5 then achievement_progress(player, "reach_level_5", 1) end
+    if level >= 10 then achievement_progress(player, "reach_level_10", 1) end
+    if level >= 25 then achievement_progress(player, "reach_level_25", 1) end
+    if level >= 50 then achievement_progress(player, "reach_level_50", 1) end
     
     return leveled_up
 end
 
 -- Track position for exploration achievements
 local player_spawn_positions = {}
-
--- Check exploration achievements periodically
-local exploration_timer = 0
-local player_last_y = {}
 local player_highest_y = {}
 local player_looped = {}
-local visited_islands = {}
+local player_last_y = {}
 
 minetest.register_on_joinplayer(function(player)
     local name = player:get_player_name()
@@ -85,16 +66,10 @@ minetest.register_on_joinplayer(function(player)
     else
         player_spawn_positions[name] = minetest.deserialize(spawn_str)
     end
-
-    local visited_str = meta:get_string("visited_islands")
-    if visited_str == "" then visited_str = "{}" end
-    visited_islands[name] = minetest.deserialize(visited_str) or {}
 end)
 
 -- ========================================================
 -- Reliable world-loop detection via sl_teleport callback
--- Uses the SAME function/logic the teleport mod uses, so
--- the trigger can no longer "miss" Nyaa~ (⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄)
 -- ========================================================
 minetest.register_on_mods_loaded(function()
     if sl_teleport and sl_teleport.register_on_teleport then
@@ -102,48 +77,34 @@ minetest.register_on_mods_loaded(function()
             if not entity or not entity:is_player() then return end
             local name = entity:get_player_name()
 
-            -- World loop achievement — fires on ANY axis wrap
             if looped.x or looped.y or looped.z then
                 unlock_achievement(entity, "secret_world_loop")
                 player_looped[name] = true
-                minetest.log("action",
-                    string.format("[achievement_tracking] %s world-looped via teleport "
-                                  .. "(x:%s y:%s z:%s)", name,
-                                  tostring(looped.x), tostring(looped.y), tostring(looped.z)))
+                minetest.log("action", "[achievement_tracking] World loop detected for " .. name)
             end
         end)
-        minetest.log("action",
-            "[achievement_tracking] Hooked into sl_teleport for world-loop detection ✅")
-    else
-        minetest.log("warning",
-            "[achievement_tracking] sl_teleport API not found — "
-            .. "world-loop achievements will be unreliable!")
     end
 end)
 
 -- Helper to check if player is on solid ground (not air, not ignore)
 local function is_on_real_ground(player)
     local pos = player:get_pos()
-    -- Check center and 4 corners for better accuracy
-    local checks = {
-        {x=pos.x, y=pos.y-0.1, z=pos.z},
-        {x=pos.x+0.3, y=pos.y-0.1, z=pos.z},
-        {x=pos.x-0.3, y=pos.y-0.1, z=pos.z},
-        {x=pos.x, y=pos.y-0.1, z=pos.z+0.3},
-        {x=pos.x, y=pos.y-0.1, z=pos.z-0.3},
-    }
-    for _, p in ipairs(checks) do
-        local node = minetest.get_node_or_nil(p)
-        if node and node.name ~= "air" and node.name ~= "ignore" then
-            local def = minetest.registered_nodes[node.name]
-            if def and def.walkable then
-                return true
+    -- Check a small area around the feet
+    for dx = -0.3, 0.3, 0.3 do
+        for dz = -0.3, 0.3, 0.3 do
+            local p = {x=pos.x + dx, y=pos.y - 0.1, z=pos.z + dz}
+            local node = minetest.get_node(p)
+            if node.name ~= "air" and node.name ~= "ignore" then
+                local def = minetest.registered_nodes[node.name]
+                if def and def.walkable then
+                    return true
+                end
             end
         end
     end
     
-    -- Check for entities (platforms, other players, etc)
-    local objs = minetest.get_objects_inside_radius({x=pos.x, y=pos.y-0.5, z=pos.z}, 0.6)
+    -- Check for entities below
+    local objs = minetest.get_objects_inside_radius({x=pos.x, y=pos.y-0.5, z=pos.z}, 0.7)
     for _, obj in ipairs(objs) do
         if obj ~= player then
             return true
@@ -153,9 +114,10 @@ local function is_on_real_ground(player)
     return false
 end
 
+local exploration_timer = 0
 minetest.register_globalstep(function(dtime)
     exploration_timer = exploration_timer + dtime
-    local check_exploration = (exploration_timer >= 10)
+    local check_exploration = (exploration_timer >= 5)
     if check_exploration then exploration_timer = 0 end
 
     for _, player in ipairs(minetest.get_connected_players()) do
@@ -163,56 +125,49 @@ minetest.register_globalstep(function(dtime)
         local pos  = player:get_pos()
         if not pos then goto next_player end
 
-        local pl = game_mode.get_player_state(name)
-        if pl.phase == "ghost" then
-            -- Ghosts can't trigger landing/fall achievements
-            player_highest_y[name] = nil
-            player_looped[name] = nil
-            player_last_y[name] = pos.y
-            goto next_player
+        -- Skip tracking for ghosts if game_mode is available
+        if game_mode and game_mode.get_player_state then
+            local pl = game_mode.get_player_state(name)
+            if pl and pl.phase == "ghost" then
+                player_highest_y[name] = nil
+                player_looped[name] = nil
+                player_last_y[name] = pos.y
+                goto next_player
+            end
         end
 
         local last_y = player_last_y[name] or pos.y
+        local v = player:get_velocity()
         
-        -- Fall tracking
-        if pos.y < last_y then
-            -- Falling
-            player_highest_y[name] = math.max(player_highest_y[name] or last_y, last_y)
-        else
-            -- Not falling (hit ground, jumping up, or looped)
-            if player_highest_y[name] then
-                -- Check if it was a world loop (very large jump up)
-                local wrap_detected = (pos.y - last_y) > 10000 
-                
-                if not wrap_detected then
-                    -- Potential landing. Verify we actually hit something "real"
-                    if is_on_real_ground(player) then
-                        local fall_dist = player_highest_y[name] - pos.y
-                        if fall_dist >= 10000 then
-                            unlock_achievement(player, "challenge_fall_10k")
-                        elseif fall_dist >= 1000 then
-                            unlock_achievement(player, "challenge_fall_1k")
-                        elseif fall_dist >= 100 then
-                            unlock_achievement(player, "challenge_fall_100")
-                        end
-
-                        -- Check if we landed after a loop
-                        if player_looped[name] then
-                            unlock_achievement(player, "challenge_loop_land")
-                            player_looped[name] = nil
-                        end
-                    elseif pos.y == last_y then
-                        -- Stuck in mid-air (e.g. ignore node)? 
-                        -- Keep peak height but don't grant yet.
-                    else
-                        -- Moving up (jump/fly), reset fall distance
-                        player_highest_y[name] = nil
+        -- Fall Detection
+        if v and v.y < -5 then
+            -- Falling downwards with significant speed
+            player_highest_y[name] = math.max(player_highest_y[name] or pos.y, pos.y)
+        elseif player_highest_y[name] then
+            -- Stopped falling or moving up. Check for landing.
+            local wrap_detected = (pos.y - last_y) > 10000 -- World wrap
+            
+            if not wrap_detected then
+                if is_on_real_ground(player) then
+                    local fall_dist = player_highest_y[name] - pos.y
+                    if fall_dist >= 10000 then
+                        unlock_achievement(player, "challenge_fall_10k")
+                    elseif fall_dist >= 1000 then
+                        unlock_achievement(player, "challenge_fall_1k")
+                    elseif fall_dist >= 100 then
+                        unlock_achievement(player, "challenge_fall_100")
                     end
-                end
-                
-                -- Reset peak if we jumped up or moved significantly after landing
-                if not wrap_detected and pos.y > last_y then
+
+                    if player_looped[name] then
+                        unlock_achievement(player, "challenge_loop_land")
+                    end
+                    
                     player_highest_y[name] = nil
+                    player_looped[name] = nil
+                elseif v and v.y >= 0 then
+                    -- Moving up without hitting ground (jump/fly), reset fall
+                    player_highest_y[name] = nil
+                    player_looped[name] = nil
                 end
             end
         end
@@ -220,7 +175,7 @@ minetest.register_globalstep(function(dtime)
         player_last_y[name] = pos.y
 
         if check_exploration then
-            -- Depth achievements (multi-tier)
+            -- Depth achievements
             if pos.y < -20000 then
                 unlock_achievement(player, "secret_depth_20k")
             elseif pos.y < -10000 then
@@ -233,8 +188,7 @@ minetest.register_globalstep(function(dtime)
 
             local spawn = player_spawn_positions[name]
             if spawn then
-                local distance = vector.distance(pos, spawn)
-                if distance >= 1000 then
+                if vector.distance(pos, spawn) >= 1000 then
                     unlock_achievement(player, "travel_1000_blocks")
                 end
             end
@@ -242,7 +196,7 @@ minetest.register_globalstep(function(dtime)
             if pos.y > 100 then
                 unlock_achievement(player, "visit_floating_island")
             end
-
+            
             if pos.y >= -10 and pos.y <= 50 then
                 unlock_achievement(player, "find_city")
             end
@@ -250,37 +204,5 @@ minetest.register_globalstep(function(dtime)
         ::next_player::
     end
 end)
-
--- Helper to mark island visit (call this when player lands on island)
-function mark_island_visit(player, island_id)
-    local name = player:get_player_name()
-    if not visited_islands[name] then
-        visited_islands[name] = {}
-    end
-    
-    if not visited_islands[name][island_id] then
-        visited_islands[name][island_id] = true
-        local meta = player:get_meta()
-        meta:set_string("visited_islands", minetest.serialize(visited_islands[name]))
-        
-        local count = 0
-        for _ in pairs(visited_islands[name]) do
-            count = count + 1
-        end
-        
-        -- Update island hopper achievement
-        local data = meta:get_string("achievements")
-        if data ~= "" then
-            local ach_data = minetest.deserialize(data) or {}
-            ach_data.progress = ach_data.progress or {}
-            ach_data.progress["visit_10_islands"] = count
-            meta:set_string("achievements", minetest.serialize(ach_data))
-            
-            if count >= 10 then
-                unlock_achievement(player, "visit_10_islands")
-            end
-        end
-    end
-end
 
 minetest.log("action", "[achievement_tracking] Achievement auto-tracking loaded! 🏆")
