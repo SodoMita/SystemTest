@@ -215,14 +215,7 @@ minetest.register_node(game_mode.modname .. ":objective_core", {
 		if beacon_spawn then
 			local dist = vector.distance(pos, beacon_spawn)
 			if dist <= 8 then
-				-- Delivery successful!
-				if state.match_active then
-					game_mode.end_match(pl.team,
-						S("@1 delivered the Objective Core!", name))
-				else
-					minetest.chat_send_player(name,
-						S("Objective Core placed, but no match is running."))
-				end
+				game_mode.deliver_objective(pl.team, name)
 			else
 				minetest.chat_send_player(name,
 					S("Place the Objective Core near your team's beacon to win! (within 8 blocks)"))
@@ -230,6 +223,15 @@ minetest.register_node(game_mode.modname .. ":objective_core", {
 		end
 	end,
 })
+
+-- Shared delivery API used by both the physical node and headless tests.
+function game_mode.deliver_objective(team_id, actor_name)
+	if not state.match_active then return false, "no active match" end
+	if not state.win_conditions.objective then return false, "objective mode disabled" end
+	if not game_mode.is_beacon_team(team_id) then return false, "invalid team" end
+	game_mode.end_match(team_id, S("@1 delivered the Objective Core!", actor_name or "Unknown"))
+	return true
+end
 
 -- Also register as a craftitem so it appears in inventory properly
 -- (the node definition above handles placement)

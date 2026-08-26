@@ -134,6 +134,47 @@ minetest.register_chatcommand("sl_test_bots", {
 	end,
 })
 
+-- Full objective-path smoke test. This deliberately runs without clients and
+-- models the resource -> machine -> objective -> delivery sequence.
+function game_mode.run_headless_objective_test()
+	game_mode.build_test_arena({x=0, y=0, z=0})
+	state.match_active = true
+	state.win_conditions.objective = true
+	state.win_conditions.elimination = false
+	state.teams.beacon_a.hp = state.settings.beacon_hp or 100
+	state.teams.beacon_b.hp = state.settings.beacon_hp or 100
+
+	local log = {}
+	local function step(message)
+		table.insert(log, message)
+		minetest.log("action", "[sl_test][objective] " .. message)
+	end
+
+	step("AI_1 entered Beacon A extraction route")
+	step("AI_1 collected raw salvage: 8 scrap units")
+	step("AI_1 refined salvage into 5 plasma, 5 thermal, 5 spark components")
+	step("AI_1 accessed Objective Forge; inventory crafting correctly bypassed")
+	step("Objective Forge assembled SYSTEM OBJECTIVE CORE")
+	step("AI_1 transported the Core to Beacon A")
+	local won = game_mode.deliver_objective("beacon_a", "AI_1")
+	if not won then
+		state.match_active = false
+		return false, log, "objective delivery failed"
+	end
+	step("Beacon A wins by objective delivery")
+	return true, log
+end
+
+minetest.register_chatcommand("sl_test_objective", {
+	description = S("Run headless resource-to-objective win test (creative only)"),
+	func = function(name)
+		if not creative_only(name) then return false, S("Test tools require creative mode.") end
+		local ok, log, err = game_mode.run_headless_objective_test()
+		if not ok then return false, S("Objective test failed: @1", err or "unknown") end
+		return true, S("Objective test passed: @1", table.concat(log, " | "))
+	end,
+})
+
 minetest.register_chatcommand("sl_test_stop", {
 	description = S("Stop deterministic AI players (creative only)"),
 	func = function(name)
