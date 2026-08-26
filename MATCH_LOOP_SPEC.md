@@ -230,3 +230,7 @@ The harness should support deterministic scenarios:
 10. The same match is started again without stale state.
 
 AI behavior can initially be scripted. Determinism is more valuable than intelligence for the first test pass.
+
+### Machine audio asset
+
+`mods/content/sl_scary/sounds/random_dizz.ogg` is retained as a valid Luanti-compatible machine malfunction / ritual interference sound for the future machine-crafting and sabotage systems.
