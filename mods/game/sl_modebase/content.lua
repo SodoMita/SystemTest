@@ -441,6 +441,63 @@ minetest.register_tool(modname .. ":sabotage_charge", {
 	end,
 })
 
+-- Evil-ghost loadout top-up. WP2's spawn.lua owns the base spawn kit
+-- (one bounded sabotage charge); WP3 adds its possession focus here rather
+-- than editing another package's file.
+function game_mode.grant_evil_ghost_kit(player)
+	if not player or not player:is_player() then return false end
+	local pl = game_mode.get_player_state(player:get_player_name())
+	if pl.phase ~= "evil_ghost" then return false end
+	local inv = player:get_inventory()
+	local focus = ItemStack(modname .. ":possession_focus")
+	if not inv:contains_item("main", focus) then
+		inv:add_item("main", focus)
+	end
+	return true
+end
+
+-- Re-issue the focus after any respawn that leaves the player evil.
+minetest.register_on_respawnplayer(function(player)
+	minetest.after(0, function()
+		local p = player and player:get_player_name()
+			and minetest.get_player_by_name(player:get_player_name())
+		if p then game_mode.grant_evil_ghost_kit(p) end
+	end)
+end)
+
+-- Evil ghost possession: seize one object at a time, on a cooldown.
+-- Reusable (unlike the one-shot sabotage charge) because the cooldown,
+-- the single-object limit, and punch-exorcism already bound it.
+minetest.register_tool(modname .. ":possession_focus", {
+	description = S("Possession Focus\n(Evil Ghost Only; one object at a time)"),
+	inventory_image = "sl_raw_crystal.png^[colorize:#ff00ff:150",
+	groups = { not_in_creative_inventory = 1 },
+	on_use = function(itemstack, user, pointed_thing)
+		if not user or not user:is_player() then return itemstack end
+		local name = user:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		if pl.phase ~= "evil_ghost" then
+			minetest.chat_send_player(name, S("Only a revived evil ghost can possess objects."))
+			return itemstack
+		end
+		if not pointed_thing or pointed_thing.type ~= "node" then
+			minetest.chat_send_player(name, S("Aim the focus at an object."))
+			return itemstack
+		end
+
+		local ok, err = game_mode.possess_object(pointed_thing.under, name)
+		if not ok then
+			minetest.chat_send_player(name, err or S("Possession failed."))
+		else
+			minetest.chat_send_player(name, S("You slip inside the object."))
+		end
+		return itemstack -- Not consumed; the cooldown is the limit.
+	end,
+	on_drop = function(itemstack, dropper, pos)
+		return itemstack -- Don't allow dropping
+	end,
+})
+
 -- Reincarnation item for ghosts to become evil ghosts
 minetest.register_craftitem(modname .. ":reincarnate", {
 	description = S("Revive as Evil Ghost\n(Ghost Only; lose match points)"),
@@ -455,8 +512,11 @@ minetest.register_craftitem(modname .. ":reincarnate", {
 
 		pl.phase = "evil_ghost"
 		pl.points = 0
+		pl.possession_pos = nil
+		pl.possession_ready_at = nil
 		game_mode.broadcast(S("A containment breach has been detected."))
 		game_mode.spawn_player(user)
+		game_mode.grant_evil_ghost_kit(user)
 
 		return ItemStack("") -- Consumed
 	end,

@@ -23,6 +23,12 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
   `/sl_summon_ghost` and `/sl_ghost_offer`.
 - Evil ghost revival: voluntary via the revival item, burns all match points,
   targetable (purgeable), one bounded sabotage charge per revival.
+- Evil ghost possession: an evil ghost seizes one allowlisted object at a time
+  with the Possession Focus (doors, hatches, terminals, crates, pickups,
+  platforms — never beacons, never the Ghost Altar). Possessed objects show
+  `OBJECT POSSESSED`, refuse use, and slam if they are doors; the living
+  exorcise them with two punches. 20 s duration, 45 s cooldown (+30 s when
+  exorcised), purged on match end.
 - Sabotage: 30 s corruption with a visible marker; sabotaged beacons take
   corrosion damage; sabotaged interactables refuse use; living players repair
   by punching; everything is purged on match end/restart.
@@ -37,7 +43,6 @@ Still open (Phase A remainder):
 - Hand-built arena map committed to the repo (two beacons, lobby, cage,
   routes, cover, hand-placed pickups).
 - Direct-message UI polish and reconnect hardening pass.
-- Evil ghost possession of objects (only node sabotage exists so far).
 
 Live-engine soak test (August 2026): `tests/soak/run_soak.py` boots a real
 Luanti server where the `aaa_botmatch` harness runs simulated AI players
