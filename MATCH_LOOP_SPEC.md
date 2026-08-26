@@ -228,6 +228,13 @@ The harness should support deterministic scenarios:
 8. A player disconnects and reconnects.
 9. A match ends and resets cleanly.
 10. The same match is started again without stale state.
+11. The objective path collects resources, routes them through a machine-only craft step, creates the Objective Core, and wins by delivery.
+
+Headless objective smoke test command, creative mode only:
+
+```text
+/sl_test_objective
+```
 
 AI behavior can initially be scripted. Determinism is more valuable than intelligence for the first test pass.
 
