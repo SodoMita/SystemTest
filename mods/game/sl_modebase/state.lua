@@ -33,6 +33,19 @@ local state = {
 	match_started_at = 0,
 	match_ended_at = 0,
 
+	-- Ready check / insertion sequencing (LOBBY -> READY CHECK -> COUNTDOWN -> INSERTION)
+	ready_check = {
+		active = false,
+		initiator = nil,
+		ready = {},         -- [name] = true
+		started_at = 0,
+		countdown_left = 0, -- > 0 while counting down to insertion
+		last_announced = -1,
+	},
+
+	-- Active sabotages: [pos_hash] = { pos, kind = "node"|"beacon", team_id, until_time }
+	sabotage = {},
+
 	-- Win Conditions (Options)
 	win_conditions = {
 		elimination = true,
@@ -44,6 +57,10 @@ local state = {
 		lives = 5,
 		beacon_hp = 100,
 		mm_auto_assign = true,
+		match_duration = 600,   -- seconds; 0 disables the match timer
+		ready_timeout = 60,     -- seconds to collect /sl_ready confirmations
+		countdown = 5,          -- insertion countdown length in seconds
+		sabotage_duration = 30, -- seconds a sabotage charge corrupts its target
 	}
 }
 
@@ -151,5 +168,45 @@ function game_mode.get_connected_player_names()
 		table.insert(res, player:get_player_name())
 	end
 	return res
+end
+
+-- ================================================================
+-- Shared utilities: clock, position hashing, sabotage registry
+-- ================================================================
+
+function game_mode.now()
+	return minetest.get_us_time() / 1000000
+end
+
+function game_mode.pos_hash(pos)
+	return string.format("%d,%d,%d", math.floor(pos.x + 0.5), math.floor(pos.y + 0.5), math.floor(pos.z + 0.5))
+end
+
+function game_mode.get_sabotage(pos)
+	return state.sabotage[game_mode.pos_hash(pos)]
+end
+
+function game_mode.is_sabotaged(pos)
+	return game_mode.get_sabotage(pos) ~= nil
+end
+
+-- Clears one sabotage entry and restores the node's original infotext.
+function game_mode.clear_sabotage_at(pos)
+	local hash = game_mode.pos_hash(pos)
+	local entry = state.sabotage[hash]
+	if not entry then return false end
+	state.sabotage[hash] = nil
+	local meta = minetest.get_meta(pos)
+	meta:set_int("sl_sabotaged_until", 0)
+	meta:set_string("infotext", meta:get_string("sl_prev_infotext") or "")
+	meta:set_string("sl_prev_infotext", "")
+	return true
+end
+
+function game_mode.clear_all_sabotage()
+	for _, entry in pairs(state.sabotage) do
+		game_mode.clear_sabotage_at(entry.pos)
+	end
+	state.sabotage = {}
 end
 

@@ -56,6 +56,9 @@ function game_mode.spawn_player(player)
 		player:set_properties({
 			textures = boxman_textures,
 			visual_size = {x=10, y=10},
+			-- Restore standard boxes in case this player was a ghost last match.
+			collisionbox = { -0.3, 0.0, -0.3, 0.3, 1.75, 0.3 },
+			selectionbox = { -0.3, 0.0, -0.3, 0.3, 1.75, 0.3 },
 		})
 		player:set_armor_groups({ immortal = 1 })
 		player:set_physics_override({
@@ -63,6 +66,14 @@ function game_mode.spawn_player(player)
 			jump = 1.0,
 			gravity = 1.0,
 		})
+
+		-- Former ghosts must not keep flight/noclip in the lobby.
+		local privs = minetest.get_player_privs(name)
+		if not minetest.settings:get_bool("creative_mode") then
+			privs.fly = nil
+			privs.noclip = nil
+			minetest.set_player_privs(name, privs)
+		end
 		
 		-- Clear inventory for lobby
 		local inv = player:get_inventory()
@@ -87,7 +98,9 @@ function game_mode.spawn_player(player)
 			visual_size = is_evil and {x=1.2, y=1.2} or {x=0, y=0},
 			textures = is_evil and {"sl_boxman_neon.png^[colorize:#ff00ff:120"} or boxman_textures,
 			collisionbox = {0,0,0,0,0,0},
-			selectionbox = {0,0,0,0,0,0},
+			-- Evil ghosts stay selectable so the living can purge them;
+			-- contained ghosts remain untargetable.
+			selectionbox = is_evil and {-0.3, 0.0, -0.3, 0.3, 1.75, 0.3} or {0,0,0,0,0,0},
 		})
 		
 		-- Ghosts receive only a revival option; evil ghosts receive a bounded sabotage tool.
@@ -136,6 +149,11 @@ function game_mode.spawn_player(player)
 				visual_size = {x=10, y=10},
 			})
 		end
+		-- Guarantee targetability even after a ghost phase zeroed the boxes.
+		player:set_properties({
+			collisionbox = { -0.3, 0.0, -0.3, 0.3, 1.75, 0.3 },
+			selectionbox = { -0.3, 0.0, -0.3, 0.3, 1.75, 0.3 },
+		})
 		player:set_physics_override({
 			speed = 1.0,
 			jump = 1.0,

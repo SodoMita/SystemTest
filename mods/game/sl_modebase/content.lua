@@ -425,9 +425,16 @@ minetest.register_tool(modname .. ":sabotage_charge", {
 		local pos = pointed_thing.under
 		local node = minetest.get_node_or_nil(pos)
 		if not node or node.name == "air" then return itemstack end
-		local meta = minetest.get_meta(pos)
-		meta:set_int("sl_sabotaged_until", math.floor(minetest.get_us_time() / 1000000) + 30)
-		meta:set_string("infotext", S("SIGNAL CORRUPTED"))
+		if game_mode.is_sabotaged(pos) then return itemstack end
+
+		local kind, team_id = "node", nil
+		if node.name == game_mode.modname .. ":beacon_a" then
+			kind, team_id = "beacon", "beacon_a"
+		elseif node.name == game_mode.modname .. ":beacon_b" then
+			kind, team_id = "beacon", "beacon_b"
+		end
+
+		game_mode.register_sabotage(pos, kind, team_id)
 		minetest.sound_play("alert", {pos = pos, gain = 0.7, max_hear_distance = 12})
 		game_mode.broadcast(S("A system has been corrupted."))
 		return ItemStack("")

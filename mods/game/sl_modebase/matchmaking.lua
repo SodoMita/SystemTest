@@ -132,7 +132,14 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
 		minetest.chat_send_player(name, S("Match settings updated."))
 	elseif fields.start_match then
-		local ok, msg = game_mode.start_new_match(name)
+		-- Terminal launch goes through the ready check; creative-mode admins
+		-- (test harness) can bypass it for fast iteration.
+		local ok, msg
+		if minetest.settings:get_bool("creative_mode") then
+			ok, msg = game_mode.start_new_match(name)
+		else
+			ok, msg = game_mode.begin_ready_check(name)
+		end
 		if not ok and msg then
 			minetest.chat_send_player(name, "[System Looting] " .. msg)
 		end

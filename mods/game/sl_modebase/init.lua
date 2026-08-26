@@ -29,7 +29,8 @@ include_files(
 	"nodes.lua",    -- beacon nodes + loot crate
 	"content.lua",  -- craftable items, tools, tactical nodes, interactables
 	"test_harness.lua", -- headless AI agents and deterministic arena builder
-	"commands.lua"  -- chat commands and privileges
+	"commands.lua", -- chat commands and privileges
+	"hud.lua"       -- persistent match HUD (identity-neutral)
 )
 
 minetest.log("action", "[game_mode] Loaded core PvP game mode with beacons and monster master")

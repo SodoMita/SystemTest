@@ -1,7 +1,44 @@
 # System Looting — Match Loop Specification
 
-**Status:** Design direction / pre-implementation
+**Status:** Phase A partially implemented on `feat/ghost-altar-ritual` — see Implementation Status below
 **Priority:** P0 — build this before expanding crafting
+
+## Implementation Status (August 2026)
+
+Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
+`lua5.1 tests/smoke_test.lua` against the headless engine stub in
+`tests/minetest_stub.lua`):
+
+- Match sequencing: ready check (`/sl_ready`) -> countdown -> insertion;
+  `/sl_match_start now` bypasses for admins; roster requires >= 2 players on
+  both beacon teams.
+- Cloud cage: ghosts are held at `ghost_spawn`, immortal, invisible,
+  untargetable, flight-enabled, and a containment platform is materialized
+  around the spawn on load (`/sl_build_cage` to rebuild).
+- Communication seal: ghost chat is blocked, and every registered chat
+  command (including `/msg`, `/w`, `/tell`) is wrapped with a phase guard.
+  Allowlist: `/sl_ghost_offer`, `/sl_state`, `/help` only.
+- Ghost Altar ritual: consumes Ashen Relic + Soul Shard + Signal Ink, summons
+  one random contained ghost for 30 s; creative-only dev commands
+  `/sl_summon_ghost` and `/sl_ghost_offer`.
+- Evil ghost revival: voluntary via the revival item, burns all match points,
+  targetable (purgeable), one bounded sabotage charge per revival.
+- Sabotage: 30 s corruption with a visible marker; sabotaged beacons take
+  corrosion damage; sabotaged interactables refuse use; living players repair
+  by punching; everything is purged on match end/restart.
+- Match timer + result screen (formspec scoreboard + chat log) + clean reset:
+  phases, lives, points, inventories, sabotages, and ghost privileges are all
+  normalized before the next match.
+- Identity-neutral HUD: phase, clock, own lives, public beacon integrity.
+  No team names, colors, or other players' private state.
+
+Still open (Phase A remainder):
+
+- Hand-built arena map committed to the repo (two beacons, lobby, cage,
+  routes, cover, hand-placed pickups).
+- Scripted AI player harness with the 10 deterministic scenarios below.
+- Direct-message UI polish and reconnect hardening pass.
+- Evil ghost possession of objects (only node sabotage exists so far).
 
 ## Core fantasy
 

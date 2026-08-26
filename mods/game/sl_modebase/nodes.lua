@@ -74,14 +74,16 @@ minetest.register_abm({
 	end,
 })
 
-function game_mode.damage_beacon(team_id, amount, attacker_name)
+function game_mode.damage_beacon(team_id, amount, attacker_name, silent)
 	local tdef = state.teams[team_id]
 	if not tdef or not tdef.spawn then return end
 	
 	tdef.hp = (tdef.hp or 100) - (amount or 5)
 	
-	game_mode.broadcast(S("@1 damaged @2! (HP: @3)", 
-		attacker_name or "A Monster", tdef.label, tostring(tdef.hp)))
+	if not silent then
+		game_mode.broadcast(S("@1 damaged @2! (HP: @3)", 
+			attacker_name or "A Monster", tdef.label, tostring(tdef.hp)))
+	end
 
 	local bpos = {x=tdef.spawn.x, y=tdef.spawn.y-1, z=tdef.spawn.z}
 	
@@ -97,6 +99,72 @@ function game_mode.damage_beacon(team_id, amount, attacker_name)
 		handle_beacon_destruction(team_id, node and bpos or nil, attacker_name)
 	end
 end
+
+-- ================================================================
+-- Sabotage registry: bounded corruption with visible cause,
+-- a duration limit, and a repair counterplay for the living.
+-- ================================================================
+
+function game_mode.register_sabotage(pos, kind, team_id)
+	local meta = minetest.get_meta(pos)
+	local entry = {
+		pos = vector.round(pos),
+		kind = kind or "node",
+		team_id = team_id,
+		until_time = game_mode.now() + (state.settings.sabotage_duration or 30),
+	}
+	state.sabotage[game_mode.pos_hash(entry.pos)] = entry
+	if meta:get_string("sl_prev_infotext") == "" then
+		meta:set_string("sl_prev_infotext", meta:get_string("infotext"))
+	end
+	meta:set_int("sl_sabotaged_until", math.floor(entry.until_time))
+	meta:set_string("infotext", S("SIGNAL CORRUPTED"))
+	return entry
+end
+
+-- Returns true (and warns the clicker) when the target node is corrupted.
+local function refuse_if_sabotaged(pos, clicker)
+	if game_mode.is_sabotaged(pos) then
+		minetest.chat_send_player(clicker:get_player_name(),
+			S("SIGNAL CORRUPTED - this system will not respond. Punch it to repair."))
+		return true
+	end
+	return false
+end
+
+-- 1 Hz tick: corrode sabotaged beacons and expire finished sabotages.
+local sabotage_tick_accum = 0
+function game_mode.sabotage_step(dtime)
+	sabotage_tick_accum = sabotage_tick_accum + dtime
+	if sabotage_tick_accum < 1 then return end
+	sabotage_tick_accum = 0
+
+	local now = game_mode.now()
+	for _, entry in pairs(state.sabotage) do
+		if now >= entry.until_time then
+			game_mode.clear_sabotage_at(entry.pos)
+		elseif entry.kind == "beacon" and entry.team_id and state.match_active then
+			-- Bounded corrosion: discoverable, damage-capped, repairable.
+			game_mode.damage_beacon(entry.team_id, 2, S("Corrosion"), true)
+		end
+	end
+end
+
+-- Living players repair corrupted systems by punching them.
+minetest.register_on_punchnode(function(pos, node, puncher, pointed_thing)
+	if not puncher or not puncher:is_player() then return end
+	if not game_mode.is_sabotaged(pos) then return end
+	local pl = game_mode.get_player_state(puncher:get_player_name())
+	if pl.phase ~= "alive" then
+		minetest.chat_send_player(puncher:get_player_name(),
+			S("Only the living can repair corrupted systems."))
+		return
+	end
+	game_mode.clear_sabotage_at(pos)
+	minetest.chat_send_player(puncher:get_player_name(),
+		S("Corruption neutralized. System restored."))
+	minetest.sound_play("default_tool_break", { pos = pos, gain = 0.5, max_hear_distance = 8 })
+end)
 
 minetest.register_node(game_mode.modname .. ":beacon_a", {
 	description = S("Beacon A"),
@@ -261,6 +329,8 @@ minetest.register_node(game_mode.modname .. ":loot_crate", {
 		local meta = minetest.get_meta(pos)
 		local name = clicker:get_player_name()
 
+		if refuse_if_sabotaged(pos, clicker) then return itemstack end
+
 		minetest.show_formspec(name, "sl_modebase:loot_crate",
 			"formspec_version[4]" ..
 			"size[8,9.5]" ..
@@ -349,6 +419,7 @@ minetest.register_node(game_mode.modname .. ":ghost_task_terminal", {
 		if not clicker or not clicker:is_player() then return end
 		local name = clicker:get_player_name()
 		local pl = game_mode.get_player_state(name)
+		if refuse_if_sabotaged(pos, clicker) then return end
 		if pl.phase == "ghost" then
 			if not pl.ghost_summoned_by then
 				minetest.chat_send_player(name, S("No living player has summoned you."))
@@ -386,6 +457,7 @@ minetest.register_node(game_mode.modname .. ":ghost_altar", {
 	on_rightclick = function(pos, node, clicker, itemstack)
 		if not clicker or not clicker:is_player() then return itemstack end
 		local name = clicker:get_player_name()
+		if refuse_if_sabotaged(pos, clicker) then return itemstack end
 		local caller = game_mode.get_player_state(name)
 		if not state.match_active or caller.phase ~= "alive" then
 			minetest.chat_send_player(name, S("The altar answers only to a living player during an active match."))
@@ -464,3 +536,53 @@ minetest.register_lbm({
 		end
 	end,
 })
+
+-- ================================================================
+-- Cloud cage: minimal containment structure materialized at ghost_spawn.
+-- Only fills air/ignore, so hand-built arenas and admin edits survive.
+-- ================================================================
+
+function game_mode.build_cloud_cage()
+	if not state.ghost_spawn then return 0 end
+	local base = vector.round(state.ghost_spawn)
+	local placed = 0
+
+	local function fill(p, node_name)
+		local node = minetest.get_node_or_nil(p)
+		if node and (node.name == "air" or node.name == "ignore") then
+			minetest.set_node(p, { name = node_name })
+			placed = placed + 1
+		end
+	end
+
+	-- Floor slab one node below the spawn point.
+	for x = -5, 5 do
+		for z = -5, 5 do
+			fill({ x = base.x + x, y = base.y - 1, z = base.z + z }, "default:glass")
+		end
+	end
+
+	-- Corner pylons marking the containment perimeter.
+	for _, c in ipairs({ {-5, -5}, {-5, 5}, {5, -5}, {5, 5} }) do
+		for y = 0, 3 do
+			fill({ x = base.x + c[1], y = base.y + y, z = base.z + c[2] }, "default:obsidianbrick")
+		end
+	end
+
+	if placed > 0 then
+		minetest.log("action", "[game_mode] Cloud cage materialized at "
+			.. minetest.pos_to_string(base) .. " (" .. placed .. " nodes)")
+	end
+	return placed
+end
+
+if minetest.load_area then
+	minetest.register_on_mods_loaded(function()
+		minetest.after(2, function()
+			if state.ghost_spawn then
+				minetest.load_area(vector.round(state.ghost_spawn))
+			end
+			game_mode.build_cloud_cage()
+		end)
+	end)
+end

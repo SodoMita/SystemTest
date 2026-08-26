@@ -14,6 +14,10 @@ function game_mode.end_match(winner, reason)
 	state.match_active = false
 	state.match_ended_at = minetest.get_us_time() / 1000000
 
+	-- Clean reset: cancel any pending ready check and neutralize live sabotages.
+	game_mode.cancel_ready_check()
+	game_mode.clear_all_sabotage()
+
 	-- Restore beacons and spawns from persistent storage
 	local storage = game_mode.storage or minetest.get_mod_storage()
 	if storage then
@@ -54,6 +58,9 @@ function game_mode.end_match(winner, reason)
 		end
 	end)
 
+	-- Result screen for all connected players (chat scoreboard + formspec).
+	game_mode.send_results(winner, reason)
+
 	if winner == "beacons" then
 		game_mode.broadcast(S("Beacon teams win! (@1)", reason or ""))
 	elseif state.teams[winner] then
@@ -79,6 +86,17 @@ function game_mode.end_match(winner, reason)
 	else
 		game_mode.broadcast(S("Match ended. (@1)", reason or ""))
 	end
+
+	-- CLEAN RESET: normalize per-player phases so the lobby holds no stale
+	-- ghost / evil-ghost identities. Without this, a player who ended the
+	-- match as a ghost would keep the communication seal in the lobby and
+	-- could never run match-control commands again (soft-lock).
+	for _, pl in pairs(state.players) do
+		pl.phase = "alive"
+		pl.eliminated = false
+		pl.ghost_summoned_by = nil
+		pl.ghost_summon_pos = nil
+	end
 end
 
 -- Reset for new match
@@ -96,6 +114,59 @@ local function reset_players_for_new_match()
 		if player and not minetest.settings:get_bool("creative_mode") then
 			player:get_inventory():set_list("main", {})
 		end
+	end
+end
+
+-- Result screen: chat scoreboard plus a formspec summary shown to everyone.
+-- Deliberately identity-neutral: it reports each player's own phase and public
+-- match facts only, never hidden team or role information.
+function game_mode.send_results(winner, reason)
+	local winner_label
+	if winner == "beacons" then
+		winner_label = S("BEACON TEAMS")
+	elseif winner and state.teams[winner] then
+		winner_label = game_mode.get_team_label(winner)
+	else
+		winner_label = S("DRAW")
+	end
+
+	-- Chat scoreboard (persists in the console log)
+	game_mode.broadcast(S("=== MATCH #@1 RESULTS: @2 (@3) ===",
+		tostring(state.match_count or 0), winner_label, reason or ""))
+	local score_rows = {}
+	for name, pl in pairs(state.players) do
+		if minetest.get_player_by_name(name) then
+			local row = string.format("%s | %s | lives %d | pts %d",
+				name, tostring(pl.phase), pl.lives or 0, pl.points or 0)
+			table.insert(score_rows, row)
+			game_mode.broadcast(row)
+		end
+	end
+
+	-- Formspec result screen
+	local fs = {
+		"formspec_version[4]",
+		"size[8,6.5]",
+		"bgcolor[#0a0a12ee;true]",
+		"label[0.5,0.4;" .. minetest.formspec_escape(S("MATCH RESULTS")) .. "]",
+		"label[0.5,0.9;" .. minetest.formspec_escape(
+			string.format("%s — %s", winner_label, reason or "")) .. "]",
+		"tablecolumns[text;text;text;text]",
+	}
+	local rows = {}
+	for name, pl in pairs(state.players) do
+		if minetest.get_player_by_name(name) then
+			table.insert(rows, string.format("%s,%s,%d,%d",
+				minetest.formspec_escape(name), tostring(pl.phase),
+				pl.lives or 0, pl.points or 0))
+		end
+	end
+	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;Player,Phase,Lives,Points;"
+		.. table.concat(rows, ";") .. ";0]")
+	table.insert(fs, "button_exit[3,5.9;2,0.7;close;Close]")
+	local fs_str = table.concat(fs, "")
+	for _, player in ipairs(minetest.get_connected_players()) do
+		minetest.show_formspec(player:get_player_name(), "sl_modebase:results", fs_str)
 	end
 end
 
@@ -174,6 +245,11 @@ function game_mode.start_new_match(initiator)
 		return false, S("Need players on both beacon teams before launch.")
 	end
 
+	-- Insertion: the ready check is consumed and any stale sabotage is purged
+	-- so no previous-match corruption leaks into the new simulation.
+	game_mode.cancel_ready_check()
+	game_mode.clear_all_sabotage()
+
 	state.match_count = (state.match_count or 0) + 1
 	state.match_active = true
 	state.match_started_at = minetest.get_us_time() / 1000000
@@ -206,6 +282,125 @@ function game_mode.start_new_match(initiator)
 
 	return true
 end
+
+-- ================================================================
+-- Ready check -> countdown -> insertion sequencing
+-- ================================================================
+
+function game_mode.cancel_ready_check(reason)
+	state.ready_check.active = false
+	state.ready_check.ready = {}
+	state.ready_check.countdown_left = 0
+	state.ready_check.last_announced = -1
+	state.ready_check.initiator = nil
+	if reason then
+		game_mode.broadcast(reason)
+	end
+end
+
+function game_mode.begin_ready_check(initiator)
+	if state.match_active then
+		return false, S("Match is already running.")
+	end
+	if state.ready_check.active then
+		return false, S("A ready check is already in progress.")
+	end
+	-- Validate the roster before asking anyone to commit.
+	local connected = game_mode.get_connected_player_names()
+	if #connected < 2 then
+		return false, S("Need at least 2 players to start a match.")
+	end
+
+	state.ready_check.active = true
+	state.ready_check.initiator = initiator
+	state.ready_check.ready = {}
+	state.ready_check.started_at = game_mode.now()
+	state.ready_check.countdown_left = 0
+	state.ready_check.last_announced = -1
+
+	game_mode.broadcast(S("Ready check opened by @1. Type /sl_ready to confirm insertion.",
+		initiator or "the system"))
+	return true
+end
+
+function game_mode.mark_ready(name)
+	if not state.ready_check.active then
+		return false, S("No ready check is active.")
+	end
+	if state.ready_check.countdown_left > 0 then
+		return false, S("Insertion countdown is already running.")
+	end
+	state.ready_check.ready[name] = true
+
+	local connected = game_mode.get_connected_player_names()
+	local ready_count = 0
+	for _, pname in ipairs(connected) do
+		if state.ready_check.ready[pname] then
+			ready_count = ready_count + 1
+		end
+	end
+	game_mode.broadcast(S("@1 is ready. (@2/@3)",
+		name, tostring(ready_count), tostring(#connected)))
+
+	if ready_count >= #connected then
+		state.ready_check.countdown_left = state.settings.countdown or 5
+		game_mode.broadcast(S("Roster confirmed. Insertion in @1...",
+			tostring(math.ceil(state.ready_check.countdown_left))))
+	end
+	return true
+end
+
+local function ready_check_step(dtime)
+	local rc = state.ready_check
+	if not rc.active then return end
+	if state.match_active then
+		game_mode.cancel_ready_check()
+		return
+	end
+
+	if rc.countdown_left > 0 then
+		rc.countdown_left = rc.countdown_left - dtime
+		local secs = math.ceil(rc.countdown_left)
+		if secs ~= rc.last_announced then
+			rc.last_announced = secs
+			if secs > 0 then
+				game_mode.broadcast(tostring(secs) .. "...")
+			end
+		end
+		if rc.countdown_left <= 0 then
+			local initiator = rc.initiator
+			game_mode.cancel_ready_check()
+			local ok, err = game_mode.start_new_match(initiator)
+			if not ok and err then
+				game_mode.broadcast(err)
+			end
+		end
+		return
+	end
+
+	-- Waiting for confirmations; expire if the roster never completes.
+	if game_mode.now() - rc.started_at > (state.settings.ready_timeout or 60) then
+		game_mode.cancel_ready_check(S("Ready check expired. Not enough players confirmed."))
+	end
+end
+
+-- Match timer: bounded matches end in a draw when the clock runs out.
+local function match_timer_step()
+	if not state.match_active then return end
+	local duration = state.settings.match_duration or 0
+	if duration <= 0 then return end
+	if game_mode.now() - state.match_started_at >= duration then
+		game_mode.end_match(nil, S("Time expired"))
+	end
+end
+
+minetest.register_globalstep(function(dtime)
+	ready_check_step(dtime)
+	match_timer_step()
+	if game_mode.sabotage_step then
+		game_mode.sabotage_step(dtime)
+	end
+end)
 
 -- Protection override to prevent ghosts and lobby players from digging/placing
 local old_is_protected = minetest.is_protected

@@ -216,19 +216,41 @@ minetest.register_chatcommand("sl_ghost_offer", {
 	end,
 })
 
--- A ghost cannot use ordinary chat or direct-message commands. Gameplay commands
--- are explicitly allowlisted above and do not expose a public conversation channel.
-if minetest.register_on_chatcommand then
-	minetest.register_on_chatcommand(function(name, command)
-		local pl = game_mode.get_player_state(name)
-		if pl.phase == "ghost" or pl.phase == "evil_ghost" then
-			if command ~= "sl_ghost_offer" and command ~= "sl_state" then
-				minetest.chat_send_player(name, S("Ghost communications are sealed."))
-				return true
-			end
+-- Ghost communication seal. Chat messages are blocked in match.lua; chat
+-- COMMANDS (including direct-message builtins like /msg, /w, /tell) must be
+-- blocked here. minetest.register_on_chatcommand does not exist, so every
+-- registered command is wrapped with a phase guard instead. The allowlist
+-- covers only the designed ghost channels; it exposes no conversation route.
+local GHOST_ALLOWED_COMMANDS = {
+	sl_ghost_offer = true, -- designed ghost-to-summoner information transfer
+	sl_state = true,       -- read-only self diagnostics
+	help = true,           -- local help output; reaches nobody
+}
+
+local function wrap_chatcommand_with_ghost_guard(cmd_name)
+	local def = minetest.registered_chatcommands[cmd_name]
+	if not def or def.sl_ghost_guarded then return end
+	local old_func = def.func
+	def.func = function(pname, param)
+		local pl = game_mode.get_player_state(pname)
+		if pl and (pl.phase == "ghost" or pl.phase == "evil_ghost")
+				and not GHOST_ALLOWED_COMMANDS[cmd_name] then
+			return false, S("Ghost communications are sealed.")
 		end
-	end)
+		return old_func(pname, param)
+	end
+	def.sl_ghost_guarded = true
 end
+
+local function wrap_all_chatcommands()
+	for cmd_name in pairs(minetest.registered_chatcommands) do
+		wrap_chatcommand_with_ghost_guard(cmd_name)
+	end
+end
+
+wrap_all_chatcommands()
+-- Catch commands registered by mods that load after this one.
+minetest.register_on_mods_loaded(wrap_all_chatcommands)
 
 -- Admin command: force-assign player to beacon or monster master
 minetest.register_chatcommand("sl_assign", {
@@ -281,11 +303,29 @@ minetest.register_chatcommand("sl_set_lobby", {
 
 -- Match control commands
 minetest.register_chatcommand("sl_match_start", {
-	params = "",
-	description = S("Start a new match based on configured win conditions."),
+	params = "[now]",
+	description = S("Open the ready check, or launch immediately with 'now' (admin)."),
 	privs = { sl_admin = true },
 	func = function(name, param)
-		local ok, msg = game_mode.start_new_match(name)
+		if param == "now" then
+			local ok, msg = game_mode.start_new_match(name)
+			if ok == false and msg then
+				return false, msg
+			end
+			return true
+		end
+		local ok, msg = game_mode.begin_ready_check(name)
+		if ok == false and msg then
+			return false, msg
+		end
+		return true
+	end,
+})
+
+minetest.register_chatcommand("sl_ready", {
+	description = S("Confirm insertion during a ready check."),
+	func = function(name)
+		local ok, msg = game_mode.mark_ready(name)
 		if ok == false and msg then
 			return false, msg
 		end
@@ -314,6 +354,20 @@ minetest.register_chatcommand("sl_match_status", {
 		end
 
 		return true, S("Match #@1 is running.", tostring(state.match_count))
+	end,
+})
+
+minetest.register_chatcommand("sl_build_cage", {
+	description = S("Materialize the cloud cage structure at the current ghost spawn (creative)."),
+	func = function(name)
+		if not minetest.settings:get_bool("creative_mode") then
+			return false, S("Cage construction is available only in creative mode.")
+		end
+		if state.ghost_spawn and minetest.load_area then
+			minetest.load_area(vector.round(state.ghost_spawn))
+		end
+		local placed = game_mode.build_cloud_cage()
+		return true, S("Cloud cage update complete. @1 nodes materialized.", tostring(placed))
 	end,
 })
 
