@@ -177,6 +177,22 @@ for _, t in ipairs(tactical_nodes) do
 end
 
 -- ---------------------------------------------------------------
+-- Ritual components (rare; consumed by the Ghost Altar)
+-- ---------------------------------------------------------------
+local ritual_items = {
+	{ "ritual_ashen_relic", "Ashen Relic", "sl_raw_crystal.png^[colorize:#aa00ff:160" },
+	{ "ritual_soul_shard", "Soul Shard", "sl_energy_crystal.png^[colorize:#ff00ff:160" },
+	{ "ritual_signal_ink", "Signal Ink", "sl_circuit_board.png^[colorize:#00ffff:140" },
+}
+for _, item in ipairs(ritual_items) do
+	minetest.register_craftitem(modname .. ":" .. item[1], {
+		description = S(item[2] .. "\\n(Rare Ritual Component)"),
+		inventory_image = item[3],
+		groups = { rare = 1, ritual_component = 1 },
+	})
+end
+
+-- ---------------------------------------------------------------
 -- Information items
 -- ---------------------------------------------------------------
 minetest.register_craftitem(modname .. ":data_pad_security", {
@@ -397,9 +413,30 @@ minetest.register_tool(modname .. ":summon_monster", {
 	end,
 })
 
--- Reincarnation item for ghosts to become neutral monsters
+-- Evil ghost sabotage: one bounded charge per revival, targeting a nearby node.
+minetest.register_tool(modname .. ":sabotage_charge", {
+	description = S("Sabotage Charge\n(Evil Ghost Only)"),
+	inventory_image = "sl_circuit_board.png^[colorize:#ff00ff:150",
+	groups = { not_in_creative_inventory = 1 },
+	on_use = function(itemstack, user, pointed_thing)
+		local pl = game_mode.get_player_state(user:get_player_name())
+		if pl.phase ~= "evil_ghost" then return itemstack end
+		if not pointed_thing or pointed_thing.type ~= "node" then return itemstack end
+		local pos = pointed_thing.under
+		local node = minetest.get_node_or_nil(pos)
+		if not node or node.name == "air" then return itemstack end
+		local meta = minetest.get_meta(pos)
+		meta:set_int("sl_sabotaged_until", math.floor(minetest.get_us_time() / 1000000) + 30)
+		meta:set_string("infotext", S("SIGNAL CORRUPTED"))
+		minetest.sound_play("alert", {pos = pos, gain = 0.7, max_hear_distance = 12})
+		game_mode.broadcast(S("A system has been corrupted."))
+		return ItemStack("")
+	end,
+})
+
+-- Reincarnation item for ghosts to become evil ghosts
 minetest.register_craftitem(modname .. ":reincarnate", {
-	description = S("Reincarnate as Neutral Monster\n(Ghost Only)"),
+	description = S("Revive as Evil Ghost\n(Ghost Only; lose match points)"),
 	inventory_image = "monster_texture.png^[resize:32x32^[colorize:#ffffff:50",
 	groups = { not_in_creative_inventory = 1 },
 	on_use = function(itemstack, user, pointed_thing)
@@ -409,8 +446,9 @@ minetest.register_craftitem(modname .. ":reincarnate", {
 			return itemstack
 		end
 
-		pl.phase = "monster"
-		game_mode.broadcast(S("@1 has reincarnated as a Neutral Monster!", name))
+		pl.phase = "evil_ghost"
+		pl.points = 0
+		game_mode.broadcast(S("A containment breach has been detected."))
 		game_mode.spawn_player(user)
 
 		return ItemStack("") -- Consumed

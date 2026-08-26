@@ -318,7 +318,7 @@ minetest.register_node(game_mode.modname .. ":spawn_lobby", {
 -- ================================================================
 
 minetest.register_node(game_mode.modname .. ":ghost_mutator", {
-	description = S("Ghost Mutator (Mutation to Neutral Monster)"),
+	description = S("Deprecated Ghost Mutator (Use Ghost Altar)"),
 	tiles = {"sl_raw_crystal.png^[colorize:#ff00ff:80"},
 	paramtype = "light",
 	light_source = 12,
@@ -328,11 +328,9 @@ minetest.register_node(game_mode.modname .. ":ghost_mutator", {
 		local name = clicker:get_player_name()
 		local pl = game_mode.get_player_state(name)
 		if pl.phase == "ghost" then
-			pl.phase = "monster"
-			game_mode.broadcast(S("@1's ghost has mutated into a Neutral Monster!", name))
-			game_mode.spawn_player(clicker)
+			minetest.chat_send_player(name, S("Neutral-monster mutation is disabled. Use a Ghost Altar ritual for revival."))
 		else
-			minetest.chat_send_player(name, S("Only ghosts can use the mutator."))
+			minetest.chat_send_player(name, S("Only contained ghosts can interact with this deprecated node."))
 		end
 	end,
 })
@@ -350,13 +348,92 @@ minetest.register_node(game_mode.modname .. ":ghost_task_terminal", {
 		local name = clicker:get_player_name()
 		local pl = game_mode.get_player_state(name)
 		if pl.phase == "ghost" then
-			local pads = {"sl_modebase:data_pad_security", "sl_modebase:data_pad_logistics", "sl_modebase:data_pad_medical"}
-			local pad = pads[math.random(1, #pads)]
-			clicker:get_inventory():add_item("main", pad)
-			minetest.chat_send_player(name, S("Task complete. Recovered encrypted data pad."))
+			if not pl.ghost_summoned_by then
+				minetest.chat_send_player(name, S("No living player has summoned you."))
+				return
+			end
+			minetest.chat_send_player(name,
+				S("Channel active. Use /sl_ghost_offer <summoner> <security|logistics|medical>."))
 		else
-			minetest.chat_send_player(name, S("This terminal is for ghosts only."))
+			minetest.chat_send_player(name, S("This terminal is for contained ghosts only."))
 		end
+	end,
+})
+
+-- ================================================================
+-- Ghost Altar — ritual summons one random contained ghost
+-- ================================================================
+local altar_cost = {
+	[game_mode.modname .. ":ritual_ashen_relic"] = 1,
+	[game_mode.modname .. ":ritual_soul_shard"] = 1,
+	[game_mode.modname .. ":ritual_signal_ink"] = 1,
+}
+
+minetest.register_node(game_mode.modname .. ":ghost_altar", {
+	description = S("Ghost Altar"),
+	drawtype = "mesh",
+	mesh = "ghost_altar.obj",
+	tiles = { "sl_raw_crystal.png^[colorize:#7700aa:120" },
+	paramtype = "light",
+	light_source = 12,
+	groups = { cracky = 2, oddly_breakable_by_hand = 1 },
+	is_ground_content = false,
+	selection_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },
+	collision_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },
+
+	on_rightclick = function(pos, node, clicker, itemstack)
+		if not clicker or not clicker:is_player() then return itemstack end
+		local name = clicker:get_player_name()
+		local caller = game_mode.get_player_state(name)
+		if not state.match_active or caller.phase ~= "alive" then
+			minetest.chat_send_player(name, S("The altar answers only to a living player during an active match."))
+			return itemstack
+		end
+
+		local inv = clicker:get_inventory()
+		for item_name, count in pairs(altar_cost) do
+			if not inv:contains_item("main", ItemStack(item_name .. " " .. count)) then
+				minetest.chat_send_player(name, S("Ritual incomplete. Three rare components are required."))
+				return itemstack
+			end
+		end
+
+		local ghosts = {}
+		for ghost_name, ghost_state in pairs(state.players) do
+			if ghost_state.phase == "ghost" and minetest.get_player_by_name(ghost_name) then
+				table.insert(ghosts, ghost_name)
+			end
+		end
+		if #ghosts == 0 then
+			minetest.chat_send_player(name, S("No contained ghost signal detected."))
+			return itemstack
+		end
+
+		for item_name, count in pairs(altar_cost) do
+			inv:remove_item("main", ItemStack(item_name .. " " .. count))
+		end
+
+		local ghost_name = ghosts[math.random(1, #ghosts)]
+		local ghost = minetest.get_player_by_name(ghost_name)
+		local ghost_state = state.players[ghost_name]
+		ghost_state.ghost_summoned_by = name
+		ghost_state.ghost_summon_pos = vector.round(pos)
+		ghost:set_pos({x = pos.x, y = pos.y + 1.2, z = pos.z})
+		minetest.chat_send_player(name, S("The altar has summoned a ghost signal."))
+		minetest.chat_send_player(ghost_name, S("You have been summoned to the Ghost Altar. Channel open for 30 seconds."))
+		minetest.sound_play("alert", { pos = pos, gain = 0.9, max_hear_distance = 16 })
+
+		minetest.after(30, function()
+			local g = minetest.get_player_by_name(ghost_name)
+			local gs = state.players[ghost_name]
+			if g and gs and gs.phase == "ghost" and gs.ghost_summoned_by == name then
+				gs.ghost_summoned_by = nil
+				gs.ghost_summon_pos = nil
+				g:set_pos(table.copy(state.ghost_spawn))
+				minetest.chat_send_player(ghost_name, S("The altar channel has collapsed. You return to the cloud cage."))
+			end
+		end)
+		return itemstack
 	end,
 })
 

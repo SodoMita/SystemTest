@@ -1,8 +1,10 @@
 # System Looting — Finalization Roadmap
 
+> **Design revision — August 2026:** the immediate milestone is now a reliable match loop, **not crafting**. Ghosts are isolated in a cloud cage; ghost chat is locked; ghosts cannot directly affect teams. Revival creates an evil ghost with a point-loss penalty and limited sabotage powers. All players remain visually identical by design. See [`MATCH_LOOP_SPEC.md`](MATCH_LOOP_SPEC.md).
+
 **Goal of "finalize":** reach something **playable with testers** — a multiplayer match
-where two beacon teams compete, with a working **crafting → final-goal** loop layered
-on top of the existing last-team-standing MVP.
+where two beacon teams compete through movement, looting, combat, death transitions,
+and clean match reset. Crafting is a later system layered onto this stable loop.
 
 **Locked design decisions (from discussion):**
 - MTG `default` and other `external/` mods are **temporary scaffolding**, swapped out
@@ -46,6 +48,31 @@ on top of the existing last-team-standing MVP.
 | `.git` size | 66 MB (tree only ~19 MB) | heavy history from committed binaries |
 
 > Note: `goto continue` in 4 files is **valid** in Luanti's LuaJIT runtime — not a bug.
+
+---
+
+## Revised implementation order
+
+### Phase A — Match-loop vertical slice
+
+1. Build and commit one small hand-made arena with two beacons, a lobby, a Monster Master area, a cloud cage, routes, cover, and hand-placed pickups.
+2. Add ready check, minimum player/team validation, countdown, insertion, match timer, results, and clean reset.
+3. Add a persistent HUD for match phase, lives, beacon health, role-local information, and objective status without leaking hidden team identity.
+4. Validate identical-player social play: no nametags, no team chat, direct messages, and no accidental team/role indicators.
+5. Implement the cloud-cage ghost state: high-altitude containment, no team interaction, no ghost chat, no direct map influence.
+6. Add deliberate living-player summoning as the only ghost-to-living information channel.
+7. Add voluntary evil-ghost revival with end-of-match point loss, flight, controlled possession, and bounded sabotage.
+8. Add scripted AI players and deterministic scenarios for every state transition, disconnect, match end, and reset.
+
+**Exit check:** 2–4 human or scripted AI players can complete repeated matches without administrator intervention after setup.
+
+### Phase B — Crafting foundation, later
+
+1. Remove or disable direct inventory crafting of placeable/world-affecting items.
+2. Keep personal crafting limited to information, consumables, charges, repair kits, keys, and tokens.
+3. Introduce machines for structures, traps, barriers, objective machinery, and other placeable outputs.
+4. Start with partial information items and summoned-ghost information exchange.
+5. Add the Objective Core only after the elimination/death/match-reset loop is stable.
 
 ---
 

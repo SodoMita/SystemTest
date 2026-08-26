@@ -14,6 +14,10 @@ function game_mode.spawn_player(player)
 		pos = table.copy(state.monster_master.base_spawn)
 	elseif pl.phase == "ghost" then
 		pos = table.copy(state.ghost_spawn)
+	elseif pl.phase == "evil_ghost" then
+		pos = table.copy(pl.last_death_pos or state.ghost_spawn)
+	elseif pl.phase == "monster" or pl.phase == "master_monster" then
+		pos = table.copy(pl.last_death_pos or state.ghost_spawn)
 	elseif pl.team and state.teams[pl.team] then
 		pos = table.copy(state.teams[pl.team].spawn)
 	end
@@ -65,7 +69,7 @@ function game_mode.spawn_player(player)
 		if not minetest.settings:get_bool("creative_mode") then
 			inv:set_list("main", {})
 		end
-	elseif pl.phase == "ghost" then
+	elseif pl.phase == "ghost" or pl.phase == "evil_ghost" then
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_physics_override({
 			speed = 1.5,
@@ -78,16 +82,22 @@ function game_mode.spawn_player(player)
 		privs.noclip = true
 		minetest.set_player_privs(name, privs)
 
+		local is_evil = pl.phase == "evil_ghost"
 		player:set_properties({
-			visual_size = {x=0, y=0}, -- Invisibility
+			visual_size = is_evil and {x=1.2, y=1.2} or {x=0, y=0},
+			textures = is_evil and {"sl_boxman_neon.png^[colorize:#ff00ff:120"} or boxman_textures,
 			collisionbox = {0,0,0,0,0,0},
 			selectionbox = {0,0,0,0,0,0},
 		})
 		
-		-- Give Reincarnation item
+		-- Ghosts receive only a revival option; evil ghosts receive a bounded sabotage tool.
 		local inv = player:get_inventory()
 		inv:set_list("main", {})
-		inv:add_item("main", "sl_modebase:reincarnate")
+		if is_evil then
+			inv:add_item("main", game_mode.modname .. ":sabotage_charge")
+		else
+			inv:add_item("main", game_mode.modname .. ":reincarnate")
+		end
 	elseif pl.phase == "monster" or pl.phase == "master_monster" then
 		-- Remove flight/noclip when mutating
 		local privs = minetest.get_player_privs(name)

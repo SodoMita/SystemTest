@@ -22,13 +22,16 @@ local state = {
 		player = nil, -- name of current monster master
 	},
 
+	-- Cloud cage: intentionally far above the playable arena.
 	ghost_spawn = { x = 0, y = 100, z = 0 },
-	lobby_spawn = { x = 0, y = 100, z = 0 },
+	lobby_spawn = { x = 0, y = 10, z = 0 },
 
-	players = {}, -- [name] = { team=..., lives=..., eliminated=bool, role="monster_master"|nil, phase=... }
+	players = {}, -- [name] = { team=..., lives=..., eliminated=bool, role=..., phase=... }
 
 	match_active = false,
 	match_count = 0,
+	match_started_at = 0,
+	match_ended_at = 0,
 
 	-- Win Conditions (Options)
 	win_conditions = {
@@ -90,7 +93,11 @@ function game_mode.get_player_state(name)
 			lives = game_mode.LIVES_PER_PLAYER,
 			eliminated = false,
 			role = nil,
-			phase = "alive", -- "alive", "ghost", "monster", "master_monster"
+			phase = "alive", -- alive, ghost (cloud cage), evil_ghost, monster, master_monster
+			points = 0,
+			ghost_summoned_by = nil,
+			ghost_summon_pos = nil,
+			last_death_pos = nil,
 		}
 		players[name] = pl
 	end

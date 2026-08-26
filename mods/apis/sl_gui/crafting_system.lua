@@ -205,8 +205,15 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
             local quantity = tonumber(fields[quantity_field] or "1") or 1
             quantity = math.max(1, math.min(999, math.floor(quantity)))
 
-            if recipe then
-                local can_craft_all = true
+			if recipe then
+				-- World-affecting outputs belong to machines, never inventory crafting.
+				-- A registered node is the authoritative signal for this prototype.
+				if minetest.registered_nodes[recipe.output] then
+					minetest.chat_send_player(player:get_player_name(),
+						"Machine required: this output cannot be crafted in inventory.")
+					goto continue_craft
+				end
+				local can_craft_all = true
                 local inv = player:get_inventory()
 
                 for item_name, count in pairs(recipe.ingredients) do

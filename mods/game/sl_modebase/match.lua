@@ -12,6 +12,7 @@ function game_mode.end_match(winner, reason)
 	end
 
 	state.match_active = false
+	state.match_ended_at = minetest.get_us_time() / 1000000
 
 	-- Restore beacons and spawns from persistent storage
 	local storage = game_mode.storage or minetest.get_mod_storage()
@@ -86,6 +87,9 @@ local function reset_players_for_new_match()
 		pl.lives = state.settings.lives or 5
 		pl.eliminated = false
 		pl.phase = "alive"
+		pl.points = 0
+		pl.ghost_summoned_by = nil
+		pl.last_death_pos = nil
 		
 		-- Clear inventory at start of match too
 		local player = minetest.get_player_by_name(name)
@@ -107,9 +111,13 @@ function game_mode.start_new_match(initiator)
 	end
 
 	local connected = game_mode.get_connected_player_names()
-	if #connected < 1 then
-		return false, S("Need at least 1 player to start a match.")
+	if #connected < 2 then
+		return false, S("Need at least 2 players to start a match.")
 	end
+
+	-- Auto-assign the Monster Master only when two beacon teams can still exist.
+	-- A two-player test match remains a direct team-vs-team simulation.
+	local auto_assign_mm = state.settings.mm_auto_assign and #connected >= 3
 
 	-- Auto-assign Monster Master if nobody has the role
 	local mm_exists = false
@@ -122,7 +130,7 @@ function game_mode.start_new_match(initiator)
 		end
 	end
 
-	if not mm_exists and state.settings.mm_auto_assign then
+	if not mm_exists and auto_assign_mm then
 		-- Pick player from the biggest team
 		local team_counts = { beacon_a = 0, beacon_b = 0 }
 		for _, name in ipairs(connected) do
@@ -155,8 +163,20 @@ function game_mode.start_new_match(initiator)
 		end
 	end
 
+	-- Ensure the active simulation has two actual beacon teams.
+	for _, name in ipairs(connected) do
+		local pl = game_mode.get_player_state(name)
+		if not pl.team and pl.role ~= "monster_master" then
+			game_mode.assign_beacon_team(name)
+		end
+	end
+	if game_mode.count_team_players("beacon_a") == 0 or game_mode.count_team_players("beacon_b") == 0 then
+		return false, S("Need players on both beacon teams before launch.")
+	end
+
 	state.match_count = (state.match_count or 0) + 1
 	state.match_active = true
+	state.match_started_at = minetest.get_us_time() / 1000000
 
 	reset_players_for_new_match()
 
@@ -197,7 +217,7 @@ function minetest.is_protected(pos, name)
 		return false -- Creative/Admins can always build
 	end
 	
-	if pl and (pl.phase == "ghost" or not state.match_active) then
+	if pl and (pl.phase == "ghost" or pl.phase == "evil_ghost" or not state.match_active) then
 		return true
 	end
 	return old_is_protected(pos, name)
@@ -243,8 +263,8 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 	if hitter and hitter:is_player() then
 		local hname = hitter:get_player_name()
 		local hpl = game_mode.get_player_state(hname)
-		if hpl and hpl.phase == "ghost" then
-			return true -- Ghosts can't attack
+		if hpl and (hpl.phase == "ghost" or hpl.phase == "evil_ghost") then
+			return true -- Ghosts cannot directly attack players
 		end
 	end
 end)
@@ -252,8 +272,8 @@ end)
 -- Restrict ghost chat
 minetest.register_on_chat_message(function(name, message)
 	local pl = game_mode.get_player_state(name)
-	if pl and pl.phase == "ghost" then
-		minetest.chat_send_player(name, minetest.colorize("#ff5555", S("Ghosts cannot speak to the living.")))
+	if pl and (pl.phase == "ghost" or pl.phase == "evil_ghost") then
+		minetest.chat_send_player(name, minetest.colorize("#ff5555", S("Ghost communications are sealed.")))
 		return true -- Block message
 	end
 end)
@@ -298,6 +318,9 @@ minetest.register_on_dieplayer(function(player, reason)
 		return
 	end
 
+	-- Preserve the death location for an eventual evil-ghost insertion.
+	pl.last_death_pos = vector.round(pos)
+
 	-- Phase-based transition
 	if pl.phase == "alive" then
 		pl.lives = math.max(0, pl.lives - 1)
@@ -310,10 +333,13 @@ minetest.register_on_dieplayer(function(player, reason)
 				S("You have @1 lives remaining.", tostring(pl.lives)))
 		end
 	elseif pl.phase == "ghost" then
-		pl.phase = "monster"
-		player:set_armor_groups({fleshy = 100})
-		game_mode.broadcast(S("@1's spirit has mutated into a Neutral Monster!", name))
+		-- Contained ghosts are immortal and should not be damage-transitioned.
+		player:set_armor_groups({immortal = 1})
+	elseif pl.phase == "evil_ghost" then
+		pl.eliminated = true
+		game_mode.broadcast(S("A corrupted ghost has been purged from the simulation."))
 	elseif pl.phase == "monster" then
+		-- Legacy compatibility for old saved state.
 		pl.phase = "master_monster"
 		player:set_armor_groups({fleshy = 100})
 		game_mode.broadcast(S("@1 has been bound to the Monster Master's will!", name))

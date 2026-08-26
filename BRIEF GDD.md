@@ -1,72 +1,100 @@
 ```md
-A hybrid design blending mechanics from **Fortnite Tower Defense**, **Minecraft**, **Among Us**, **Vampire Survivor**, and **rogue-likes** — set in an abstract, competitive **cyberworld**, where multiple systems collide in a high-stakes simulation.
+# SYSTEM LOOTING — CORE DESIGN BRIEF
 
----
+A competitive survival game inside a hostile cybernetic simulation. Teams fight around beacons while identical-looking players infer identity through chat, movement, choices, and observed actions.
 
-## 🛠️ Core Gameplay
+## Core Match
 
-- Players are divided into **initial teams**, each with distinct objectives but operating under shared rules.
-- Core teams engage in:
-  - **Base building & defense**
-  - **Exploration of combat zones**
-  - **Looting resources**
-  - **Fighting hostile AI monsters**
+- Players enter a shared lobby and complete a ready check.
+- Players are assigned to beacon teams; one player may become the Monster Master.
+- The match takes place on a hand-built arena using the `singlenode` mapgen.
+- Players scavenge, move, defend, attack, and manage limited lives.
+- Initial match gameplay uses fixed equipment and hand-placed pickups.
+- Crafting is a later system, not a requirement for the first playable loop.
+- Win conditions may include elimination and, later, objective delivery, defense, and point modes.
 
-- The world is **poor and hostile**, demanding constant adaptation.
+## Identity Is Deliberately Ambiguous
 
----
+All living players use the same visual identity. There are no permanent uniforms, nametags, or obvious team markers. Players identify one another through:
 
-## 💀 Death Isn’t the End
+- Chat and direct messages.
+- Movement and timing.
+- Visible actions.
+- Alliances and betrayal.
+- Memory of previous decisions.
 
-When a knocked down player dies, they **don’t leave the game**—they shift roles:
+There is no team chat. Direct messages are an intentional social mechanic.
 
-### 👻 Ghost
-- Dead players return as **ghosts**, with access to:
-  - **Special quests**
-  - **Sabotage / support options** for the living
-  - The ability to **revive** as...
+## Death and Ghosts
 
-### 🧟 Neutral Monster
-- Ghosts may choose to respawn as neutral monsters:
-  - **Hostile to all players**
-  - Still capable of **indirectly benefiting** their original team by attacking opponents
-  - Can possess players to become impostor
-- On death transitions to the final phase:
+Death is a state transition, not an immediate exit.
 
-### 🐕‍🦺 Monster
-- Spawned by monster master
-- Follow orders of master
-- Respawn as other monster
----
-## 🧠 Monster Master
+```text
+ALIVE -> GHOST IN CLOUD CAGE -> EVIL GHOST AFTER REVIVAL -> ELIMINATED
+```
 
-- A **solo-player faction**
-- Functions like an asymmetric **RTS commander**.
-- **Income mechanics:**
-  - Passive income
-  - Reward by **caused damage**
-- Can:
-  - **Deploy monsters**
-  - **Upgrade units**
-  - **Use obstacles**
+### Ghost in Cloud Cage
 
----
+- The ghost is held in a cloud cage far above the map.
+- Ghosts cannot directly affect either team.
+- Ghost chat is locked for all ghosts.
+- Ghosts cannot damage, heal, mark, block, or communicate with living players.
+- Ghosts may craft information items only.
+- An alive player may deliberately summon a ghost.
+- A summoned ghost may offer information to that player.
+- Information can be used after revival.
 
-## 🏆 Win Conditions
+### Evil Ghost
 
-Victory conditions are chosen at match start, changing the pacing and tactics of each session:
+Revival is a voluntary and morally negative choice. The revived player becomes an evil ghost and loses all points earned by that player at the end of the match.
 
-- 🧮 **Point-Based** 
-- ⚔️ **Last Team Standing**
-- 🎯 **Item Delivery Objective**
-- 🛡️ **Defense Mode**
-- 🧩 **Hybrid / Custom Rulesets**
+An evil ghost may:
 
----
+- Fly around the map.
+- Taunt through permitted audiovisual interactions, not normal ghost chat.
+- Possess selected items or objects.
+- Sabotage systems and interactable objects.
 
-## 🌐 Visuals
-- **3d**
-- **Colored outlines on unlit black:** like in 80th
-- **Realistic shapes:** realistic people, no visible low-poly or pixelized items
-- **Huge open world:** procedural simple voxel world with dynamic objects
+Evil ghost powers require cooldowns, discoverable causes, and counterplay. They must create uncertainty, not unrestricted griefing.
+
+## Monster Master
+
+The Monster Master is an asymmetric commander. The long-term design includes:
+
+- Monster deployment.
+- Unit upgrades.
+- Command and target priorities.
+- Obstacles and traps.
+- Income based on monster activity.
+
+The initial milestone may use only basic scripted monster deployment.
+
+## Crafting Direction
+
+Crafting is deferred until the match loop is stable.
+
+- Personal inventory crafting may produce non-placeable items such as information, consumables, charges, repair kits, keys, and tokens.
+- Placeable, structural, deployable, or world-affecting items may **not** be crafted directly in the player inventory.
+- Those items must be produced on dedicated machines or stations with input slots, processing time, and risk.
+
+The first future crafting branch should focus on information items. Information should be partial, contextual, and sometimes unreliable — never automatic omniscience.
+
+## Visual Direction
+
+- 3D cybernetic environment.
+- Neon outlines against deep black.
+- Realistic silhouettes and readable actions.
+- Identical player appearance as a social deduction feature.
+- Hand-built arena rather than procedural mapgen.
+
+## First Playable Target
+
+```text
+LOBBY -> READY CHECK -> TEAM ASSIGNMENT -> SPAWN
+-> MOVE / SCAVENGE -> COMBAT / BEACON PRESSURE
+-> DEATH TRANSITIONS -> MATCH RESOLUTION
+-> RESULTS -> CLEAN RESET
+```
+
+A match must be playable by humans or scripted AI players without administrator intervention after setup.
 ```

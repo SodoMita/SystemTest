@@ -10,15 +10,23 @@ function game_mode.set_monster_master(name)
 	if name == nil or name == "" then
 		-- Remove tool from old MM if they exist
 		if state.monster_master.player then
-			local old_p = minetest.get_player_by_name(state.monster_master.player)
+			local old_name = state.monster_master.player
+			local old_p = minetest.get_player_by_name(old_name)
 			if old_p then
 				old_p:get_inventory():remove_item("main", game_mode.modname .. ":summon_monster")
+			end
+			local old_state = state.players[old_name]
+			if old_state and old_state.role == "monster_master" then
+				old_state.role = nil
 			end
 		end
 		state.monster_master.player = nil
 		return
 	end
 
+	if state.monster_master.player and state.monster_master.player ~= name then
+		game_mode.set_monster_master(nil)
+	end
 	state.monster_master.player = name
 
 	local pl = game_mode.get_player_state(name)
@@ -64,6 +72,8 @@ minetest.register_chatcommand("sl_state", {
 		end
 
 		table.insert(parts, S("Lives: @1", tostring(pl.lives)))
+		table.insert(parts, S("Phase: @1", tostring(pl.phase)))
+		table.insert(parts, S("Points: @1", tostring(pl.points or 0)))
 		if pl.eliminated then
 			table.insert(parts, S("(Eliminated)"))
 		end
@@ -153,6 +163,73 @@ minetest.register_chatcommand("sl_mm_spawn", {
 	end,
 })
 
+-- Living player deliberately opens a temporary information channel to a cloud-cage ghost.
+minetest.register_chatcommand("sl_summon_ghost", {
+	params = "<ghost_name>",
+	description = S("Summon a contained ghost for information"),
+	func = function(name, param)
+		if not minetest.settings:get_bool("creative_mode") then
+			return false, S("Ghost summoning commands are available only in creative mode.")
+		end
+		local caller = game_mode.get_player_state(name)
+		if caller.phase ~= "alive" or not state.match_active then
+			return false, S("Only a living player in an active match may summon a ghost.")
+		end
+		local target = param:match("^(%S+)$")
+		local ghost = target and game_mode.get_player_state(target)
+		if not ghost or ghost.phase ~= "ghost" then
+			return false, S("Target is not a contained ghost.")
+		end
+		ghost.ghost_summoned_by = name
+		minetest.chat_send_player(target, S("A living player has opened a channel. Prepare one information packet."))
+		return true, S("Ghost channel opened. The ghost must offer information.")
+	end,
+})
+
+-- Allowed ghost-to-living information transfer. This is not public chat.
+minetest.register_chatcommand("sl_ghost_offer", {
+	params = "<living_name> <security|logistics|medical>",
+	description = S("Offer one information packet to your summoner"),
+	func = function(name, param)
+		if not minetest.settings:get_bool("creative_mode") then
+			return false, S("Ghost information commands are available only in creative mode.")
+		end
+		local pl = game_mode.get_player_state(name)
+		if pl.phase ~= "ghost" or not pl.ghost_summoned_by then
+			return false, S("You are not a summoned cloud-cage ghost.")
+		end
+		local target, kind = param:match("^(%S+)%s+(%S+)$")
+		if target ~= pl.ghost_summoned_by or not minetest.get_player_by_name(target) then
+			return false, S("You may only offer information to your summoner.")
+		end
+		local ids = {
+			security = "data_pad_security",
+			logistics = "data_pad_logistics",
+			medical = "data_pad_medical",
+		}
+		if not ids[kind] then return false, S("Unknown information packet.") end
+		local receiver = minetest.get_player_by_name(target)
+		receiver:get_inventory():add_item("main", game_mode.modname .. ":" .. ids[kind])
+		minetest.chat_send_player(target, S("An information packet has been delivered by the summoned ghost."))
+		pl.ghost_summoned_by = nil
+		return true, S("Information packet transmitted.")
+	end,
+})
+
+-- A ghost cannot use ordinary chat or direct-message commands. Gameplay commands
+-- are explicitly allowlisted above and do not expose a public conversation channel.
+if minetest.register_on_chatcommand then
+	minetest.register_on_chatcommand(function(name, command)
+		local pl = game_mode.get_player_state(name)
+		if pl.phase == "ghost" or pl.phase == "evil_ghost" then
+			if command ~= "sl_ghost_offer" and command ~= "sl_state" then
+				minetest.chat_send_player(name, S("Ghost communications are sealed."))
+				return true
+			end
+		end
+	end)
+end
+
 -- Admin command: force-assign player to beacon or monster master
 minetest.register_chatcommand("sl_assign", {
 	params = "<player> <beacon_a|beacon_b|monster_master>",
@@ -197,6 +274,7 @@ minetest.register_chatcommand("sl_set_lobby", {
 		if not player then return false end
 		local pos = player:get_pos()
 		state.lobby_spawn = vector.round(pos)
+		game_mode.save_spawns()
 		return true, S("Lobby spawn set to @1", minetest.pos_to_string(state.lobby_spawn))
 	end,
 })
