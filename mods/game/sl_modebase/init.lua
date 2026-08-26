@@ -28,6 +28,7 @@ include_files(
 	"entities.lua", -- monster entities
 	"nodes.lua",    -- beacon nodes + loot crate
 	"content.lua",  -- craftable items, tools, tactical nodes, interactables
+	"test_harness.lua", -- headless AI agents and deterministic arena builder
 	"commands.lua"  -- chat commands and privileges
 )
 
