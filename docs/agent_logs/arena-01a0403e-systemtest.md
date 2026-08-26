@@ -106,3 +106,25 @@ Scanner surface for future assertions: `minetest.registered_tools
 ["sl_modebase:scanner"].on_use(stack, player, nil)` emits
 "SIGNAL SWEEP: <POSSESSION|CORRUPTION|BEACON CORROSION> — <d>m <bearing>,
 <s>s remaining." to the user only; 5 s cooldown message "recharging".
+
+## 2026-08-26 — CI diagnosis: syntax gate fails on pre-existing goto files
+
+Local reproduction with a **stock Lua 5.1 build** (same parser class as CI's
+`luac5.1 -p`): exactly six pre-existing files fail the syntax gate, all using
+LuaJIT-only `goto`:
+
+- mods/apis/sl_gui/achievement_tracking.lua (WP5)
+- mods/apis/sl_gui/crafting_system.lua (WP6)
+- mods/apis/sl_gui/running_system.lua (WP5)
+- mods/content/dialogue/trigger_manager.lua (WP5)
+- mods/content/dialogue/yaml.lua (WP5)
+- mods/content/sl_scary/init.lua (unassigned content mod)
+
+This explains the failed `soak` run 33021498379 on commit 340c1af and will
+fail every push until resolved. Filed as **issue #1** per §7.6 (no cross-WP
+patches from this session) with three resolution options; decision belongs to
+WP4 (gate) + the owning WPs (files).
+
+All `sl_modebase` files — including this session's scanner — are strict-5.1
+clean, and `tests/smoke_test.lua` passes 67/67 under the stock Lua 5.1
+interpreter (same runtime class CI uses for that step).
