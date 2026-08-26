@@ -1,0 +1,58 @@
+name: soak
+
+# Merge gate for the multi-agent workflow described in AGENT_PARALLEL_PLAN.md:
+# every push / pull request must pass the stub smoke test and the live-engine
+# soak test (simulated AI players, bug harvest, balance telemetry).
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua + Luanti engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1
+          # Distro package first; fall back to the minetestdevs PPA.
+          # NOTE: engine install path is the one step not verified in the
+          # original dev sandbox (which used the Debian trixie package).
+          sudo apt-get install -y minetest \
+            || sudo apt-get install -y luanti \
+            || { sudo add-apt-repository -y ppa:minetestdevs/stable \
+                 && sudo apt-get update \
+                 && sudo apt-get install -y minetest; }
+
+      - name: Syntax check all mod Lua files
+        run: |
+          fail=0
+          for f in $(find mods -name '*.lua'); do
+            luac5.1 -p "$f" || { echo "SYNTAX FAIL: $f"; fail=1; }
+          done
+          exit $fail
+
+      - name: Headless stub smoke test (67 assertions)
+        run: lua5.1 tests/smoke_test.lua
+
+      - name: Live-engine soak test (AI players, 3 matches)
+        run: |
+          python3 tests/soak/run_soak.py \
+            --matches 3 --lives 4 --match-duration 150 \
+            --seed ${{ github.run_number }} \
+            --timeout 900 --report soak_report.json --keep-world
+
+      - name: Upload soak report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-report-run${{ github.run_number }}
+          path: |
+            soak_report.json
+            /tmp/sl_soak_*/server_console.log
+          if-no-files-found: ignore

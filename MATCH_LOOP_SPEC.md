@@ -36,9 +36,18 @@ Still open (Phase A remainder):
 
 - Hand-built arena map committed to the repo (two beacons, lobby, cage,
   routes, cover, hand-placed pickups).
-- Scripted AI player harness with the 10 deterministic scenarios below.
 - Direct-message UI polish and reconnect hardening pass.
 - Evil ghost possession of objects (only node sabotage exists so far).
+
+Live-engine soak test (August 2026): `tests/soak/run_soak.py` boots a real
+Luanti server where the `aaa_botmatch` harness runs simulated AI players
+through full matches — insertion, PvP, deaths, cloud cage, altar ritual,
+information offers, evil-ghost revival, sabotage/repair, disconnect/
+reconnect, elimination and timer endings — harvesting every Lua error as a
+bug event and emitting per-match balance telemetry (win rates, side bias,
+K/D, beacon damage, event counters). Verified: 6 engine runs / 18 matches,
+final verdict PASS with zero bug events on Luanti 5.10. Multi-agent parallel
+workflow around this gate: `AGENT_PARALLEL_PLAN.md`.
 
 ## Core fantasy
 

@@ -226,6 +226,8 @@ check(state.players.alpha.lives == (state.settings.lives or 5), "lives refilled"
 check(state.players.alpha.points == 0, "points reset")
 check(not state.ready_check.active, "no stale ready check")
 check(alpha:get_pos().y == state.teams.beacon_a.spawn.y, "respawned at team spawn")
+check(state.teams.beacon_b.hp == (state.settings.beacon_hp or 100),
+	"beacon HP restored at insertion (no stale damage; was " .. tostring(state.teams.beacon_b.hp) .. ")")
 
 section("PHASE 13 — HUD is present and identity-neutral")
 H.advance(1, 0.5) -- let the HUD globalstep refresh under the new match

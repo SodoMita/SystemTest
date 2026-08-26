@@ -250,6 +250,21 @@ function game_mode.start_new_match(initiator)
 	game_mode.cancel_ready_check()
 	game_mode.clear_all_sabotage()
 
+	-- Beacons start every match at full integrity. Without this, damage
+	-- taken in a previous match persists (stale-state violation of the
+	-- "same match started again without stale state" scenario).
+	for _, team_id in ipairs(state.teams_order) do
+		local tdef = state.teams[team_id]
+		tdef.hp = state.settings.beacon_hp or 100
+		if tdef.spawn then
+			local bpos = { x = tdef.spawn.x, y = tdef.spawn.y - 1, z = tdef.spawn.z }
+			if minetest.load_area then minetest.load_area(bpos) end
+			local meta = minetest.get_meta(bpos)
+			meta:set_int("hp", tdef.hp)
+			meta:set_string("infotext", S("@1 (HP: @2)", tdef.label, tostring(tdef.hp)))
+		end
+	end
+
 	state.match_count = (state.match_count or 0) + 1
 	state.match_active = true
 	state.match_started_at = minetest.get_us_time() / 1000000
