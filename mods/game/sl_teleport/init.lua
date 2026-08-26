@@ -6,7 +6,11 @@ local offset = 1000  -- Adjust this value as needed
 -- ========================================================
 -- Public API — let other mods hook into teleport events Nyaa~
 -- ========================================================
-sl_teleport = sl_teleport or {}
+-- Publish the API explicitly through _G so Luanti's global-variable checker
+-- does not report an undeclared global access on startup.
+local teleport_api = rawget(_G, "sl_teleport") or {}
+_G.sl_teleport = teleport_api
+local sl_teleport = teleport_api
 sl_teleport.callbacks = sl_teleport.callbacks or {}
 sl_teleport.TELEPORT_LIMIT = 29900
 
