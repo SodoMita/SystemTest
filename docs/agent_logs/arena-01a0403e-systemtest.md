@@ -64,3 +64,45 @@ Identity neutrality: the possession broadcast names no player and no team.
   reachable via `game_mode.possess_object(pos, name)` for whoever adds it.
 - `tests/smoke_test.lua` assertions for possession — same reason; the API above
   is the surface to test against.
+
+## 2026-08-26 — WP3 addendum: Signal Scanner (detection counterplay)
+
+**Coordination note:** a second WP3 session on this branch landed the
+possession implementation above (commit 340c1af). This session rebased onto
+it instead of colliding and contributes one additive piece.
+
+### What changed
+
+- `content.lua` — new `sl_modebase:scanner` information tool + personal-craft
+  recipe (non-placeable output, so personal crafting is the correct class per
+  ROADMAP Phase B). 24 m sweep over **both** registries — `state.sabotage`
+  (corruption / beacon corrosion) and `state.possession` (the registry
+  introduced above) — reporting kind, distance, 8-point bearing, and seconds
+  remaining, with a 5 s per-player cooldown. Alive players in an active match
+  only. Read-only: the scanner never mutates either registry and reads no
+  identity fields (`team_id` / `ghost`), so output stays identity-neutral.
+
+### Why
+
+The possession bounding table lists "Detect / prevent / recover" as punch
+exorcism, expiry, and purge; detection at arm's length is the infotext and
+slamming doors. The scanner adds the at-range detection leg of the spec's
+"a way for living players to detect, prevent, or recover" requirement without
+touching the possession mechanics.
+
+### Measured
+
+- `tests/smoke_test.lua` — 67/67, unchanged (run before and after).
+- Scratch harness (kept outside the repo; `tests/**` is WP4-owned): 15/15 —
+  scanner detects both a `possession_focus` possession and a classic sabotage
+  (kind / distance / bearing / remaining), cooldown enforced, no identity
+  leaks, two-punch exorcism and match-end purge of both registries confirmed.
+- Syntax clean on touched files. Soak still deferred to CI (no engine binary
+  in this workspace, same environment limitation as above).
+
+### Notes for WP4
+
+Scanner surface for future assertions: `minetest.registered_tools
+["sl_modebase:scanner"].on_use(stack, player, nil)` emits
+"SIGNAL SWEEP: <POSSESSION|CORRUPTION|BEACON CORROSION> — <d>m <bearing>,
+<s>s remaining." to the user only; 5 s cooldown message "recharging".

@@ -498,6 +498,121 @@ minetest.register_tool(modname .. ":possession_focus", {
 	end,
 })
 
+-- ================================================================
+-- Signal Scanner — detection counterplay for sabotage and possession.
+--
+-- Spec ("Evil revival state"): every sabotage action needs "a way for
+-- living players to detect, prevent, or recover from it." Possession's
+-- visible cause (infotext, slamming doors) works at arm's length; the
+-- scanner is the at-range detector. It is an information-class tool:
+-- non-placeable, personally craftable, and strictly identity-neutral —
+-- it reports what is corrupted or possessed and how long it will last,
+-- never who corrupted or possessed it.
+--
+-- Additive to the WP3 possession registry (nodes.lua): reads only the
+-- public state tables and never mutates them.
+-- ================================================================
+
+local SCAN_RANGE = 24
+local SCAN_COOLDOWN = 5
+local scanner_ready_at = {} -- [player_name] = time of next allowed scan
+
+-- 8-point bearing without trig (portable across Lua 5.1 / LuaJIT).
+-- Engine convention: +X = east, +Z = north.
+local function compass_bearing(dx, dz)
+	local abs_x, abs_z = math.abs(dx), math.abs(dz)
+	if abs_x < 0.5 and abs_z < 0.5 then return "right here" end
+	local primary, secondary
+	if abs_x >= abs_z then
+		primary = (dx > 0) and "E" or "W"
+		if abs_z >= abs_x * 0.5 then
+			secondary = (dz > 0) and "N" or "S"
+		end
+	else
+		primary = (dz > 0) and "N" or "S"
+		if abs_x >= abs_z * 0.5 then
+			secondary = (dx > 0) and "E" or "W"
+		end
+	end
+	return primary .. (secondary or "")
+end
+
+minetest.register_tool(modname .. ":scanner", {
+	description = S("Signal Scanner\n(Living players: sweep for corrupted or possessed systems)"),
+	inventory_image = "sl_sensor_array.png^[colorize:#00ffff:100",
+	groups = { information = 1 },
+
+	on_use = function(itemstack, user, pointed_thing)
+		if not user or not user:is_player() then return itemstack end
+		local name = user:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		local state = game_mode.state
+
+		if not state.match_active or pl.phase ~= "alive" then
+			minetest.chat_send_player(name, S("The scanner is silent outside of a live match."))
+			return itemstack
+		end
+
+		local now = game_mode.now()
+		if (scanner_ready_at[name] or 0) > now then
+			minetest.chat_send_player(name, S("The scanner is still recharging."))
+			return itemstack
+		end
+		scanner_ready_at[name] = now + SCAN_COOLDOWN
+
+		-- Nearest anomaly across both registries: sabotage (corruption /
+		-- beacon corrosion) and possession. Entries in both carry pos and
+		-- until_time; identity fields (team_id / ghost) are never read.
+		local origin = user:get_pos()
+		local best, best_dist, best_kind = nil, SCAN_RANGE, nil
+		for _, entry in pairs(state.sabotage) do
+			local dist = vector.distance(origin, entry.pos)
+			if dist <= best_dist then
+				best, best_dist = entry, dist
+				best_kind = (entry.kind == "beacon") and "beacon" or "sabotage"
+			end
+		end
+		for _, entry in pairs(state.possession or {}) do
+			local dist = vector.distance(origin, entry.pos)
+			if dist <= best_dist then
+				best, best_dist, best_kind = entry, dist, "possession"
+			end
+		end
+
+		if not best then
+			minetest.chat_send_player(name,
+				S("SIGNAL SWEEP: no corrupted or possessed systems within @1 meters.",
+					tostring(SCAN_RANGE)))
+			return itemstack
+		end
+
+		local kind_label = (best_kind == "possession") and S("POSSESSION")
+			or (best_kind == "beacon") and S("BEACON CORROSION")
+			or S("CORRUPTION")
+		local remaining = math.max(0, math.ceil(best.until_time - now))
+		local delta = vector.subtract(best.pos, origin)
+		minetest.chat_send_player(name, minetest.colorize("#00ffff",
+			S("SIGNAL SWEEP: @1 — @2m @3, @4s remaining.",
+				kind_label,
+				tostring(math.floor(best_dist + 0.5)),
+				compass_bearing(delta.x, delta.z),
+				tostring(remaining))))
+		minetest.sound_play("click", { to_player = name, gain = 0.4 })
+		return itemstack
+	end,
+})
+
+-- Personal crafting: the scanner is non-placeable information equipment,
+-- which the ROADMAP keeps in the personal inventory crafting class.
+minetest.register_craft({
+	output = modname .. ":scanner",
+	recipe = {
+		{ "",                              modname .. ":raw_crystal",     "" },
+		{ modname .. ":electronic_waste", modname .. ":circuit_board",   modname .. ":electronic_waste" },
+		{ "",                              modname .. ":plastic_scrap",   "" },
+	},
+})
+
 -- Reincarnation item for ghosts to become evil ghosts
 minetest.register_craftitem(modname .. ":reincarnate", {
 	description = S("Revive as Evil Ghost\n(Ghost Only; lose match points)"),

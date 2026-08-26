@@ -28,7 +28,9 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
   platforms — never beacons, never the Ghost Altar). Possessed objects show
   `OBJECT POSSESSED`, refuse use, and slam if they are doors; the living
   exorcise them with two punches. 20 s duration, 45 s cooldown (+30 s when
-  exorcised), purged on match end.
+  exorcised), purged on match end. Detection counterplay: the craftable
+  Signal Scanner sweeps sabotage and possession within 24 m (kind, distance,
+  bearing, time left) without revealing identities.
 - Sabotage: 30 s corruption with a visible marker; sabotaged beacons take
   corrosion damage; sabotaged interactables refuse use; living players repair
   by punching; everything is purged on match end/restart.
