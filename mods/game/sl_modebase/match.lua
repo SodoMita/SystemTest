@@ -103,7 +103,6 @@ end
 -- Reset for new match
 local function reset_players_for_new_match()
 	for name, pl in pairs(state.players) do
-		pl.lives = state.settings.lives or 5
 		pl.eliminated = false
 		pl.phase = "alive"
 		pl.points = 0
@@ -137,8 +136,8 @@ function game_mode.send_results(winner, reason)
 	local score_rows = {}
 	for name, pl in pairs(state.players) do
 		if minetest.get_player_by_name(name) then
-			local row = string.format("%s | %s | lives %d | pts %d",
-				name, tostring(pl.phase), pl.lives or 0, pl.points or 0)
+			local row = string.format("%s | %s | pts %d",
+				name, tostring(pl.phase), pl.points or 0)
 			table.insert(score_rows, row)
 			game_mode.broadcast(row)
 		end
@@ -152,17 +151,17 @@ function game_mode.send_results(winner, reason)
 		"label[0.5,0.4;" .. minetest.formspec_escape(S("MATCH RESULTS")) .. "]",
 		"label[0.5,0.9;" .. minetest.formspec_escape(
 			string.format("%s — %s", winner_label, reason or "")) .. "]",
-		"tablecolumns[text;text;text;text]",
+		"tablecolumns[text;text;text]",
 	}
 	local rows = {}
 	for name, pl in pairs(state.players) do
 		if minetest.get_player_by_name(name) then
-			table.insert(rows, string.format("%s,%s,%d,%d",
+			table.insert(rows, string.format("%s,%s,%d",
 				minetest.formspec_escape(name), tostring(pl.phase),
-				pl.lives or 0, pl.points or 0))
+				pl.points or 0))
 		end
 	end
-	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;Player,Phase,Lives,Points;"
+	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;Player,Phase,Points;"
 		.. table.concat(rows, ";") .. ";0]")
 	table.insert(fs, "button_exit[3,5.9;2,0.7;close;Close]")
 	local fs_str = table.concat(fs, "")
@@ -580,17 +579,13 @@ minetest.register_on_dieplayer(function(player, reason)
 	-- Preserve the death location for an eventual evil-ghost insertion.
 	pl.last_death_pos = vector.round(pos)
 
-	-- Phase-based transition
+	-- Phase-based transition. Single-life design: the first death sends a
+	-- player straight to the cloud cage (owner directive 2026-08: multiple
+	-- lives are against the game design).
 	if pl.phase == "alive" then
-		pl.lives = math.max(0, pl.lives - 1)
-		if pl.lives <= 0 then
-			pl.phase = "ghost"
-			player:set_armor_groups({immortal = 1})
-			game_mode.broadcast(S("@1 has fallen and returned as a Ghost!", name))
-		else
-			minetest.chat_send_player(name,
-				S("You have @1 lives remaining.", tostring(pl.lives)))
-		end
+		pl.phase = "ghost"
+		player:set_armor_groups({immortal = 1})
+		game_mode.broadcast(S("@1 has fallen and returned as a Ghost!", name))
 	elseif pl.phase == "ghost" then
 		-- Contained ghosts are immortal and should not be damage-transitioned.
 		player:set_armor_groups({immortal = 1})

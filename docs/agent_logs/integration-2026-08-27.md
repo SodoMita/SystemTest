@@ -45,3 +45,28 @@ restriction is gone. Smoke test runs under `luajit` too.
 - Stub suite: 77/77 (new assertions: focus tool, reusability, 2-hit
   exorcism, whisper, cooldown penalty).
 - Live soak + history surgery results: see commit messages / owner report.
+
+## Single-life conversion (owner directive, later same day)
+
+Owner: "Having multiple lives is against game design, so remove that."
+
+Removed the lives system entirely (not merely set to 1):
+- sl_modebase: LIVES_PER_PLAYER constant, settings.lives, player-state
+  field, on_dieplayer multi-life branch (first death now -> cloud cage),
+  results-screen lives column, /sl_state lives line, /sl_assign lives
+  reset, terminal "Initial Lives" field, HUD lives pips (line 2 now shows
+  only the phase state), sl_gui player-info lives line, beacon-destruction
+  and rejoin-demotion lives writes.
+- aaa_botmatch: lives config/setting passthrough, lives_used stats
+  (deaths counters remain); turbo lethality retuned for single-life
+  pacing (combat_damage 5, attack_interval 1.0 s, beacon_hp 50) — matches
+  land in the 6-12 s band and ghost-economy windows survive.
+- soak driver: --lives flag removed; b_timer regime now wins draws with a
+  4 s clock against the single-life wipeout.
+- Docs: MATCH_LOOP_SPEC (single-life rule recorded in Ghost cloud cage +
+  checklist/scenario lines), ROADMAP, BRIEF GDD.
+
+Verified: luajit sweep clean; stub suite 83/83 (lua5.1 + luajit; phase 5
+rewritten to single-death semantics, 2 lives assertions removed); live
+turbo 10/10 PASS with all nine event types present (possessions 9,
+sabotages 9, exorcisms 2, revivals 18).

@@ -26,7 +26,6 @@ local function handle_beacon_destruction(team_id, pos, attacker_name)
 
 	for _, player in ipairs(to_kill) do
 		local pl = game_mode.get_player_state(player:get_player_name())
-		pl.lives = 0
 		pl.phase = "ghost"
 		player:set_hp(0)
 	end

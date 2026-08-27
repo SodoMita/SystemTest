@@ -4,7 +4,7 @@
 -- Loaded by init.lua only when sl_botmatch.mob_mode = true.
 --
 -- A mob player = the same logical FakePlayerRef every bot uses (so all
--- game rules — teams, lives, phases, rituals, chat seal — apply
+-- game rules — teams, phases, rituals, chat seal — apply
 -- identically) PLUS a physical entity body:
 --   * identical visual identity to real players (same boxman model and
 --     texture — matches the game's identity-ambiguity design),

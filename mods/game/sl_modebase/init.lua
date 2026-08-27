@@ -11,7 +11,7 @@ game_mode.S = S
 game_mode.modpath = modpath
 
 -- Core configurable constants
-game_mode.LIVES_PER_PLAYER = game_mode.LIVES_PER_PLAYER or 5
+-- (Single-life design: no lives system. First death -> cloud cage.)
 
 -- Helper to include local files, like ctf_core.include_files
 local function include_files(...)

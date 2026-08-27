@@ -101,7 +101,6 @@ def make_world(world: Path, args) -> Path:
                 f"sl_botmatch.matches = {args.matches}",
                 f"sl_botmatch.seed = {args.seed}",
                 f"sl_botmatch.match_duration = {args.match_duration}",
-                f"sl_botmatch.lives = {args.lives}",
                 f"sl_botmatch.disconnect_test = {'true' if not args.no_disconnect else 'false'}",
                 f"sl_botmatch.turbo = {'true' if args.turbo else 'false'}",
                 f"sl_botmatch.mob_mode = {'true' if (args.mob or args.game_autostart) else 'false'}",
@@ -165,7 +164,7 @@ def print_report(report: dict) -> None:
                   f"hp_end={t.get('hp_end', '?')}")
         for name, b in sorted((m.get("bots") or {}).items()):
             print(f"   {name}: team={b.get('team')} K/D={b.get('kills', 0)}/{b.get('deaths', 0)} "
-                  f"lives_used={b.get('lives_used', 0)} final={b.get('final_phase')}"
+                  f"final={b.get('final_phase')}"
                   f"{' EVIL' if b.get('revived_evil') else ''}")
 
     bugs = stats.get("bugs", [])
@@ -187,7 +186,6 @@ def main() -> int:
     ap.add_argument("--bots", type=int, default=4)
     ap.add_argument("--seed", type=int, default=1337)
     ap.add_argument("--match-duration", type=int, default=90)
-    ap.add_argument("--lives", type=int, default=3)
     ap.add_argument("--no-disconnect", action="store_true",
                     help="skip the disconnect/reconnect scenario")
     ap.add_argument("--turbo", action="store_true",

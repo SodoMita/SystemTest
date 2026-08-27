@@ -25,7 +25,6 @@ function game_mode.spawn_player(player)
 			-- Beacon destroyed while this player was disconnected: the team
 			-- is out, so the returning player enters the cloud cage instead
 			-- of crashing on a nil spawn (found by the turbo soak sweep).
-			pl.lives = 0
 			pl.phase = "ghost"
 			pos = table.copy(state.ghost_spawn)
 		end
@@ -193,7 +192,7 @@ minetest.register_on_joinplayer(function(player)
 end)
 
 minetest.register_on_leaveplayer(function(player)
-	-- nothing special yet; state is kept so reconnecting keeps team/lives
+	-- nothing special yet; state is kept so reconnecting keeps team/phase
 end)
 
 minetest.register_on_respawnplayer(function(player)

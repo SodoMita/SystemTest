@@ -26,7 +26,7 @@ local state = {
 	ghost_spawn = { x = 0, y = 100, z = 0 },
 	lobby_spawn = { x = 0, y = 10, z = 0 },
 
-	players = {}, -- [name] = { team=..., lives=..., eliminated=bool, role=..., phase=... }
+	players = {}, -- [name] = { team=..., eliminated=bool, role=..., phase=... }
 
 	match_active = false,
 	match_count = 0,
@@ -57,7 +57,6 @@ local state = {
 
 	-- Match Settings
 	settings = {
-		lives = 5,
 		beacon_hp = 100,
 		mm_auto_assign = true,
 		match_duration = 600,   -- seconds; 0 disables the match timer
@@ -116,7 +115,6 @@ function game_mode.get_player_state(name)
 	if not pl then
 		pl = {
 			team = nil,
-			lives = game_mode.LIVES_PER_PLAYER,
 			eliminated = false,
 			role = nil,
 			phase = "alive", -- alive, ghost (cloud cage), evil_ghost, monster, master_monster

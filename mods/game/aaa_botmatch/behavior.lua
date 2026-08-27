@@ -295,7 +295,7 @@ function botmatch.behave_alive(bot, pl, dt)
 		end
 	end
 
-	-- 1.5) Engage nearby enemy players. Mutual attrition drains lives,
+	-- 1.5) Engage nearby enemy players. Mutual attrition sends players
 	-- creating the ghost / altar / revival / sabotage windows this soak
 	-- exists to exercise.
 	local enemy = botmatch.find_enemy_target(bot, pl)

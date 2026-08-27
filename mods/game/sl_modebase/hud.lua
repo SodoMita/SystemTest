@@ -4,7 +4,7 @@ local state = game_mode.state
 -- ================================================================
 -- Persistent match HUD (Phase A.3)
 -- Identity-neutral by design: it displays match phase, clock, the
--- player's own lives/phase, and public beacon integrity only.
+-- the player's own phase, and public beacon integrity only.
 -- It never renders team names, team colors, or other players'
 -- private state, so it cannot leak hidden identity.
 -- ================================================================
@@ -83,13 +83,10 @@ local function update_hud(player)
 	end
 	player:hud_change(h.status, "text", status)
 
-	-- Line 2: own lives + own phase (private, role-local)
+	-- Line 2: own phase (private, role-local; single-life design)
 	local vitals = ""
-	if state.match_active then
-		vitals = S("LIVES @1", string.rep("|", math.max(0, pl.lives or 0)))
-		if pl.phase ~= "alive" then
-			vitals = vitals .. "  [" .. string.upper(tostring(pl.phase):gsub("_", " ")) .. "]"
-		end
+	if state.match_active and pl.phase ~= "alive" then
+		vitals = "[" .. string.upper(tostring(pl.phase):gsub("_", " ")) .. "]"
 	end
 	player:hud_change(h.vitals, "text", vitals)
 

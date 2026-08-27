@@ -43,9 +43,9 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
   corrosion damage; sabotaged interactables refuse use; living players repair
   by punching; everything is purged on match end/restart.
 - Match timer + result screen (formspec scoreboard + chat log) + clean reset:
-  phases, lives, points, inventories, sabotages, and ghost privileges are all
+  phases, points, inventories, sabotages, and ghost privileges are all
   normalized before the next match.
-- Identity-neutral HUD: phase, clock, own lives, public beacon integrity.
+- Identity-neutral HUD: phase, clock, own phase state, public beacon integrity.
   No team names, colors, or other players' private state.
 
 Still open (Phase A remainder):
@@ -117,7 +117,7 @@ SPAWN AT BEACON
   -> SCAVENGE / MOVE
   -> READ THE OTHER PLAYERS
   -> DEFEND OR PRESSURE THE OPPOSING BEACON
-  -> SURVIVE LIVES / DEATH TRANSITIONS
+  -> SURVIVE / SINGLE DEATH -> CLOUD CAGE
   -> ELIMINATION OR OBJECTIVE RESOLUTION
   -> RESULTS
 ```
@@ -136,6 +136,10 @@ Crafting is not a prerequisite for this milestone. The match must already be fun
 - UI must never silently leak team or role information that the visual design intentionally hides.
 
 ## Ghost cloud cage
+
+**Single-life rule (owner directive, 2026-08):** there is no lives system.
+The first death sends a player straight to the cloud cage; the
+multiple-lives mechanic was removed as contrary to the game design.
 
 A player who reaches the ghost phase is transferred to a **cloud cage far above the map**.
 
@@ -200,7 +204,7 @@ The first match should be tested with:
 - Hand-placed pickups.
 - Existing weapons/tools.
 - Beacon damage and defense.
-- Lives and death transitions.
+- Single-life death transitions (first death -> cloud cage).
 - Ghost cloud cage.
 - Optional evil-ghost revival.
 - Match end and clean reset.
@@ -297,7 +301,7 @@ The harness should support deterministic scenarios:
 
 1. Two teams spawn and complete a match.
 2. A beacon is damaged and destroyed.
-3. A player loses lives and enters the cloud cage.
+3. A player dies (single life) and enters the cloud cage.
 4. A ghost remains unable to affect teams.
 5. An alive player summons a ghost for information.
 6. A ghost revives as an evil ghost.

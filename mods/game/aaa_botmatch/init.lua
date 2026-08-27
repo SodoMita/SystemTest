@@ -42,7 +42,6 @@ botmatch.config = {
 	matches = tonumber(minetest.settings:get("sl_botmatch.matches") or "3") or 3,
 	seed = tonumber(minetest.settings:get("sl_botmatch.seed") or "20260827") or 20260827,
 	match_duration = tonumber(minetest.settings:get("sl_botmatch.match_duration") or "120") or 120,
-	lives = tonumber(minetest.settings:get("sl_botmatch.lives") or "3") or 3,
 	bot_speed = tonumber(minetest.settings:get("sl_botmatch.bot_speed") or "4") or 4,
 	attack_interval = tonumber(minetest.settings:get("sl_botmatch.attack_interval") or "2.5") or 2.5,
 	inter_match_delay = tonumber(minetest.settings:get("sl_botmatch.inter_match_delay") or "4") or 4,
@@ -68,8 +67,10 @@ if botmatch.config.turbo then
 	local s = minetest.settings
 	local function overridden(key) return s:get("sl_botmatch." .. key) ~= nil end
 	if not overridden("beacon_spacing") then botmatch.config.beacon_spacing = 4 end
-	if not overridden("attack_interval") then botmatch.config.attack_interval = 0.5 end
-	if not overridden("combat_damage") then botmatch.config.combat_damage = 10 end
+	-- Single-life pacing: softer hits + sturdier beacons keep matches in
+	-- the 6-12 s band so the ghost economy still gets its windows.
+	if not overridden("attack_interval") then botmatch.config.attack_interval = 1.0 end
+	if not overridden("combat_damage") then botmatch.config.combat_damage = 5 end
 	if not overridden("respawn_delay") then botmatch.config.respawn_delay = 0.5 end
 	if not overridden("inter_match_delay") then botmatch.config.inter_match_delay = 1 end
 	-- Shorter possession window keeps the exorcism counterplay relevant
@@ -258,7 +259,6 @@ function botmatch.record_death(name)
 	local m = botmatch.current
 	if not m or not m.bots[name] then return end
 	m.bots[name].deaths = m.bots[name].deaths + 1
-	m.bots[name].lives_used = m.bots[name].lives_used + 1
 end
 
 function botmatch.record_event(key, amount)
@@ -358,7 +358,6 @@ function botmatch.start_run()
 	if not (botmatch.config.mob_mode and not botmatch.config.auto_start) then
 		state.settings.auto_start = false
 	end
-	state.settings.lives = botmatch.config.lives
 	state.settings.match_duration = botmatch.config.match_duration
 	state.settings.mm_auto_assign = false -- deterministic roster
 	state.win_conditions.elimination = true
@@ -367,7 +366,7 @@ function botmatch.start_run()
 		-- matches resolve in seconds.
 		local s = minetest.settings
 		if s:get("sl_botmatch.countdown") == nil then state.settings.countdown = 1 end
-		if s:get("sl_botmatch.beacon_hp") == nil then state.settings.beacon_hp = 20 end
+		if s:get("sl_botmatch.beacon_hp") == nil then state.settings.beacon_hp = 50 end
 		if s:get("sl_botmatch.possession_duration") == nil then
 			state.settings.possession_duration = botmatch.config.turbo_possession_duration or 12
 		end
@@ -435,7 +434,7 @@ function botmatch.open_match_record()
 	for _, name in ipairs(botmatch.bot_order) do
 		local pl = game_mode.get_player_state(name)
 		bots_stats[name] = {
-			team = pl.team or "?", kills = 0, deaths = 0, lives_used = 0,
+			team = pl.team or "?", kills = 0, deaths = 0,
 			revived_evil = false, final_phase = "?",
 		}
 	end
@@ -533,7 +532,6 @@ local function compute_aggregate()
 		win_rate = { beacon_a = 0, beacon_b = 0, draw = 0, beacons = 0 },
 		avg_duration_s = 0,
 		kills_total = 0, deaths_total = 0,
-		lives_used_total = 0,
 		avg_beacon_damage_taken = 0,
 		events = { ghost_summons = 0, offers = 0, revivals = 0, sabotages = 0,
 			repairs = 0, possessions = 0, exorcisms = 0,
@@ -551,7 +549,6 @@ local function compute_aggregate()
 		for _, bs in pairs(m.bots) do
 			agg.kills_total = agg.kills_total + bs.kills
 			agg.deaths_total = agg.deaths_total + bs.deaths
-			agg.lives_used_total = agg.lives_used_total + bs.lives_used
 		end
 	end
 	for k in pairs(agg.win_rate) do

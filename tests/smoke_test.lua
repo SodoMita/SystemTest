@@ -6,7 +6,7 @@
 --   * ghost chat + chat COMMAND seal (msg/w/tell guarded)
 --   * cloud cage materialization
 --   * ready check -> countdown -> insertion
---   * lives -> ghost cloud-cage transition
+--   * single death -> ghost cloud-cage transition
 --   * ghost altar ritual + information offer
 --   * evil-ghost revival (point loss, targetable, bounded sabotage)
 --   * sabotage corrosion, interaction refusal, punch repair
@@ -110,13 +110,10 @@ check(beta:get_pos().x == state.teams.beacon_b.spawn.x, "beta inserted at beacon
 check(state.players.alpha.phase == "alive" and state.players.beta.phase == "alive",
 	"both players alive at insertion")
 
-section("PHASE 5 — lives drain into cloud-cage ghost state")
-for i = 1, 5 do
-	alpha:set_hp(0)
-	H.respawn(alpha)
-end
-check(state.players.alpha.lives == 0, "alpha lives drained to 0")
-check(state.players.alpha.phase == "ghost", "alpha transitioned to ghost")
+section("PHASE 5 — single death sends the player to the cloud cage")
+alpha:set_hp(0)
+H.respawn(alpha)
+check(state.players.alpha.phase == "ghost", "first (and only) death transitioned alpha to ghost")
 check(alpha:get_pos().y == state.ghost_spawn.y, "ghost held in cloud cage altitude")
 check(H.player_privs.alpha.fly == true, "cage ghost has flight")
 check(alpha:get_properties().selectionbox[1] == 0, "contained ghost is untargetable")
@@ -250,7 +247,6 @@ local ok2, msg2 = minetest.registered_chatcommands.sl_match_start.func("alpha", 
 check(ok2 == true, "'now' bypass restarts immediately" .. (ok2 and "" or (" -> " .. tostring(msg2))))
 check(state.match_active == true, "new match active")
 check(state.players.alpha.phase == "alive", "evil-ghost state reset to alive")
-check(state.players.alpha.lives == (state.settings.lives or 5), "lives refilled")
 check(state.players.alpha.points == 0, "points reset")
 check(not state.ready_check.active, "no stale ready check")
 check(alpha:get_pos().y == state.teams.beacon_a.spawn.y, "respawned at team spawn")

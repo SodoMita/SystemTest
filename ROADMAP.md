@@ -21,7 +21,7 @@ and clean match reset. Crafting is a later system layered onto this stable loop.
 ## Current state (verified from the code)
 
 ### Works / present
-- `sl_modebase` — beacon teams (`beacon_a`/`beacon_b`), per-player lives, elimination,
+- `sl_modebase` — beacon teams (`beacon_a`/`beacon_b`), single-life death transitions, elimination,
   monster master role, `/sl_*` chat commands, beacon nodes that set team spawns.
 - `sl_gui/crafting_system.lua` — a **complete button-based crafting UI** (categories,
   search, ingredient check/consume). This is the crafting engine to build on.
@@ -57,7 +57,7 @@ and clean match reset. Crafting is a later system layered onto this stable loop.
 
 1. Build and commit one small hand-made arena with two beacons, a lobby, a Monster Master area, a cloud cage, routes, cover, and hand-placed pickups.
 2. Add ready check, minimum player/team validation, countdown, insertion, match timer, results, and clean reset.
-3. Add a persistent HUD for match phase, lives, beacon health, role-local information, and objective status without leaking hidden team identity.
+3. Add a persistent HUD for match phase, own phase state, beacon health, role-local information, and objective status without leaking hidden team identity.
 4. Validate identical-player social play: no nametags, no team chat, direct messages, and no accidental team/role indicators.
 5. Implement the cloud-cage ghost state: high-altitude containment, no team interaction, no ghost chat, no direct map influence.
 6. Add deliberate living-player summoning as the only ghost-to-living information channel.
@@ -122,7 +122,7 @@ match ends correctly and announces the winner.
 1. **Build a small hand-made test map** (singlenode arena with two bases + loot points).
    Ship it as a saved map or a one-command builder, since there's no mapgen.
 2. **Match lifecycle UX:** clear "how to start" (commands exist: `/sl_be_monster_master`,
-   match start). Add an on-screen HUD for team, lives, objective progress.
+   match start). Add an on-screen HUD for phase state, objective progress.
 3. **Convert menu audio to `.ogg`**, name it `menu_music.ogg`; add `menu/header.png` +
    background so the game looks intentional in the menu.
 4. **Playtest checklist:** join → assigned team → spawn at beacon → craft loop → win/lose →

@@ -32,7 +32,6 @@ function game_mode.set_monster_master(name)
 	local pl = game_mode.get_player_state(name)
 	pl.role = "monster_master"
 	pl.team = nil
-	pl.lives = game_mode.LIVES_PER_PLAYER
 	pl.eliminated = false
 
 	local player = minetest.get_player_by_name(name)
@@ -71,7 +70,6 @@ minetest.register_chatcommand("sl_state", {
 			table.insert(parts, S("Team: None"))
 		end
 
-		table.insert(parts, S("Lives: @1", tostring(pl.lives)))
 		table.insert(parts, S("Phase: @1", tostring(pl.phase)))
 		table.insert(parts, S("Points: @1", tostring(pl.points or 0)))
 		if pl.eliminated then
@@ -272,7 +270,6 @@ minetest.register_chatcommand("sl_assign", {
 		elseif role == "beacon_a" or role == "beacon_b" then
 			pl.team = role
 			pl.role = nil
-			pl.lives = game_mode.LIVES_PER_PLAYER
 			pl.eliminated = false
 
 			local player = minetest.get_player_by_name(target_name)

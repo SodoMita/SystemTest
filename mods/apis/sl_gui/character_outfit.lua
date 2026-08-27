@@ -149,7 +149,6 @@ local function build_player_info(player)
         end
 
         if pl then
-            table.insert(lines, string.format("Lives: %d", pl.lives or 0))
             table.insert(lines, pl.eliminated and "Status: ELIMINATED" or "Status: Active")
         end
 

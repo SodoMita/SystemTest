@@ -48,13 +48,10 @@ local function get_matchmaking_formspec(player_name)
 	table.insert(fs, "box[5.0,1.5;4.5,3.4;#1a1a1aff]")
 	table.insert(fs, "label[5.2,1.8;Match Settings:]")
 	
-	local sett = state.settings or { lives = 5, beacon_hp = 100, mm_auto_assign = true }
+	local sett = state.settings or { beacon_hp = 100, mm_auto_assign = true }
 	
-	table.insert(fs, "label[5.2,2.3;Initial Lives:]")
-	table.insert(fs, string.format("field[7.5,2.1;1.5,0.6;sett_lives;;%d]", sett.lives))
-	
-	table.insert(fs, "label[5.2,2.9;Beacon HP:]")
-	table.insert(fs, string.format("field[7.5,2.7;1.5,0.6;sett_beacon_hp;;%d]", sett.beacon_hp))
+	table.insert(fs, "label[5.2,2.3;Beacon HP:]")
+	table.insert(fs, string.format("field[7.5,2.1;1.5,0.6;sett_beacon_hp;;%d]", sett.beacon_hp))
 	
 	table.insert(fs, string.format("checkbox[5.2,3.3;sett_mm_auto;MM Auto-Assign;%s]", tostring(sett.mm_auto_assign)))
 	table.insert(fs, string.format("checkbox[5.2,3.7;sett_auto_start;Auto-Start Matches;%s]", tostring(sett.auto_start)))
@@ -128,7 +125,6 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	elseif fields.cond_objective then
 		state.win_conditions.objective = (fields.cond_objective == "true")
 	elseif fields.save_settings then
-		state.settings.lives = tonumber(fields.sett_lives) or 5
 		state.settings.beacon_hp = tonumber(fields.sett_beacon_hp) or 100
 		state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
 		state.settings.auto_start = (fields.sett_auto_start == "true")

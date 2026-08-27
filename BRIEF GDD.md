@@ -8,7 +8,7 @@ A competitive survival game inside a hostile cybernetic simulation. Teams fight 
 - Players enter a shared lobby and complete a ready check.
 - Players are assigned to beacon teams; one player may become the Monster Master.
 - The match takes place on a hand-built arena using the `singlenode` mapgen.
-- Players scavenge, move, defend, attack, and manage limited lives.
+- Players scavenge, move, defend, and attack. Single life: the first death sends a player to the cloud cage.
 - Initial match gameplay uses fixed equipment and hand-placed pickups.
 - Crafting is a later system, not a requirement for the first playable loop.
 - Win conditions may include elimination and, later, objective delivery, defense, and point modes.
