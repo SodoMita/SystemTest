@@ -17,3 +17,19 @@ This asset pass was generated procedurally for prototype use.  It fills missing 
 ## Notes
 
 These are intentionally lightweight placeholders: suitable for loading the game and testing gameplay loops, not final production art. Replace files in place as final assets become available.
+
+## Sound pass (2026-08-27)
+
+All 106 `.ogg` files in the game are now generated procedurally by
+`generate_sound_assets.py` — no third-party default audio remains. The set covers
+`mods/default/sounds` (footsteps, digs, dug/place, glass, tools, chests, lava,
+furnace, smoke, player damage), `mods/content/sl_mvp_assets/sounds`,
+`mods/content/sl_scary/sounds`, `mods/content/dark_skybox/sounds`,
+`mods/apis/sl_gui/sounds`, and `menu/`.
+
+Encoding targets small download size: mono, 22.05 kHz for one-shots and 16 kHz for
+long beds, Vorbis at a low quality target, peak-normalised with anti-click fades and
+seamless cross-faded loops for ambience/music. Whole set is ~800 KiB (~7.6 KiB avg,
+down from ~3.4 MB). Regenerate deterministically with:
+
+    python3 generate_sound_assets.py
