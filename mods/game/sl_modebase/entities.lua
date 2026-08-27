@@ -14,6 +14,100 @@ local state = game_mode.state
 local MONSTER_NAME = modname .. ":monster"
 game_mode.MONSTER_NAME = MONSTER_NAME
 
+-- ================================================================
+-- Monster variant catalog
+-- ================================================================
+-- The Monster Spawner unit exposes exactly this catalog through its
+-- GUI list. Entries without an `entity` field are variants of the
+-- shared monster below (re-stats/re-skin at spawn time); entries
+-- with an `entity` field deploy that entity as-is (the sl_scary
+-- horror mobs manage their own stats and AI). The /sl_mm_spawn
+-- command deploys the same creatures via game_mode.spawn_monster.
+-- ================================================================
+game_mode.MONSTER_TYPES = {
+	stalker = {
+		label = "Stalker",
+		texture = "monster_texture.png",
+		hp = 30,
+		speed = 2.5,
+		damage = 4,
+		size = { x = 1, y = 1 },
+	},
+	scout = {
+		label = "Scout",
+		texture = "monster_texture.png^[colorize:#33ffcc:100",
+		hp = 15,
+		speed = 3.8,
+		damage = 3,
+		size = { x = 0.7, y = 0.7 },
+	},
+	brute = {
+		label = "Brute",
+		texture = "monster_texture.png^[colorize:#ff5522:120",
+		hp = 60,
+		speed = 1.6,
+		damage = 8,
+		size = { x = 1.4, y = 1.4 },
+	},
+	-- sl_scary horror mobs (deployed as their own entities)
+	dredger = {
+		label = "Dredger",
+		entity = "sl_scary:dredger",
+		hp = 40,
+		speed = 3.0,
+		damage = 4,
+	},
+	wraith = {
+		label = "Signal Wraith",
+		entity = "sl_scary:signal_wraith",
+		hp = 20,
+		speed = 2.5,
+		damage = 3,
+	},
+	containment = {
+		label = "Containment Horror",
+		entity = "sl_scary:containment",
+		hp = 80,
+		speed = 1.0,
+		damage = 10,
+	},
+}
+
+game_mode.MONSTER_TYPE_ORDER = { "stalker", "scout", "brute", "dredger", "wraith", "containment" }
+
+-- Spawn one monster of the given variant at pos, owned by owner_name.
+-- Unknown variants fall back to "stalker". Returns the object or nil.
+function game_mode.spawn_monster(pos, variant, owner_name)
+	variant = variant or "stalker"
+	local def = game_mode.MONSTER_TYPES[variant] or game_mode.MONSTER_TYPES.stalker
+	local entity_name = def.entity or MONSTER_NAME
+	local obj = minetest.add_entity(pos, entity_name)
+	if not obj then return nil end
+
+	-- Shared-mode variants get re-stats/re-skin per instance; external
+	-- entities (sl_scary mobs) run their own stats and animation.
+	if not def.entity and obj.set_properties then
+		local scale = def.size.x
+		obj:set_properties({
+			hp_max = def.hp,
+			hp = def.hp,
+			textures = { def.texture },
+			visual_size = { x = def.size.x, y = def.size.y },
+			collisionbox = { -0.4 * scale, 0.0, -0.4 * scale, 0.4 * scale, 1.8 * scale, 0.4 * scale },
+		})
+	end
+	local lua = obj:get_luaentity()
+	if lua then
+		lua.monster_variant = variant
+		if not def.entity then
+			lua.move_speed = def.speed
+			lua.attack_damage = def.damage
+		end
+		lua.monster_owner = owner_name
+	end
+	return obj
+end
+
 minetest.register_entity(MONSTER_NAME, {
 	initial_properties = {
 		hp_max = 30,
@@ -110,15 +204,15 @@ minetest.register_entity(MONSTER_NAME, {
 				local dist = vector.distance(pos, tpos)
 				local dir = vector.normalize(vector.subtract(tpos, pos))
 				
-				-- Add slight jitter to movement
-				local jitter = {x=(math.random()-0.5)*0.5, y=0, z=(math.random()-0.5)*0.5}
-				local move_dir = vector.add(dir, jitter)
-				
-				self.object:set_velocity({
-					x = move_dir.x * 2.5,
-					y = move_dir.y * 2.5,
-					z = move_dir.z * 2.5,
-				})
+			-- Add slight jitter to movement
+			local jitter = {x=(math.random()-0.5)*0.5, y=0, z=(math.random()-0.5)*0.5}
+			local move_dir = vector.add(dir, jitter)
+			local move_speed = self.move_speed or 2.5
+			self.object:set_velocity({
+				x = move_dir.x * move_speed,
+				y = move_dir.y * move_speed,
+				z = move_dir.z * move_speed,
+			})
 				self.object:set_rotation(vector.dir_to_rotation(dir))
 
 				-- Attack logic
@@ -129,7 +223,7 @@ minetest.register_entity(MONSTER_NAME, {
 						if p then
 							p:punch(self.object, 1.0, {
 								full_punch_interval = 1.0,
-								damage_groups = { fleshy = 4 },
+								damage_groups = { fleshy = self.attack_damage or 4 },
 							}, nil)
 						end
 					else

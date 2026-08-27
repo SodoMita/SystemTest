@@ -717,3 +717,704 @@ minetest.register_node("sl_scary:hide_spot", {
 
 -- minetest.register_entity("sl_scary:codop", {
 
+
+-- ============================================================
+-- NEW MOBS (high-tech horror, agency-first design)
+-- ============================================================
+-- Principles from EVENT IDEAS.md:
+--   "No random surrealism. Everything has a cause."
+--   "Lore is archaeology. Players dig up what went wrong."
+--   "Responsibility is horror. The scariest thing is 'I caused this.'"
+-- ============================================================
+
+-- Sprite strip frame layout (144×16, 9 frames of 16×16):
+--   Frames 0-2  (x: 0-48):   idle   (3 frames, ~2 fps loop)
+--   Frames 3-5  (x: 48-96):  walk   (3 frames, ~4 fps loop)
+--   Frames 6-7  (x: 96-128): attack (2 frames, ~6 fps loop)
+--   Frame 8     (x: 128-144): death  (1 frame, no loop)
+
+local sprite_animations = {
+    idle   = {x = 0,   y = 48},
+    walk   = {x = 48,  y = 96},
+    attack = {x = 96,  y = 128},
+    death  = {x = 128, y = 144},
+}
+local sprite_fps = {
+    idle = 2,
+    walk = 4,
+    attack = 6,
+    death = 6,
+}
+
+-- Helper: find a player within a cubic range (matches existing codebase API)
+local function find_player_in_range(pos, range)
+    local players = minetest.get_connected_players()
+    for _, player in ipairs(players) do
+        if player and player:is_player() then
+            local ppos = player:get_pos()
+            if ppos and vector.distance(pos, ppos) <= range then
+                return player
+            end
+        end
+    end
+    return nil
+end
+
+-- Helper: find nearest player (returns player + distance)
+local function find_nearest_player(pos, range)
+    local players = minetest.get_connected_players()
+    local nearest = nil
+    local nearest_dist = range
+    for _, player in ipairs(players) do
+        if player and player:is_player() then
+            local ppos = player:get_pos()
+            if ppos then
+                local d = vector.distance(pos, ppos)
+                if d <= nearest_dist then
+                    nearest = player
+                    nearest_dist = d
+                end
+            end
+        end
+    end
+    return nearest, nearest_dist
+end
+
+-- Helper: set animation state on a sprite entity (changes frames if state changed)
+local function set_sprite_anim(self, state)
+    if self.last_anim_state == state then return end
+    self.last_anim_state = state
+    local anim = sprite_animations[state]
+    local fps = sprite_fps[state]
+    if anim then
+        self.object:set_animation(anim, fps, state ~= "death" and -1 or 0)
+    end
+end
+
+-- ---------------------------------------------------------
+-- DREDGER  (sl_scary:dredger)
+-- "Used to be Maintenance Tech Kowalski."
+-- Patrols its old route. Stops to "fix" nearby interactable
+-- nodes. Attacks when you interrupt the routine.
+-- ---------------------------------------------------------
+
+minetest.register_entity("sl_scary:dredger", {
+    initial_properties = {
+        physical = true,
+        collide_with_objects = true,
+        collisionbox = {-0.4, -0.5, -0.4, 0.4, 0.5, 0.4},
+        visual = "sprite",
+        textures = {"sl_scary_dredger_strip.png"},
+        visual_size = {x=1.8, y=1.8, z=1.8},
+        static_save = false,
+        glow = 4,
+        pointable = true,
+        hp_max = 40,
+        makes_footstep_sound = false,
+        automatic_rotate = false,
+        automatic_face_movement_dir = false,
+    },
+
+    -- Configuration
+    patrol_radius = 20,
+    patrol_speed = 1.2,
+    chase_speed = 3.0,
+    detection_range = 12,
+    attack_range = 1.2,
+    attack_damage = 4,
+    attack_cooldown = 1.5,
+    distraction_chance = 0.35,
+    interactable_nodes = {
+        "sl_scary:hide_spot",
+        "group:terminal",
+        "group:machine",
+    },
+
+    -- State
+    state = "patrol",
+    anim_state = "idle",
+    patrol_target = nil,
+    patrol_origin = nil,
+    target_player = nil,
+    timer = 0,
+    attack_timer = 0,
+    idle_timer = 0,
+    was_patrolling_pos = nil,
+
+    on_activate = function(self, staticdata, dtime_s)
+        self.state = "patrol"
+        local pos = self.object:get_pos()
+        if pos then
+            self.patrol_origin = {x = pos.x, y = pos.y, z = pos.z}
+        end
+        self:select_patrol_target()
+        set_sprite_anim(self, "idle")
+    end,
+
+    select_patrol_target = function(self)
+        local origin = self.patrol_origin or self.object:get_pos()
+        if not origin then return end
+        local angle = math.random() * math.pi * 2
+        local dist = math.random(5, self.patrol_radius)
+        self.patrol_target = {
+            x = origin.x + math.cos(angle) * dist,
+            y = origin.y,
+            z = origin.z + math.sin(angle) * dist,
+        }
+    end,
+
+    find_nearby_interactable = function(self, pos)
+        local nodes = minetest.find_nodes_in_area(
+            vector.subtract(pos, 4),
+            vector.add(pos, 4),
+            self.interactable_nodes
+        )
+        if nodes and #nodes > 0 then
+            return nodes[math.random(1, #nodes)]
+        end
+        return nil
+    end,
+
+    move_toward = function(self, target_pos, speed, dtime)
+        local pos = self.object:get_pos()
+        if not pos or not target_pos then return false end
+        local dir = vector.subtract(target_pos, pos)
+        dir.y = 0
+        local dist = vector.length(dir)
+        if dist < 0.3 then return true end
+        dir = vector.normalize(dir)
+        local step = math.min(speed * dtime, dist)
+        local new_pos = vector.add(pos, vector.multiply(dir, step))
+        new_pos.y = pos.y
+        self.object:set_pos(new_pos)
+        -- Rotate to face movement direction
+        local yaw = math.atan2(dir.z, dir.x) - math.pi / 2
+        self.object:set_yaw(yaw)
+        return false
+    end,
+
+    do_attack = function(self, player, dtime)
+        self.attack_timer = self.attack_timer - dtime
+        if self.attack_timer > 0 then return end
+        local pos = self.object:get_pos()
+        local player_pos = player:get_pos()
+        if not pos or not player_pos then return end
+        local dist = vector.distance(pos, player_pos)
+        if dist > self.attack_range then return end
+        local hp = player:get_hp()
+        if hp then
+            player:set_hp(hp - self.attack_damage)
+            minetest.sound_play("scary_attack", {pos = pos, gain = 0.7, max_hear_distance = 16})
+        end
+        self.attack_timer = self.attack_cooldown
+    end,
+
+    on_step = function(self, dtime)
+        self.timer = self.timer + dtime
+        self.attack_timer = self.attack_timer - dtime
+        local pos = self.object:get_pos()
+        if not pos then return end
+
+        if self.state == "patrol" then
+            set_sprite_anim(self, "idle")
+            local arrived = self:move_toward(self.patrol_target, self.patrol_speed, dtime)
+            -- Distraction check: pause to "fix" nearby interactable
+            if self.timer > 2.0 then
+                self.timer = 0
+                local interactable = self:find_nearby_interactable(pos)
+                if interactable and math.random() < self.distraction_chance then
+                    self.state = "working"
+                    self.idle_timer = 2.0 + math.random() * 3.0
+                    self.work_target = interactable
+                    return
+                end
+            end
+            if arrived then
+                self.idle_timer = 1.0 + math.random() * 2.0
+                self.state = "idle"
+                self:select_patrol_target()
+            end
+            -- Player detection
+            local player = find_player_in_range(pos, self.detection_range)
+            if player then
+                self.state = "chase"
+                self.target_player = player
+                self.was_patrolling_pos = self.patrol_target
+            end
+
+        elseif self.state == "idle" then
+            set_sprite_anim(self, "idle")
+            self.idle_timer = self.idle_timer - dtime
+            if self.idle_timer <= 0 then
+                self.state = "patrol"
+            end
+
+        elseif self.state == "working" then
+            set_sprite_anim(self, "idle")
+            self.idle_timer = self.idle_timer - dtime
+            if self.idle_timer <= 0 then
+                self.state = "patrol"
+                self.work_target = nil
+            end
+            -- If player gets close while working, aggro (interrupted routine)
+            local player = find_player_in_range(pos, 3)
+            if player then
+                self.state = "chase"
+                self.target_player = player
+                self.work_target = nil
+            end
+
+        elseif self.state == "chase" then
+            set_sprite_anim(self, "walk")
+            if not self.target_player or not self.target_player:is_player() then
+                self.state = "patrol"
+                self.target_player = nil
+                if self.was_patrolling_pos then
+                    self.patrol_target = self.was_patrolling_pos
+                end
+                return
+            end
+            local player_pos = self.target_player:get_pos()
+            local dist = player_pos and vector.distance(pos, player_pos) or 999
+            -- Lose target if too far
+            if dist > self.detection_range * 2 then
+                self.state = "patrol"
+                self.target_player = nil
+                if self.was_patrolling_pos then
+                    self.patrol_target = self.was_patrolling_pos
+                end
+                return
+            end
+            -- Attack or chase
+            if dist <= self.attack_range then
+                set_sprite_anim(self, "attack")
+                self:do_attack(self.target_player, dtime)
+            else
+                self:move_toward(player_pos, self.chase_speed, dtime)
+            end
+        end
+    end,
+
+    on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
+        if hitter and hitter:is_player() then
+            self.state = "chase"
+            self.target_player = hitter
+        end
+    end,
+
+    on_death = function(self, killer)
+        set_sprite_anim(self, "death")
+        local pos = self.object:get_pos()
+        if pos then
+            minetest.add_item(pos, "sl_scary:dredger_badge")
+            minetest.sound_play("mob_death", {pos = pos, gain = 0.8, max_hear_distance = 16})
+        end
+    end,
+})
+
+minetest.register_craftitem("sl_scary:dredger_badge", {
+    description = "Dredger ID Badge — 'KOWALSKI, F. — Maintenance Tech'\n" ..
+                  "Overtime log: 96h continuous before incident.\n" ..
+                  "'Exposed to hydraulic fluid. Personality changes noted.'",
+    inventory_image = "sl_scary_dredger_strip.png^[resize:16x16",
+    stack_max = 1,
+})
+
+minetest.register_abm({
+    label = "Spawn Dredger",
+    nodenames = {"group:metal_floor", "default:steelblock"},
+    interval = 60,
+    chance = 80,
+    action = function(pos)
+        if minetest.settings:get_bool("creative_mode") then return end
+        if #minetest.get_connected_players() == 0 then return end
+        if mobpop >= maxmobpop then return end
+        minetest.add_entity(vector.add(pos, {x=0, y=1, z=0}), "sl_scary:dredger")
+    end,
+})
+
+-- ---------------------------------------------------------
+-- CONTAINMENT HORROR  (sl_scary:containment)
+-- "They sealed it in Section 12. The logs say noise is
+--  still reported inside the sealed section."
+-- Massive, slow, devastating. Dormant until you get close.
+-- Vulnerable after each attack (stun window).
+-- ---------------------------------------------------------
+
+minetest.register_entity("sl_scary:containment", {
+    initial_properties = {
+        physical = true,
+        collide_with_objects = true,
+        collisionbox = {-0.8, -1.0, -0.8, 0.8, 1.0, 0.8},
+        visual = "sprite",
+        textures = {"sl_scary_containment_strip.png"},
+        visual_size = {x=3.0, y=3.0, z=3.0},
+        static_save = false,
+        glow = 6,
+        pointable = true,
+        hp_max = 80,
+        makes_footstep_sound = true,
+        automatic_rotate = false,
+        automatic_face_movement_dir = false,
+    },
+
+    detection_range = 25,
+    chase_speed = 1.0,
+    attack_range = 2.0,
+    attack_damage = 10,
+    attack_cooldown = 3.0,
+    stun_after_attack = 2.5,
+
+    state = "dormant",
+    anim_state = "idle",
+    target_player = nil,
+    timer = 0,
+    attack_timer = 0,
+    stun_timer = 0,
+
+    on_activate = function(self, staticdata, dtime_s)
+        self.state = "dormant"
+        set_sprite_anim(self, "idle")
+    end,
+
+    on_step = function(self, dtime)
+        self.timer = self.timer + dtime
+        self.attack_timer = self.attack_timer - dtime
+        self.stun_timer = self.stun_timer - dtime
+        local pos = self.object:get_pos()
+        if not pos then return end
+
+        if self.state == "dormant" then
+            set_sprite_anim(self, "idle")
+            -- Wake only when player is very close (you chose to enter)
+            local player = find_player_in_range(pos, 5)
+            if player then
+                self.state = "chasing"
+                self.target_player = player
+                minetest.sound_play("scary_attack", {pos = pos, gain = 1.0, max_hear_distance = 32})
+            end
+
+        elseif self.state == "stunned" then
+            if self.stun_timer <= 0 then
+                self.state = "chasing"
+            end
+
+        elseif self.state == "chasing" then
+            if not self.target_player or not self.target_player:is_player() then
+                self.state = "dormant"
+                self.target_player = nil
+                return
+            end
+            local player_pos = self.target_player:get_pos()
+            if not player_pos then return end
+            local dist = vector.distance(pos, player_pos)
+            if dist > self.detection_range * 2 then
+                self.state = "dormant"
+                self.target_player = nil
+                return
+            end
+            if self.stun_timer > 0 then
+                set_sprite_anim(self, "idle")
+                return
+            end
+            if dist <= self.attack_range and self.attack_timer <= 0 then
+                set_sprite_anim(self, "attack")
+                local hp = self.target_player:get_hp()
+                if hp then
+                    self.target_player:set_hp(hp - self.attack_damage)
+                    minetest.sound_play("scary_attack", {pos = pos, gain = 1.0, max_hear_distance = 24})
+                end
+                self.attack_timer = self.attack_cooldown
+                self.stun_timer = self.stun_after_attack
+                return
+            end
+            set_sprite_anim(self, "walk")
+            local dir = vector.normalize(vector.subtract(player_pos, pos))
+            local new_pos = vector.add(pos, vector.multiply(dir, self.chase_speed * dtime))
+            self.object:set_pos(new_pos)
+            local yaw = math.atan2(dir.z, dir.x) - math.pi / 2
+            self.object:set_yaw(yaw)
+        end
+    end,
+
+    on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
+        if self.state == "dormant" then
+            self.state = "chasing"
+            if hitter and hitter:is_player() then
+                self.target_player = hitter
+            end
+        end
+    end,
+
+    on_death = function(self, killer)
+        set_sprite_anim(self, "death")
+        local pos = self.object:get_pos()
+        if pos then
+            minetest.add_item(pos, "sl_scary:containment_shard")
+            minetest.sound_play("mob_death", {pos = pos, gain = 1.0, max_hear_distance = 32})
+        end
+    end,
+})
+
+minetest.register_craftitem("sl_scary:containment_shard", {
+    description = "Containment Shard\n" ..
+                  "Bio-mechanical tissue fused with corroded plating.\n" ..
+                  "Security Log 0433: 'Noise reported inside Section 12. Sealed.'\n" ..
+                  "Security Log 0420: 'Sealed.'\n" ..
+                  "Security Log 0352: 'Section 12 sealed.'",
+    inventory_image = "sl_scary_containment_strip.png^[resize:16x16",
+    stack_max = 3,
+})
+
+minetest.register_abm({
+    label = "Spawn Containment Horror",
+    nodenames = {"group:containment_floor", "default:stone"},
+    interval = 180,
+    chance = 300,
+    action = function(pos)
+        if minetest.settings:get_bool("creative_mode") then return end
+        if #minetest.get_connected_players() == 0 then return end
+        if mobpop >= maxmobpop then return end
+        minetest.add_entity(vector.add(pos, {x=0, y=1, z=0}), "sl_scary:containment")
+    end,
+})
+
+-- ---------------------------------------------------------
+-- SIGNAL WRAITH  (sl_scary:signal_wraith)
+-- "Ghost data trapped in the signal processing layer."
+-- Non-physical (phases through walls). Glitch-teleports.
+-- Emits corrupted data fragments on hit/death.
+-- ---------------------------------------------------------
+
+minetest.register_entity("sl_scary:signal_wraith", {
+    initial_properties = {
+        physical = false,
+        collide_with_objects = false,
+        collisionbox = {-0.3, -0.6, -0.3, 0.3, 0.6, 0.3},
+        visual = "sprite",
+        textures = {"sl_scary_wraith_strip.png"},
+        visual_size = {x=2.0, y=2.0, z=2.0},
+        static_save = false,
+        glow = 8,
+        pointable = true,
+        hp_max = 20,
+        makes_footstep_sound = false,
+        automatic_rotate = false,
+        automatic_face_movement_dir = false,
+    },
+
+    detection_range = 16,
+    chase_speed = 2.5,
+    idle_speed = 0.8,
+    attack_range = 1.0,
+    attack_damage = 3,
+    attack_cooldown = 2.0,
+    glitch_timer = 0,
+    glitch_interval = 3.0,
+
+    state = "idle",
+    target_player = nil,
+    timer = 0,
+    attack_timer = 0,
+    drift_target = nil,
+
+    on_activate = function(self, staticdata, dtime_s)
+        self.state = "idle"
+        self.last_anim_state = nil
+        set_sprite_anim(self, "idle")
+        self:select_drift_target()
+    end,
+
+    select_drift_target = function(self)
+        local pos = self.object:get_pos()
+        if not pos then return end
+        local angle = math.random() * math.pi * 2
+        local dist = math.random(3, 8)
+        self.drift_target = {
+            x = pos.x + math.cos(angle) * dist,
+            y = pos.y + (math.random() - 0.5) * 2,
+            z = pos.z + math.sin(angle) * dist,
+        }
+    end,
+
+    on_step = function(self, dtime)
+        self.timer = self.timer + dtime
+        self.glitch_timer = self.glitch_timer - dtime
+        self.attack_timer = self.attack_timer - dtime
+        local pos = self.object:get_pos()
+        if not pos then return end
+
+        if self.state == "idle" then
+            set_sprite_anim(self, "idle")
+            if self.drift_target then
+                local dist = vector.distance(pos, self.drift_target)
+                if dist < 1.0 then
+                    self:select_drift_target()
+                else
+                    local dir = vector.normalize(vector.subtract(self.drift_target, pos))
+                    self.object:set_pos(vector.add(pos, vector.multiply(dir, self.idle_speed * dtime)))
+                end
+            end
+            -- Glitch teleport
+            if self.glitch_timer <= 0 then
+                self.glitch_timer = self.glitch_interval
+                local offset = {
+                    x = (math.random() - 0.5) * 6,
+                    y = (math.random() - 0.5) * 3,
+                    z = (math.random() - 0.5) * 6,
+                }
+                self.object:set_pos(vector.add(pos, offset))
+            end
+            -- Detect
+            local player = find_player_in_range(pos, self.detection_range)
+            if player then
+                self.state = "chase"
+                self.target_player = player
+            end
+
+        elseif self.state == "chase" then
+            if not self.target_player or not self.target_player:is_player() then
+                self.state = "idle"
+                self.target_player = nil
+                return
+            end
+            local player_pos = self.target_player:get_pos()
+            if not player_pos then return end
+            local dist = vector.distance(pos, player_pos)
+
+            if dist <= self.attack_range then
+                set_sprite_anim(self, "attack")
+                if self.attack_timer <= 0 then
+                    local hp = self.target_player:get_hp()
+                    if hp then
+                        self.target_player:set_hp(hp - self.attack_damage)
+                        -- Brief screen distortion (signal corruption)
+                        self.target_player:set_eye_offset(
+                            {x=(math.random()-0.5)*0.3, y=0, z=(math.random()-0.5)*0.3},
+                            {x=(math.random()-0.5)*0.3, y=0, z=(math.random()-0.5)*0.3}
+                        )
+                        local p = self.target_player
+                        minetest.after(0.3, function()
+                            if p and p:is_player() then
+                                p:set_eye_offset({x=0,y=0,z=0}, {x=0,y=0,z=0})
+                            end
+                        end)
+                    end
+                    self.attack_timer = self.attack_cooldown
+                end
+            else
+                set_sprite_anim(self, "walk")
+                local dir = vector.normalize(vector.subtract(player_pos, pos))
+                self.object:set_pos(vector.add(pos, vector.multiply(dir, self.chase_speed * dtime)))
+            end
+            -- Glitch during chase
+            if self.glitch_timer <= 0 and dist > 3 then
+                self.glitch_timer = self.glitch_interval
+                local offset = {
+                    x = (math.random() - 0.5) * 4,
+                    y = (math.random() - 0.5) * 2,
+                    z = (math.random() - 0.5) * 4,
+                }
+                self.object:set_pos(vector.add(pos, offset))
+            end
+            if dist > self.detection_range * 1.5 then
+                self.state = "idle"
+                self.target_player = nil
+            end
+        end
+    end,
+
+    on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
+        if math.random() < 0.5 then
+            local pos = self.object:get_pos()
+            if pos then
+                self.object:set_pos(vector.add(pos, {
+                    x=(math.random()-0.5)*8,
+                    y=(math.random()-0.5)*4,
+                    z=(math.random()-0.5)*8,
+                }))
+            end
+            local pos = self.object:get_pos()
+            if pos then
+                minetest.add_item(pos, "sl_scary:corrupted_data")
+            end
+        end
+    end,
+
+    on_death = function(self, killer)
+        set_sprite_anim(self, "death")
+        local pos = self.object:get_pos()
+        if pos then
+            minetest.add_item(pos, "sl_scary:corrupted_data")
+            minetest.add_item(pos, "sl_scary:corrupted_data")
+            minetest.sound_play("mob_death", {pos = pos, gain = 0.6, max_hear_distance = 12})
+        end
+    end,
+})
+
+minetest.register_craftitem("sl_scary:corrupted_data", {
+    description = "Corrupted Data Fragment\n" ..
+                  "\"...breach in sector...signal integrity compromised...\"\n" ..
+                  "Reliability: UNKNOWN",
+    inventory_image = "sl_scary_wraith_strip.png^[resize:16x16",
+    stack_max = 5,
+})
+
+minetest.register_abm({
+    label = "Spawn Signal Wraith",
+    nodenames = {"group:terminal", "default:mese_post_light", "group:beacon"},
+    interval = 90,
+    chance = 120,
+    action = function(pos)
+        if minetest.settings:get_bool("creative_mode") then return end
+        if #minetest.get_connected_players() == 0 then return end
+        if mobpop >= maxmobpop then return end
+        minetest.add_entity(vector.add(pos, {x=0, y=2, z=0}), "sl_scary:signal_wraith")
+    end,
+})
+
+-- ---------------------------------------------------------
+-- Dev commands (creative-only)
+-- ---------------------------------------------------------
+
+minetest.register_chatcommand("sl_spawn_dredger", {
+    description = "Spawn a Dredger at your position (creative only)",
+    privs = {creative = true},
+    func = function(name)
+        local player = minetest.get_player_by_name(name)
+        if not player then return end
+        local pos = player:get_pos()
+        if not pos then return end
+        pos.y = pos.y + 1
+        minetest.add_entity(pos, "sl_scary:dredger")
+        return true, "Dredger spawned."
+    end,
+})
+
+minetest.register_chatcommand("sl_spawn_wraith", {
+    description = "Spawn a Signal Wraith at your position (creative only)",
+    privs = {creative = true},
+    func = function(name)
+        local player = minetest.get_player_by_name(name)
+        if not player then return end
+        local pos = player:get_pos()
+        if not pos then return end
+        pos.y = pos.y + 2
+        minetest.add_entity(pos, "sl_scary:signal_wraith")
+        return true, "Signal Wraith spawned."
+    end,
+})
+
+minetest.register_chatcommand("sl_spawn_containment", {
+    description = "Spawn a Containment Horror at your position (creative only)",
+    privs = {creative = true},
+    func = function(name)
+        local player = minetest.get_player_by_name(name)
+        if not player then return end
+        local pos = player:get_pos()
+        if not pos then return end
+        pos.y = pos.y + 1
+        minetest.add_entity(pos, "sl_scary:containment")
+        return true, "Containment Horror spawned."
+    end,
+})

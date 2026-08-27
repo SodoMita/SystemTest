@@ -158,6 +158,9 @@ match ends correctly and announces the winner.
     - [ ] Add "Waiting for Players" HUD when match is not active.
 - [ ] Enhance Monster Master Role:
     - [ ] Add RTS-style unit deployment UI.
+    - [x] Monster Spawner Unit: placeable node, MM-only GUI creature list
+        (Stalker/Scout/Brute + sl_scary Dredger/Wraith/Containment),
+        burns one Monster Essence per spawn.
     - [ ] Implement income system based on damage dealt by monsters.
 - [ ] Lore Integration:
     - [ ] Add readable data pads/terminals with AI-generated horror logs.

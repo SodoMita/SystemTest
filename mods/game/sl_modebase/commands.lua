@@ -42,6 +42,10 @@ function game_mode.set_monster_master(name)
 		if not inv:contains_item("main", game_mode.modname .. ":summon_monster") then
 			inv:add_item("main", game_mode.modname .. ":summon_monster")
 		end
+		-- Gift a starter stack of Monster Essence (spawner fuel)
+		if game_mode.ESSENCE_ITEM and not inv:contains_item("main", game_mode.ESSENCE_ITEM) then
+			inv:add_item("main", game_mode.ESSENCE_ITEM .. " 10")
+		end
 	end
 end
 
@@ -141,6 +145,7 @@ minetest.register_chatcommand("sl_mm_spawn", {
 			return false, S("No position.")
 		end
 
+		local spawned = 0
 		for i = 1, count do
 			local offset = {
 				x = math.random(-3, 3),
@@ -148,16 +153,13 @@ minetest.register_chatcommand("sl_mm_spawn", {
 				z = math.random(-3, 3),
 			}
 			local spawn_pos = vector.add(pos, offset)
-			local obj = minetest.add_entity(spawn_pos, game_mode.MONSTER_NAME)
+			local obj = game_mode.spawn_monster(spawn_pos, "stalker", name)
 			if obj then
-				local lua = obj:get_luaentity()
-				if lua then
-					lua.monster_owner = name
-				end
+				spawned = spawned + 1
 			end
 		end
 
-		return true, S("Spawned @1 monster(s).", tostring(count))
+		return true, S("Spawned @1 monster(s).", tostring(spawned))
 	end,
 })
 

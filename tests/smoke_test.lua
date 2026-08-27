@@ -302,5 +302,144 @@ H.advance(6, 0.5)
 check(not state.match_active, "auto-start stays idle with fewer than 2 players")
 state.settings.auto_start = false
 
+section("PHASE 15 — monster spawner unit (MM-only GUI, essence-burning)")
+-- PHASE 14's roster gate left only alpha; restore the trio for these phases.
+H.new_player("beta")
+H.new_player("gamma")
+beta = H.players["beta"]
+gamma = H.players["gamma"]
+state.settings.match_duration = 0 -- keep the timer off; the phases advance the clock
+local spawner_pos = { x = 30, y = 12, z = 30 }
+minetest.set_node(spawner_pos, { name = "sl_modebase:monster_spawner" })
+local spawner_def = minetest.registered_nodes["sl_modebase:monster_spawner"]
+check(spawner_def ~= nil, "monster_spawner node registered")
+check(minetest.registered_craftitems["sl_modebase:monster_essence"] ~= nil,
+	"monster_essence resource registered")
+spawner_def.on_construct(spawner_pos)
+local spawner_meta = minetest.get_meta(spawner_pos)
+check(spawner_meta:get_inventory():get_size("feed") == 10, "spawner feed inventory sized (10)")
+check(spawner_meta:get_int("spawner_cd") == 5, "unit gets its own spawn-rate setting (default 5 s)")
+check(spawner_meta:get_int("spawner_min") == 1, "unit gets its own minimum-essence setting (default 1)")
+
+-- A living non-MM player is refused
+local fs_beta_before = #(H.formspecs.beta or {})
+spawner_def.on_rightclick(spawner_pos, minetest.get_node(spawner_pos), beta, ItemStack(""), nil)
+check(#(H.formspecs.beta or {}) == fs_beta_before, "non-MM click opens no GUI")
+local refused = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("Only the Monster Master") then refused = true end
+end
+check(refused, "non-MM clicker is refused with a message")
+
+-- MM assignment gifts the summoning tool plus starter Monster Essence
+gm.set_monster_master("beta")
+check(beta:get_inventory():contains_item("main", ItemStack("sl_modebase:summon_monster")),
+	"MM still receives the summoning tool")
+check(beta:get_inventory():contains_item("main", ItemStack("sl_modebase:monster_essence")),
+	"MM receives starter Monster Essence")
+
+-- MM click opens the GUI listing every creature in the catalog
+spawner_def.on_rightclick(spawner_pos, minetest.get_node(spawner_pos), beta, ItemStack(""), nil)
+local spawner_form
+for _, fs in ipairs(H.formspecs.beta or {}) do
+	if fs.formname:find("^sl_modebase:monster_spawner:") then spawner_form = fs.form end
+end
+check(spawner_form ~= nil, "MM click opens the spawner GUI")
+local all_listed = true
+for id in pairs(gm.MONSTER_TYPES) do
+	if spawner_form:find("spawn_" .. id) == nil then all_listed = false end
+end
+check(all_listed, "GUI lists every monster type (incl. sl_scary mobs)")
+
+-- Empty feed: selection is refused, nothing spawns
+local spawns_before = #H.entity_spawns
+spawner_meta:set_int("spawner_cd", 0) -- back-to-back spawns here; rate covered in 14b
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_brute = "" })
+check(#H.entity_spawns == spawns_before, "no spawn without essence")
+
+-- Load the feed, then pick a Brute from the list
+spawner_meta:get_inventory():add_item("feed", ItemStack("sl_modebase:monster_essence 3"))
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_brute = "" })
+check(#H.entity_spawns == spawns_before + 1, "Brute spawned from the GUI list")
+check(H.entity_spawns[#H.entity_spawns].name == "sl_modebase:monster",
+	"spawned entity is the shared monster")
+check(gm.count_feed_essence(spawner_meta:get_inventory()) == 2, "one essence consumed per spawn")
+check(spawner_meta:get_string("infotext"):find("feed: 2") ~= nil,
+	"infotext tracks the remaining feed")
+local produced = false
+for _, line in ipairs(H.chat_all) do
+	if line:find("Brute") then produced = true end
+end
+check(produced, "spawn broadcast names the creature")
+
+-- A sl_scary horror mob from the same list (external entity, own stats)
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_dredger = "" })
+check(#H.entity_spawns == spawns_before + 2, "Dredger spawned from the GUI list")
+check(H.entity_spawns[#H.entity_spawns].name == "sl_scary:dredger",
+	"mob entry deploys its own sl_scary entity")
+check(gm.count_feed_essence(spawner_meta:get_inventory()) == 1,
+	"mob spawn also burns one essence")
+
+-- A non-MM cannot drive the GUI
+H.fire_receive_fields("gamma", "sl_modebase:monster_spawner:30,12,30", { spawn_brute = "" })
+check(#H.entity_spawns == spawns_before + 2, "non-MM field input ignored")
+
+-- An unknown creature id is ignored
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_kraken = "" })
+check(#H.entity_spawns == spawns_before + 2, "unknown creature id ignored")
+
+-- The spawner is a possessable system (evil-ghost counterplay target)
+check(gm.is_possessable("sl_modebase:monster_spawner"),
+	"spawner registered as a possessable system")
+
+section("PHASE 15b — per-node spawner settings: minimal essence + spawn rate")
+-- feed currently holds 1 essence (3 added, brute + dredger consumed)
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30",
+	{ save_spawner_cfg = "", spawner_cd = "8", spawner_min = "2" })
+check(spawner_meta:get_int("spawner_cd") == 8, "spawn-rate saved to this unit's node")
+check(spawner_meta:get_int("spawner_min") == 2, "minimum essence saved to this unit's node")
+local cfg_msg = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("configured") then cfg_msg = true end
+end
+check(cfg_msg, "settings save confirms the new values")
+
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_brute = "" })
+check(#H.entity_spawns == spawns_before + 2, "spawn refused below the unit's minimum essence")
+local low_feed_msg = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("needs at least") then low_feed_msg = true end
+end
+check(low_feed_msg, "feed-too-low message explains the minimum")
+
+-- At the unit's minimum the spawner runs again (and now obeys its rate)
+spawner_meta:get_inventory():add_item("feed", ItemStack("sl_modebase:monster_essence 2"))
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_stalker = "" })
+check(#H.entity_spawns == spawns_before + 3, "spawn allowed at the unit's minimum essence")
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_stalker = "" })
+check(#H.entity_spawns == spawns_before + 3, "immediate second spawn refused by the unit's rate")
+local spool_msg = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("still spooling") then spool_msg = true end
+end
+check(spool_msg, "cooldown message tells the MM to wait")
+check(spawner_meta:get_inventory():get_stack("feed", 1):get_count() == 2,
+	"refused cooldown spawn does not burn essence")
+H.advance(9, 0.5)
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30", { spawn_stalker = "" })
+check(#H.entity_spawns == spawns_before + 4, "spawn allowed once the unit's rate has elapsed")
+
+-- Only the Monster Master may reconfigure a unit
+H.fire_receive_fields("gamma", "sl_modebase:monster_spawner:30,12,30",
+	{ save_spawner_cfg = "", spawner_cd = "0", spawner_min = "1" })
+check(spawner_meta:get_int("spawner_cd") == 8 and spawner_meta:get_int("spawner_min") == 2,
+	"non-MM cannot change a unit's settings")
+
+-- Reset the unit through the same GUI
+H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30",
+	{ save_spawner_cfg = "", spawner_cd = "5", spawner_min = "1" })
+check(spawner_meta:get_int("spawner_cd") == 5 and spawner_meta:get_int("spawner_min") == 1,
+	"settings persist per node and can be reset via the GUI")
+
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 os.exit(fail_count == 0 and 0 or 1)

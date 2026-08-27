@@ -102,6 +102,8 @@ modebase_icons = {
     "sl_sensor_array.png": ("Sensor", (0, 180, 220)),
     "sl_objective_core.png": ("Core", (0, 255, 100)),
     "sl_loot_crate.png": ("Loot", (80, 140, 80)),
+    "sl_monster_spawner.png": ("Spawner", (226, 88, 30)),
+    "sl_monster_essence.png": ("Essence", (170, 60, 230)),
 }
 for filename, (label, color) in modebase_icons.items():
     make_icon(modebase_tex / filename, label, color)
