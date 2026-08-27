@@ -1180,7 +1180,7 @@ minetest.register_abm({
 })
 
 -- ---------------------------------------------------------
--- SIGNAL WRAITH (kept as-is — single-frame sprite, already approved)
+-- SIGNAL WRAITH  (sl_scary:signal_wraith)
 -- "Ghost data trapped in the signal processing layer."
 -- Non-physical (phases through walls). Glitch-teleports.
 -- Emits corrupted data fragments on hit/death.
@@ -1192,13 +1192,15 @@ minetest.register_entity("sl_scary:signal_wraith", {
         collide_with_objects = false,
         collisionbox = {-0.3, -0.6, -0.3, 0.3, 0.6, 0.3},
         visual = "sprite",
-        textures = {"sl_scary_signal_wraith.png"},
+        textures = {"sl_scary_wraith_strip.png"},
         visual_size = {x=2.0, y=2.0, z=2.0},
         static_save = false,
         glow = 8,
         pointable = true,
         hp_max = 20,
         makes_footstep_sound = false,
+        automatic_rotate = false,
+        automatic_face_movement_dir = false,
     },
 
     detection_range = 16,
@@ -1218,6 +1220,8 @@ minetest.register_entity("sl_scary:signal_wraith", {
 
     on_activate = function(self, staticdata, dtime_s)
         self.state = "idle"
+        self.last_anim_state = nil
+        set_sprite_anim(self, "idle")
         self:select_drift_target()
     end,
 
@@ -1241,6 +1245,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
         if not pos then return end
 
         if self.state == "idle" then
+            set_sprite_anim(self, "idle")
             if self.drift_target then
                 local dist = vector.distance(pos, self.drift_target)
                 if dist < 1.0 then
@@ -1278,6 +1283,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
             local dist = vector.distance(pos, player_pos)
 
             if dist <= self.attack_range then
+                set_sprite_anim(self, "attack")
                 if self.attack_timer <= 0 then
                     local hp = self.target_player:get_hp()
                     if hp then
@@ -1297,6 +1303,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
                     self.attack_timer = self.attack_cooldown
                 end
             else
+                set_sprite_anim(self, "walk")
                 local dir = vector.normalize(vector.subtract(player_pos, pos))
                 self.object:set_pos(vector.add(pos, vector.multiply(dir, self.chase_speed * dtime)))
             end
@@ -1335,6 +1342,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
     end,
 
     on_death = function(self, killer)
+        set_sprite_anim(self, "death")
         local pos = self.object:get_pos()
         if pos then
             minetest.add_item(pos, "sl_scary:corrupted_data")
@@ -1348,7 +1356,7 @@ minetest.register_craftitem("sl_scary:corrupted_data", {
     description = "Corrupted Data Fragment\n" ..
                   "\"...breach in sector...signal integrity compromised...\"\n" ..
                   "Reliability: UNKNOWN",
-    inventory_image = "sl_scary_signal_wraith.png^[resize:16x16",
+    inventory_image = "sl_scary_wraith_strip.png^[resize:16x16",
     stack_max = 5,
 })
 
