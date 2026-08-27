@@ -102,6 +102,10 @@ A match must be completable by 2–4 human or AI players without administrator i
 - Players can choose a role only where the ruleset permits it.
 - A minimum player count and minimum viable team composition are required.
 - Countdown begins only after the roster is valid.
+- Optional auto-start (`sl_auto_start` / `/sl_autostart on`): with enough
+  players in the lobby, the countdown begins on its own after an
+  intermission — readiness is filled silently, nobody is prompted. The
+  explicit ready check (`/sl_match_start`) remains the admin option.
 - All inventories and temporary match state are reset on insertion.
 
 ### Active match

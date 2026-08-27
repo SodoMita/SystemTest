@@ -346,6 +346,27 @@ minetest.register_chatcommand("sl_match_stop", {
 	end,
 })
 
+minetest.register_chatcommand("sl_autostart", {
+	params = "<on|off|status>",
+	description = S("Auto-start matches when the lobby has enough players (no ready prompts)."),
+	privs = { sl_admin = true },
+	func = function(name, param)
+		local arg = (param or ""):match("^(%S+)") or "status"
+		if arg == "on" then
+			state.settings.auto_start = true
+			game_mode.broadcast(S("Auto-start ENABLED: matches begin automatically."))
+			return true
+		elseif arg == "off" then
+			state.settings.auto_start = false
+			game_mode.broadcast(S("Auto-start disabled: use /sl_match_start."))
+			return true
+		end
+		return true, S("Auto-start: @1 (delay @2 s)",
+			state.settings.auto_start and "ON" or "OFF",
+			tostring(state.settings.auto_start_delay or 8))
+	end,
+})
+
 minetest.register_chatcommand("sl_match_status", {
 	description = S("Show basic match status"),
 	func = function(name)

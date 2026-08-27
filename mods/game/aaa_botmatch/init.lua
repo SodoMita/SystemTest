@@ -312,6 +312,20 @@ function botmatch.hook_game_mode()
 		orig_damage(team_id, amount, attacker, silent)
 	end
 
+	-- Whoever starts the match (botmatch schedule, game auto-start, or an
+	-- admin command), the telemetry record opens at insertion.
+	local orig_start = gm.start_new_match
+	gm.start_new_match = function(initiator)
+		if not botmatch.current then botmatch.open_match_record() end
+		local ok, err = orig_start(initiator)
+		if ok then
+			botmatch.on_match_inserted()
+		else
+			botmatch.current = nil
+		end
+		return ok, err
+	end
+
 	if botmatch.config.mob_mode then
 		-- Admin-driven flow: when a human opens the ready check, every mob
 		-- marks itself ready so the countdown only waits for the admin.
@@ -339,6 +353,11 @@ function botmatch.start_run()
 	botmatch.hook_game_mode()
 
 	local state = game_mode.state
+	-- Botmatch owns match scheduling unless it is explicitly running in
+	-- game-driven mob mode (admin/auto_start drives, bots participate).
+	if not (botmatch.config.mob_mode and not botmatch.config.auto_start) then
+		state.settings.auto_start = false
+	end
 	state.settings.lives = botmatch.config.lives
 	state.settings.match_duration = botmatch.config.match_duration
 	state.settings.mm_auto_assign = false -- deterministic roster
@@ -406,15 +425,12 @@ function botmatch.external_punch(bot_name, attacker_name, damage)
 	end
 end
 
-function botmatch.next_match()
-	if botmatch.finished then return end
-	if botmatch.match_index >= botmatch.config.matches then
-		botmatch.finish_run()
-		return
-	end
+-- Opens the per-match telemetry record. Called from the start_new_match
+-- wrapper (below), so records open no matter WHO starts the match —
+-- botmatch scheduling, the game-side auto-start, or an admin command.
+function botmatch.open_match_record()
 	botmatch.match_index = botmatch.match_index + 1
 
-	-- Fresh per-match telemetry skeleton.
 	local bots_stats = {}
 	for _, name in ipairs(botmatch.bot_order) do
 		local pl = game_mode.get_player_state(name)
@@ -439,6 +455,14 @@ function botmatch.next_match()
 		},
 	}
 	botmatch.summon_in_progress = false
+end
+
+function botmatch.next_match()
+	if botmatch.finished then return end
+	if botmatch.match_index >= botmatch.config.matches then
+		botmatch.finish_run()
+		return
+	end
 
 	local ok, err = game_mode.begin_ready_check("botmatch")
 	if not ok then
@@ -450,8 +474,8 @@ function botmatch.next_match()
 	for _, name in ipairs(botmatch.connected) do
 		game_mode.mark_ready(name)
 	end
-	local countdown = game_mode.state.settings.countdown or 5
-	minetest.after(countdown + 1.5, botmatch.on_match_inserted)
+	-- Insertion itself runs from the countdown; the start_new_match
+	-- wrapper opens the record and fires on_match_inserted.
 end
 
 function botmatch.schedule_next()

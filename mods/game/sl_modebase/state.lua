@@ -65,6 +65,11 @@ local state = {
 		countdown = 5,          -- insertion countdown length in seconds
 		sabotage_duration = 30, -- seconds a sabotage charge corrupts its target
 		possession_duration = 20, -- seconds an evil ghost holds a vessel
+		-- Auto-start: matches begin on their own when the lobby has enough
+		-- players (no /sl_ready prompts). Admin flow stays available and
+		-- takes precedence. Initial values come from server settings.
+		auto_start = minetest.settings:get_bool("sl_auto_start"),
+		auto_start_delay = tonumber(minetest.settings:get("sl_auto_start_delay") or "8") or 8,
 	}
 }
 

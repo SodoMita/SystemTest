@@ -281,5 +281,30 @@ check(joined:find("CORE A") ~= nil and joined:find("CORE B") ~= nil,
 check(joined:find("Beacon A") == nil and joined:find("beacon_a") == nil,
 	"HUD leaks no team identifiers")
 
+section("PHASE 14 — game-side auto-start")
+gm.end_match(nil, "phase 14 setup")
+H.advance(1, 0.5)
+check(not state.match_active, "match ended for auto-start test")
+-- Control: with auto_start OFF nothing relaunches on its own.
+state.settings.auto_start = false
+H.advance(6, 0.5)
+check(not state.match_active, "no auto-start while the setting is OFF")
+-- Enabled: lobby intermission -> silent readiness -> countdown -> insertion.
+state.settings.auto_start = true
+state.settings.auto_start_delay = 1
+state.settings.countdown = 1
+state.settings.match_duration = 600 -- undo the phase-11 timer fixture
+H.advance(8, 0.5)
+check(state.match_active, "auto-start relaunched the match with no player input")
+check(not state.ready_check.active, "ready check consumed by insertion")
+-- Roster gate: a lone player must not trigger matches.
+gm.end_match(nil, "phase 14 roster gate")
+H.advance(1, 0.5)
+H.remove_player("beta")
+H.remove_player("gamma")
+H.advance(6, 0.5)
+check(not state.match_active, "auto-start stays idle with fewer than 2 players")
+state.settings.auto_start = false
+
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 os.exit(fail_count == 0 and 0 or 1)

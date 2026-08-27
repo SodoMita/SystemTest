@@ -8,3 +8,10 @@ zash_unittests_autostart (Perform unit tests) bool false
 
 # Adjust the volume of the background music
 zash_music_gain (Music gain) float 0.5 0.0 1.0
+
+# Automatically start matches when the lobby has enough players (no ready
+# prompts). The ready-check flow stays available via /sl_match_start.
+sl_auto_start (Auto-start matches) bool false
+
+# Lobby intermission in seconds before an auto-started match countdown.
+sl_auto_start_delay (Auto-start intermission) int 8 3 120

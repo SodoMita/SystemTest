@@ -340,7 +340,7 @@ function game_mode.begin_ready_check(initiator)
 	return true
 end
 
-function game_mode.mark_ready(name)
+function game_mode.mark_ready(name, silent)
 	if not state.ready_check.active then
 		return false, S("No ready check is active.")
 	end
@@ -356,8 +356,10 @@ function game_mode.mark_ready(name)
 			ready_count = ready_count + 1
 		end
 	end
-	game_mode.broadcast(S("@1 is ready. (@2/@3)",
-		name, tostring(ready_count), tostring(#connected)))
+	if not silent then
+		game_mode.broadcast(S("@1 is ready. (@2/@3)",
+			name, tostring(ready_count), tostring(#connected)))
+	end
 
 	if ready_count >= #connected then
 		state.ready_check.countdown_left = state.settings.countdown or 5
@@ -411,9 +413,54 @@ local function match_timer_step()
 	end
 end
 
+-- ================================================================
+-- Auto-start (sl_auto_start / /sl_autostart): with enough players in
+-- the lobby, a match begins on its own after an intermission. It
+-- reuses the ready-check countdown so players get the same warnings,
+-- but readiness is filled in silently — nobody types /sl_ready.
+-- Admin flows (/sl_match_start, /sl_match_start now) keep working and
+-- take precedence while a ready check or match is running.
+-- ================================================================
+local auto_start_accum = 0
+local function auto_start_step(dtime)
+	if not state.settings.auto_start then
+		auto_start_accum = 0
+		return
+	end
+	if state.match_active then
+		auto_start_accum = 0
+		return
+	end
+	if state.ready_check.active then
+		-- Fill readiness silently so the countdown proceeds.
+		for _, pname in ipairs(game_mode.get_connected_player_names()) do
+			if not state.ready_check.ready[pname] then
+				game_mode.mark_ready(pname, true)
+			end
+		end
+		return
+	end
+	if #game_mode.get_connected_player_names() < 2 then
+		auto_start_accum = 0
+		return
+	end
+	auto_start_accum = auto_start_accum + dtime
+	if auto_start_accum >= (state.settings.auto_start_delay or 8) then
+		auto_start_accum = 0
+		local ok = game_mode.begin_ready_check("auto-start")
+		if ok then
+			game_mode.broadcast(S("Auto-start: insertion follows the countdown."))
+			for _, pname in ipairs(game_mode.get_connected_player_names()) do
+				game_mode.mark_ready(pname, true)
+			end
+		end
+	end
+end
+
 minetest.register_globalstep(function(dtime)
 	ready_check_step(dtime)
 	match_timer_step()
+	auto_start_step(dtime)
 	if game_mode.sabotage_step then
 		game_mode.sabotage_step(dtime)
 	end

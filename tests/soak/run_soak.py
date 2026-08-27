@@ -104,8 +104,10 @@ def make_world(world: Path, args) -> Path:
                 f"sl_botmatch.lives = {args.lives}",
                 f"sl_botmatch.disconnect_test = {'true' if not args.no_disconnect else 'false'}",
                 f"sl_botmatch.turbo = {'true' if args.turbo else 'false'}",
-                f"sl_botmatch.mob_mode = {'true' if args.mob else 'false'}",
-                f"sl_botmatch.auto_start = {'true' if args.mob else 'false'}",
+                f"sl_botmatch.mob_mode = {'true' if (args.mob or args.game_autostart) else 'false'}",
+                f"sl_botmatch.auto_start = {'true' if (args.mob and not args.game_autostart) else 'false'}",
+                f"sl_auto_start = {'true' if args.game_autostart else 'false'}",
+                f"sl_auto_start_delay = {args.auto_start_delay}",
             ]
         )
         + "\n"
@@ -194,7 +196,13 @@ def main() -> int:
     ap.add_argument("--mob", action="store_true",
                     help="mob mode: bots get pathfinding entity bodies; "
                          "matches are admin-driven (for soak: still auto)")
+    ap.add_argument("--game-autostart", action="store_true",
+                    help="drive matches through the GAME-side auto-start "
+                         "(sl_auto_start) instead of botmatch scheduling; "
+                         "implies --mob, verifies the production path")
     ap.add_argument("--inter-match-delay", type=int, default=None)
+    ap.add_argument("--auto-start-delay", type=int, default=3,
+                    help="game-side auto-start intermission seconds")
     ap.add_argument("--timeout", type=int, default=600,
                     help="wall-clock seconds before the run is aborted")
     ap.add_argument("--engine", default=None, help="path to luanti/minetest binary")

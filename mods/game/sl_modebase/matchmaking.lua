@@ -57,8 +57,9 @@ local function get_matchmaking_formspec(player_name)
 	table.insert(fs, string.format("field[7.5,2.7;1.5,0.6;sett_beacon_hp;;%d]", sett.beacon_hp))
 	
 	table.insert(fs, string.format("checkbox[5.2,3.3;sett_mm_auto;MM Auto-Assign;%s]", tostring(sett.mm_auto_assign)))
+	table.insert(fs, string.format("checkbox[5.2,3.7;sett_auto_start;Auto-Start Matches;%s]", tostring(sett.auto_start)))
 	
-	table.insert(fs, "button[5.2,4.0;4,0.6;save_settings;Apply Settings]")
+	table.insert(fs, "button[5.2,4.3;4,0.6;save_settings;Apply Settings]")
 
 	-- Role Section
 	table.insert(fs, "box[0.5,5.1;9,1.5;#1a1a1aff]")
@@ -130,6 +131,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		state.settings.lives = tonumber(fields.sett_lives) or 5
 		state.settings.beacon_hp = tonumber(fields.sett_beacon_hp) or 100
 		state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
+		state.settings.auto_start = (fields.sett_auto_start == "true")
 		minetest.chat_send_player(name, S("Match settings updated."))
 	elseif fields.start_match then
 		-- Terminal launch goes through the ready check; creative-mode admins
