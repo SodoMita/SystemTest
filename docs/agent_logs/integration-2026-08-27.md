@@ -70,3 +70,24 @@ Verified: luajit sweep clean; stub suite 83/83 (lua5.1 + luajit; phase 5
 rewritten to single-death semantics, 2 lives assertions removed); live
 turbo 10/10 PASS with all nine event types present (possessions 9,
 sabotages 9, exorcisms 2, revivals 18).
+
+
+## Lobby safety: monsters stand down outside matches (owner directive)
+
+Owner: "Make monsters not attack at lobby stage."
+
+- Damage-path audit found 5 monster damage sites: the sl_modebase monster
+  punches through the pipeline (already lobby-guarded in match.lua), but
+  4 sl_scary sites used DIRECT set_hp, bypassing the guard — horror mobs
+  could genuinely kill players in the lobby.
+- Fix: attacks_allowed() chokepoint in sl_scary (match-state check, no-op
+  without game_mode) gating all 4 direct-damage sites, the nerobot punch,
+  the shared find_nearest_player acquisition, and per-mob target scans;
+  sl_modebase monster target picking and attack condition gated on
+  state.match_active (target dropped when the match ends).
+- Regression: smoke PHASE 16 (126/126 lua5.1+luajit) — lobby pipeline
+  cancel, dredger do_attack no-op in lobby, same attack lands in-match
+  (gate is match-state, not a kill-switch), guard re-arms after match end.
+  Fixture note: phase 15 leaves beta as Monster Master (team cleared) —
+  phase 16 releases the role before its roster check.
+- Verified: luajit sweep clean; live turbo soak 4/4 PASS.

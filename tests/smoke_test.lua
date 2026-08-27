@@ -446,5 +446,54 @@ H.fire_receive_fields("beta", "sl_modebase:monster_spawner:30,12,30",
 check(spawner_meta:get_int("spawner_cd") == 5 and spawner_meta:get_int("spawner_min") == 1,
 	"settings persist per node and can be reset via the GUI")
 
+section("PHASE 16 — lobby safety: monsters never attack outside matches")
+if state.match_active then
+	gm.end_match(nil, "phase 16 setup")
+	H.advance(1, 0.5)
+end
+check(not state.match_active, "lobby state established")
+
+-- (a) Damage pipeline guard: punches to players are cancelled in the lobby
+alpha._hp = 20
+alpha.dead = false
+local canceled_lobby = H.fire_punchplayer(alpha, beta, 1.0,
+	{ full_punch_interval = 1.0, damage_groups = { fleshy = 5 } }, nil, 5)
+check(canceled_lobby == true, "punch damage cancelled in lobby (pipeline guard)")
+
+-- (b) sl_scary direct-damage family: do_attack gated by match state
+local ok_scary = pcall(dofile, "mods/content/sl_scary/init.lua")
+check(ok_scary, "sl_scary loads under the stub harness")
+local dredger = minetest.registered_entities["sl_scary:dredger"]
+local dpos = alpha:get_pos()
+local fake_self = {
+	attack_timer = 0, attack_range = 3, attack_damage = 4, attack_cooldown = 0,
+	object = { get_pos = function() return { x = dpos.x, y = dpos.y, z = dpos.z } end },
+}
+dredger.do_attack(fake_self, alpha, 1)
+check(alpha:get_hp() == 20, "horror mob attack does nothing in the lobby")
+
+-- (c) The gate is match-state, not a kill-switch: same attack lands in-match
+-- Phase 15 assigned beta as Monster Master (which clears their team);
+-- release the role so both beacon teams have members again.
+gm.set_monster_master(nil)
+state.settings.countdown = 1
+gm.begin_ready_check("phase16")
+gm.mark_ready("alpha", true)
+gm.mark_ready("beta", true)
+gm.mark_ready("gamma", true)
+H.advance(4, 0.5)
+check(state.match_active, "match started for the in-match control")
+fake_self.attack_timer = 0
+alpha._hp = 20
+dredger.do_attack(fake_self, alpha, 1)
+check(alpha:get_hp() == 16, "horror mob attack lands during an active match (4 dmg)")
+
+-- (d) Pipeline guard re-arms after the match ends
+gm.end_match(nil, "phase 16 cleanup")
+H.advance(1, 0.5)
+local canceled_after = H.fire_punchplayer(alpha, beta, 1.0,
+	{ full_punch_interval = 1.0, damage_groups = { fleshy = 5 } }, nil, 5)
+check(canceled_after == true, "punch damage cancelled again after match end")
+
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 os.exit(fail_count == 0 and 0 or 1)

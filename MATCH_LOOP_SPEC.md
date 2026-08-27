@@ -102,6 +102,9 @@ A match must be completable by 2–4 human or AI players without administrator i
 - Players can choose a role only where the ruleset permits it.
 - A minimum player count and minimum viable team composition are required.
 - Countdown begins only after the roster is valid.
+- Monsters never target or attack during the lobby stage: all monster
+  acquisition and damage paths (sl_modebase monster, sl_scary horror mobs)
+  are gated on an active match, backstopped by the lobby punch guard.
 - Optional auto-start (`sl_auto_start` / `/sl_autostart on`): with enough
   players in the lobby, the countdown begins on its own after an
   intermission — readiness is filled silently, nobody is prompted. The
