@@ -7,11 +7,44 @@ paths — no stubs — while the harness harvests bugs and balance telemetry.
 ## Run
 
 ```bash
-python3 tests/soak/run_soak.py                 # 3 matches, seed 1337
-python3 tests/soak/run_soak.py --matches 10 --seed 7 --report balance.json
+python3 tests/soak/run_soak.py --turbo                  # ~5 s per match
+python3 tests/soak/run_soak.py                          # realistic clocks
+python3 tests/soak/run_soak.py --turbo --matches 10 --seed 7 --report bal.json
 ```
 
 Exit codes: `0` pass · `1` test failure · `2` environment error (no engine).
+
+### Turbo profile (`--turbo`)
+
+Bases are placed **next to each other** (`beacon_spacing = 4`), beacon HP
+drops to 20, swings land every 0.5 s, respawn takes 0.5 s, countdown is 1 s.
+Same code paths, compressed clocks: **matches resolve in ~5 s** (measured:
+4.4/5.4/6.1 s). Every individual setting still overrides the profile
+(`sl_botmatch.beacon_spacing`, `.attack_interval`, `.combat_damage`,
+`.respawn_delay`, `.countdown`, `.beacon_hp`).
+
+### Mob mode (`--mob`) — playtest with a human admin
+
+Bots get **physical entity bodies with engine pathfinding** (A* via
+`minetest.find_path`), the same player model/texture as real players,
+real collision and gravity while alive, flight while ghostly. They are
+punchable by the admin — damage routes through the same `on_punchplayer`
+handlers as any combat — and every rule (teams, lives, phases, chat seal,
+rituals, sabotage, possession) applies to them identically.
+
+- **With `--mob` in the driver** (`auto_start`): fully headless soak of the
+  mob mode itself.
+- **For manual playtesting**, enable in server config without auto_start:
+
+  ```
+  sl_botmatch.enabled = true
+  sl_botmatch.mob_mode = true
+  ```
+
+  Join as admin, then `/sl_match_start` — bots auto-mark ready, countdown,
+  insertion. You are the only human; bots fill both teams and play the full
+  loop around you. Punch a mob to fight it; it pathfinds, dies, ghosts,
+  revives, and sabotages exactly like a player would.
 
 Requirements: a Luanti/Minetest server binary (`luanti`, `minetest`,
 `--engine PATH`, or `$LUANTI_BIN`) and Python 3.8+.

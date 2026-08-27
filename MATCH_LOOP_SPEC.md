@@ -60,9 +60,21 @@ through full matches — insertion, PvP, deaths, cloud cage, altar ritual,
 information offers, evil-ghost revival, sabotage/repair, disconnect/
 reconnect, elimination and timer endings — harvesting every Lua error as a
 bug event and emitting per-match balance telemetry (win rates, side bias,
-K/D, beacon damage, event counters). Verified: 6 engine runs / 18 matches,
-final verdict PASS with zero bug events on Luanti 5.10. Multi-agent parallel
-workflow around this gate: `AGENT_PARALLEL_PLAN.md`.
+K/D, beacon damage, event counters). Two harness modes:
+
+- **Turbo profile** (`--turbo`): bases adjacent, tiny beacon HP, fast
+  swings — a match resolves in ~5 s (measured 4.4–6.1 s), so 40-match
+  sweeps finish in minutes instead of an hour.
+- **Mob mode** (`sl_botmatch.mob_mode`): bots are pathfinding entities
+  (A* `minetest.find_path`) with player-identical visuals, collision,
+  inventory, and rule treatment; punchable by a human admin whose damage
+  flows through the real `on_punchplayer` pipeline. Headless with
+  `auto_start`, or admin-driven for solo playtesting against a full
+  bot lobby (`/sl_match_start`, bots auto-ready).
+
+Verified on Luanti 5.10: turbo PASS 3/3 @ ~5.3 s avg, mob mode PASS 2/2 @
+~4.7 s avg, zero bug events. Multi-agent parallel workflow around this
+gate: `AGENT_PARALLEL_PLAN.md`.
 
 ## Core fantasy
 

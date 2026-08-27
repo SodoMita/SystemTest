@@ -171,7 +171,11 @@ end
 function PlayerRef:is_player() return true end
 function PlayerRef:get_player_name() return self._name end
 function PlayerRef:get_pos() return { x = self._pos.x, y = self._pos.y, z = self._pos.z } end
-function PlayerRef:set_pos(p) self._pos = { x = p.x, y = p.y, z = p.z } end
+function PlayerRef:set_pos(p)
+	self._pos = { x = p.x, y = p.y, z = p.z }
+	-- Mob mode: teleporting the logical player teleports the body too.
+	if self._pos_hook then self._pos_hook(self, self._pos) end
+end
 function PlayerRef:get_hp() return self._hp end
 function PlayerRef:set_hp(hp)
 	self._hp = hp

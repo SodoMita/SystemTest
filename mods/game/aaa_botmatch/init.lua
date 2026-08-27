@@ -42,9 +42,32 @@ botmatch.config = {
 	attack_interval = tonumber(minetest.settings:get("sl_botmatch.attack_interval") or "2.5") or 2.5,
 	inter_match_delay = tonumber(minetest.settings:get("sl_botmatch.inter_match_delay") or "4") or 4,
 	combat_damage = tonumber(minetest.settings:get("sl_botmatch.combat_damage") or "5") or 5,
+	respawn_delay = tonumber(minetest.settings:get("sl_botmatch.respawn_delay") or "2") or 2,
+	-- Turbo profile: bases placed next to each other, tiny beacon HP, fast
+	-- swings — a full match cycle completes in ~5 s. Same code paths,
+	-- compressed clocks. Individual settings above still override.
+	turbo = minetest.settings:get_bool("sl_botmatch.turbo"),
+	-- Mob mode: bots get physical entity bodies with engine pathfinding.
+	-- A real admin player can join; bots auto-ready and otherwise behave
+	-- exactly like players. Matches are admin-driven (/sl_match_start),
+	-- unless auto_start is set (headless soak of the mob mode itself).
+	mob_mode = minetest.settings:get_bool("sl_botmatch.mob_mode"),
+	auto_start = minetest.settings:get_bool("sl_botmatch.auto_start"),
+	beacon_spacing = tonumber(minetest.settings:get("sl_botmatch.beacon_spacing") or "24") or 24,
 	disconnect_test = minetest.settings:get_bool("sl_botmatch.disconnect_test")
 		or minetest.settings:get("sl_botmatch.disconnect_test") == nil,
 }
+
+-- Turbo overrides (explicit settings always win because they were read first).
+if botmatch.config.turbo then
+	local s = minetest.settings
+	local function overridden(key) return s:get("sl_botmatch." .. key) ~= nil end
+	if not overridden("beacon_spacing") then botmatch.config.beacon_spacing = 4 end
+	if not overridden("attack_interval") then botmatch.config.attack_interval = 0.5 end
+	if not overridden("combat_damage") then botmatch.config.combat_damage = 10 end
+	if not overridden("respawn_delay") then botmatch.config.respawn_delay = 0.5 end
+	if not overridden("inter_match_delay") then botmatch.config.inter_match_delay = 1 end
+end
 
 math.randomseed(botmatch.config.seed)
 
@@ -183,7 +206,7 @@ function botmatch.on_bot_lethal(bot)
 	botmatch.record_death(name)
 	botmatch.fire("dieplayer", bot, { type = "punch" })
 	-- Engine would show the respawn screen; simulate the delay.
-	minetest.after(2, function()
+	minetest.after(botmatch.config.respawn_delay or 2, function()
 		-- Purged/eliminated players stay out until the clean reset at
 		-- match end — respawning them would farm kills and skew stats.
 		local pl = game_mode.get_player_state(name)
@@ -280,6 +303,21 @@ function botmatch.hook_game_mode()
 		botmatch.record_beacon_damage(team_id, amount, attacker)
 		orig_damage(team_id, amount, attacker, silent)
 	end
+
+	if botmatch.config.mob_mode then
+		-- Admin-driven flow: when a human opens the ready check, every mob
+		-- marks itself ready so the countdown only waits for the admin.
+		local orig_begin = gm.begin_ready_check
+		gm.begin_ready_check = function(initiator)
+			local ok, err = orig_begin(initiator)
+			if ok then
+				for _, n in ipairs(botmatch.connected) do
+					gm.mark_ready(n)
+				end
+			end
+			return ok, err
+		end
+	end
 end
 
 -- ================================================================
@@ -297,13 +335,29 @@ function botmatch.start_run()
 	state.settings.match_duration = botmatch.config.match_duration
 	state.settings.mm_auto_assign = false -- deterministic roster
 	state.win_conditions.elimination = true
+	if botmatch.config.turbo then
+		-- Compressed clocks: 1 s countdown; tiny beacon HP so adjacent-base
+		-- matches resolve in seconds.
+		local s = minetest.settings
+		if s:get("sl_botmatch.countdown") == nil then state.settings.countdown = 1 end
+		if s:get("sl_botmatch.beacon_hp") == nil then state.settings.beacon_hp = 20 end
+	end
 
 	dofile(botmatch.modpath .. "/behavior.lua")
+	-- NOTE: mob_player.lua is included at LOAD time (bottom of this file):
+	-- minetest.register_entity requires the mod-load context for its
+	-- modname-prefix check, which a runtime dofile does not have.
 
 	botmatch.build_arena()
 	botmatch.spawn_bots()
 
-	minetest.after(1.5, botmatch.next_match)
+	if botmatch.config.mob_mode and not botmatch.config.auto_start then
+		-- Admin-driven: bots wait in the lobby until a human (or admin
+		-- command) opens the ready check; bots auto-mark ready.
+		minetest.log("action", "[botmatch] mob mode: bodies spawned; waiting for admin /sl_match_start")
+	else
+		minetest.after(1.5, botmatch.next_match)
+	end
 end
 
 function botmatch.spawn_bots()
@@ -314,9 +368,31 @@ function botmatch.spawn_bots()
 		botmatch.bots[names[i]] = bot
 		table.insert(botmatch.bot_order, names[i])
 		table.insert(botmatch.connected, names[i])
+		if botmatch.config.mob_mode and botmatch.spawn_mob_body then
+			botmatch.spawn_mob_body(names[i], bot)
+		end
 		botmatch.fire("joinplayer", bot)
 	end
-	minetest.log("action", "[botmatch] " .. #botmatch.bot_order .. " simulated players connected")
+	minetest.log("action", "[botmatch] " .. #botmatch.bot_order
+		.. (botmatch.config.mob_mode and " mob players embodied (pathfinding entities)"
+			or " simulated players connected"))
+end
+
+-- Bridge: a real player (admin) punches a mob body. Damage is routed
+-- through the same registered punchplayer handlers as any combat.
+function botmatch.external_punch(bot_name, attacker_name, damage)
+	local victim = botmatch.bots[bot_name]
+	if not victim or victim.dead then return end
+	local attacker = attacker_name and minetest.get_player_by_name(attacker_name) or nil
+	local dmg = damage or 5
+	local canceled = botmatch.fire("punchplayer", victim, attacker, 1.0,
+		{ full_punch_interval = 1.0, damage_groups = { fleshy = dmg } }, nil, dmg)
+	if not canceled then
+		victim:set_hp(victim:get_hp() - dmg)
+		if victim:get_hp() <= 0 and attacker_name then
+			botmatch.attribute_kill(attacker_name, bot_name)
+		end
+	end
 end
 
 function botmatch.next_match()
@@ -369,6 +445,11 @@ end
 
 function botmatch.schedule_next()
 	if botmatch.finished then return end
+	if botmatch.config.mob_mode and not botmatch.config.auto_start then
+		botmatch.write_stats()
+		minetest.log("action", "[botmatch] mob mode: match recorded; waiting for admin to start the next one")
+		return
+	end
 	if botmatch.match_index >= botmatch.config.matches then
 		minetest.after(1, botmatch.finish_run)
 	else
@@ -549,7 +630,14 @@ end)
 
 minetest.register_on_mods_loaded(function()
 	minetest.log("action", string.format(
-		"[botmatch] soak harness ONLINE: %d bots, %d matches, seed %d",
-		botmatch.config.bots, botmatch.config.matches, botmatch.config.seed))
+		"[botmatch] soak harness ONLINE: %d bots, %d matches, seed %d%s",
+		botmatch.config.bots, botmatch.config.matches, botmatch.config.seed,
+		botmatch.config.mob_mode and " [MOB MODE]" or ""))
 	minetest.after(1, botmatch.start_run)
 end)
+
+-- Load-time include: entity registration needs the mod-load context
+-- (get_current_modname) that a runtime dofile lacks.
+if botmatch.config.mob_mode then
+	dofile(botmatch.modpath .. "/mob_player.lua")
+end

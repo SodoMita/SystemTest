@@ -19,7 +19,13 @@ local function dist2d(a, b)
 end
 
 -- Move one tick toward target, ground-locked to the arena plane.
+-- Mob mode: sets the nav target; the entity body walks it with engine
+-- pathfinding and syncs its position back into the logical player.
 local function step_toward(bot, target, dt, speed_mult)
+	if botmatch.config.mob_mode then
+		bot.bm.nav_target = { x = target.x, y = target.y or bot:get_pos().y, z = target.z }
+		return false
+	end
 	local pos = bot:get_pos()
 	local dx, dz = target.x - pos.x, target.z - pos.z
 	local d = math.sqrt(dx * dx + dz * dz)
@@ -45,31 +51,42 @@ function botmatch.build_arena()
 	local gm = game_mode
 	local state = gm.state
 
-	-- Arena floor 31x31 at y = 0
-	for x = -15, 15 do
-		for z = -15, 15 do
+	-- Geometry scales with beacon spacing. Turbo (spacing ~4) puts the
+	-- bases next to each other so a match resolves in seconds; the default
+	-- 24 keeps a midfield for brawls.
+	local half = math.max(4, math.floor(botmatch.config.beacon_spacing / 2))
+	local bx = math.max(2, math.floor(botmatch.config.beacon_spacing / 2))
+	local floor_half = bx + 6
+
+	-- Arena floor at y = 0
+	for x = -floor_half, floor_half do
+		for z = -floor_half, floor_half do
 			minetest.set_node({ x = x, y = 0, z = z }, { name = "default:stone" })
 		end
 	end
 
-	-- Symmetric cover blocks (identical on both halves: no side advantage)
-	for _, c in ipairs({ { -6, -4 }, { -6, 4 }, { -9, 0 }, { 6, -4 }, { 6, 4 }, { 9, 0 } }) do
-		for y = 1, 2 do
-			minetest.set_node({ x = c[1], y = y, z = c[2] }, { name = "default:cobble" })
+	-- Symmetric cover blocks only when there is a midfield to hide in.
+	if bx >= 6 then
+		for _, c in ipairs({ { -6, -4 }, { -6, 4 }, { -9, 0 }, { 6, -4 }, { 6, 4 }, { 9, 0 } }) do
+			for y = 1, 2 do
+				minetest.set_node({ x = c[1], y = y, z = c[2] }, { name = "default:cobble" })
+			end
 		end
 	end
 
-	-- Beaacons: symmetric at x = -12 / +12. set_node does not run
+	-- Beacons: symmetric at x = -bx / +bx. set_node does not run
 	-- after_place_node, so spawn anchors are registered explicitly.
-	minetest.set_node({ x = -12, y = 1, z = 0 }, { name = "sl_modebase:beacon_a" })
-	minetest.set_node({ x = 12, y = 1, z = 0 }, { name = "sl_modebase:beacon_b" })
-	state.teams.beacon_a.spawn = { x = -12, y = 2, z = 0 }
-	state.teams.beacon_b.spawn = { x = 12, y = 2, z = 0 }
+	minetest.set_node({ x = -bx, y = 1, z = 0 }, { name = "sl_modebase:beacon_a" })
+	minetest.set_node({ x = bx, y = 1, z = 0 }, { name = "sl_modebase:beacon_b" })
+	state.teams.beacon_a.spawn = { x = -bx, y = 2, z = 0 }
+	state.teams.beacon_b.spawn = { x = bx, y = 2, z = 0 }
 	gm.save_spawns()
 
-	-- Ghost altar at midfield + one loot crate (sabotage target variety)
+	-- Ghost altar at midfield + one loot crate (sabotage/possession target)
 	minetest.set_node({ x = 0, y = 1, z = 0 }, { name = "sl_modebase:ghost_altar" })
-	minetest.set_node({ x = 5, y = 1, z = 5 }, { name = "sl_modebase:loot_crate" })
+	local cx = math.min(5, floor_half - 2)
+	minetest.set_node({ x = cx, y = 1, z = cx }, { name = "sl_modebase:loot_crate" })
+	botmatch.crate_pos = { x = cx, y = 1, z = cx }
 
 	-- Lobby platform under lobby_spawn
 	local l = state.lobby_spawn
@@ -234,8 +251,9 @@ function botmatch.behave_alive(bot, pl, dt)
 	-- 1.2) Ritual: a kit carrier heads for the altar unless in melee range
 	-- (moved ahead of general engagement; otherwise the midfield brawl
 	-- starves the altar path entirely).
+	local altar_chance = botmatch.config.turbo and 0.9 or 0.5
 	if bot.bm.kit and not bot.bm.runner and not botmatch.summon_in_progress
-			and math.random() < 0.5 then
+			and math.random() < altar_chance then
 		local altar_pos = { x = 0, y = 1, z = 0 }
 		local threatened = false
 		for _, other_name in ipairs(botmatch.bot_order) do
@@ -292,7 +310,9 @@ function botmatch.behave_alive(bot, pl, dt)
 		end
 	end
 	table.insert(counter_points, { x = 0, y = 1, z = 0 })   -- altar
-	table.insert(counter_points, { x = 5, y = 1, z = 5 })   -- loot crate
+	if botmatch.crate_pos then
+		table.insert(counter_points, botmatch.crate_pos)     -- loot crate
+	end
 	for _, cpos in ipairs(counter_points) do
 		if (game_mode.is_sabotaged(cpos) or game_mode.is_possessed(cpos))
 				and dist2d(pos, cpos) < 3 then
@@ -354,9 +374,11 @@ function botmatch.behave_ghost(bot, pl, dt)
 		botmatch.try_ghost_offer(bot, pl)
 	end
 
-	-- Voluntary revival after a bounded reflection period (~10 s as ghost).
+	-- Voluntary revival after a bounded reflection period (~10 s as ghost;
+	-- compressed under turbo so 5-second matches still exercise the path).
 	if pl.ghost_summoned_by == nil and bot.bm.revived_at == 0 then
-		bot.bm.revived_at = now + 10 + math.random(0, 8)
+		local base = botmatch.config.turbo and 3 or 10
+		bot.bm.revived_at = now + base + math.random(0, botmatch.config.turbo and 3 or 8)
 	end
 	if bot.bm.revived_at > 0 and now >= bot.bm.revived_at and bot.bm.revived_at ~= -1 then
 		bot.bm.revived_at = -1

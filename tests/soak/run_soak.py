@@ -85,7 +85,7 @@ def make_world(world: Path, args) -> Path:
         f"gameid = {GAME_ID}\nbackend = sqlite3\nmg_name = singlenode\n"
     )
     conf = world.parent / "soak.conf"
-    conf.write_text(
+    conf_text = (
         "\n".join(
             [
                 "creative_mode = false",
@@ -98,12 +98,17 @@ def make_world(world: Path, args) -> Path:
                 f"sl_botmatch.seed = {args.seed}",
                 f"sl_botmatch.match_duration = {args.match_duration}",
                 f"sl_botmatch.lives = {args.lives}",
-                f"sl_botmatch.inter_match_delay = {args.inter_match_delay}",
                 f"sl_botmatch.disconnect_test = {'true' if not args.no_disconnect else 'false'}",
+                f"sl_botmatch.turbo = {'true' if args.turbo else 'false'}",
+                f"sl_botmatch.mob_mode = {'true' if args.mob else 'false'}",
+                f"sl_botmatch.auto_start = {'true' if args.mob else 'false'}",
             ]
         )
         + "\n"
     )
+    if args.inter_match_delay is not None:
+        conf_text += f"sl_botmatch.inter_match_delay = {args.inter_match_delay}\n"
+    conf.write_text(conf_text)
     return conf
 
 
@@ -177,9 +182,15 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=1337)
     ap.add_argument("--match-duration", type=int, default=90)
     ap.add_argument("--lives", type=int, default=3)
-    ap.add_argument("--inter-match-delay", type=int, default=3)
     ap.add_argument("--no-disconnect", action="store_true",
                     help="skip the disconnect/reconnect scenario")
+    ap.add_argument("--turbo", action="store_true",
+                    help="turbo profile: adjacent bases, tiny beacon HP, fast "
+                         "swings — matches resolve in ~5 s")
+    ap.add_argument("--mob", action="store_true",
+                    help="mob mode: bots get pathfinding entity bodies; "
+                         "matches are admin-driven (for soak: still auto)")
+    ap.add_argument("--inter-match-delay", type=int, default=None)
     ap.add_argument("--timeout", type=int, default=600,
                     help="wall-clock seconds before the run is aborted")
     ap.add_argument("--engine", default=None, help="path to luanti/minetest binary")

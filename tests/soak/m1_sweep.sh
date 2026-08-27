@@ -18,14 +18,14 @@ run() { # label, extra args...
   echo "[sweep] $label exit=$? -> $OUT/$label.log"
 }
 
-# A: elimination-focused (low lives, long clock)
-run a_elim  --matches 10 --lives 3 --match-duration 240 --seed 101
-# B: timer-forced (high lives, short clock -> draws)
-run b_timer --matches 10 --lives 8 --match-duration 40  --seed 202
-# C: mixed standard regime
-run c_mixed --matches 10 --lives 4 --match-duration 150 --seed 303
+# A: elimination-focused (turbo: adjacent bases, matches resolve in seconds)
+run a_elim  --turbo --matches 10 --lives 2 --match-duration 60 --seed 101
+# B: timer-forced (huge lives, short clock -> draws)
+run b_timer --turbo --matches 10 --lives 50 --match-duration 8  --seed 202
+# C: mixed standard regime (turbo clocks, moderate lives)
+run c_mixed --turbo --matches 10 --lives 3 --match-duration 30 --seed 303
 # D: wide roster (6 bots, 3v3)
-run d_wide  --matches 10 --bots 6 --lives 3 --match-duration 120 --seed 404
+run d_wide  --turbo --matches 10 --bots 6 --lives 2 --match-duration 45 --seed 404
 
 python3 tests/soak/m1_summary.py "$OUT"
 echo "SWEEP_DONE rc=$?"
