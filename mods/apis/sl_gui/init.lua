@@ -22,7 +22,13 @@ dofile(modpath .. "/ability_system.lua")
 -- Running/Sprint system with Aux1 key 🏃
 dofile(modpath .. "/running_system.lua")
 
--- Unified inventory with tabs 📋
+-- WP5: System & Comms tabs — inventory GUI for majority of sl_ commands
+dofile(modpath .. "/system_tab.lua")
+
+-- WP5: Direct Message System + Secure Link UI (cybernetic comms)
+dofile(modpath .. "/dm_system.lua")
+
+-- Unified inventory with tabs 📋 (must load AFTER system_tab and dm_system)
 dofile(modpath .. "/unified_inventory.lua")
 
 -- Character outfit / appearance menu
@@ -31,4 +37,4 @@ dofile(modpath .. "/character_outfit.lua")
 -- Old broken GUI (disabled)
 -- dofile(modpath .. "/player_gui.lua")
 
-minetest.log("action", "[gui] Custom GUI systems loaded! ✨")
+minetest.log("action", "[gui] Custom GUI systems loaded! ✨ (5 tabs + secure link)")
