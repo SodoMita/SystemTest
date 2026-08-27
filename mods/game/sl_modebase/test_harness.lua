@@ -12,18 +12,25 @@ local function creative_only(name)
 end
 
 local function node(name)
-	return minetest.registered_nodes[name] and name or "default:stone"
+	if minetest.registered_nodes[name] then
+		return name
+	end
+	if minetest.registered_nodes["ground:square_neon"] then
+		return "ground:square_neon"
+	end
+	return name
 end
 
 function game_mode.build_test_arena(origin)
 	origin = origin or {x = 0, y = 0, z = 0}
-	local floor = node("default:stone")
-	local wall = node("default:obsidian")
+	local floor = node("ground:square_neon")
+	local wall = node("ground:square_neon_opaque")
 	local beacon_a = modname .. ":beacon_a"
 	local beacon_b = modname .. ":beacon_b"
 	local altar = modname .. ":ghost_altar"
+	local spawn_mm = modname .. ":spawn_mm"
 
-	-- Compact 41 x 21 test arena: floor, perimeter, two base pads, center altar.
+	-- Compact 41 x 21 neon arena: glasslike floor, opaque perimeter, MM pad.
 	for x = -20, 20 do
 		for z = -10, 10 do
 			minetest.set_node({x=origin.x+x, y=origin.y, z=origin.z+z}, {name=floor})
@@ -41,11 +48,24 @@ function game_mode.build_test_arena(origin)
 			end
 		end
 	end
+	-- Monster master base at +Z of the arena.
+	for x = -3, 3 do
+		for z = 12, 18 do
+			minetest.set_node({x=origin.x+x, y=origin.y, z=origin.z+z}, {name=floor})
+			if x == -3 or x == 3 or z == 12 or z == 18 then
+				for y = 1, 4 do
+					minetest.set_node({x=origin.x+x, y=origin.y+y, z=origin.z+z}, {name=wall})
+				end
+			end
+		end
+	end
+	minetest.set_node({x=origin.x, y=origin.y+1, z=origin.z+15}, {name=spawn_mm})
 	minetest.set_node({x=origin.x-12, y=origin.y+2, z=origin.z}, {name=beacon_a})
 	minetest.set_node({x=origin.x+12, y=origin.y+2, z=origin.z}, {name=beacon_b})
 	minetest.set_node({x=origin.x, y=origin.y+1, z=origin.z}, {name=altar})
 	state.teams.beacon_a.spawn = {x=origin.x-12, y=origin.y+3, z=origin.z}
 	state.teams.beacon_b.spawn = {x=origin.x+12, y=origin.y+3, z=origin.z}
+	state.monster_master.base_spawn = {x=origin.x, y=origin.y+2, z=origin.z+15}
 	state.ghost_spawn = {x=origin.x, y=origin.y+40, z=origin.z}
 	state.lobby_spawn = {x=origin.x, y=origin.y+5, z=origin.z}
 	game_mode.save_spawns()

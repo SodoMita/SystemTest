@@ -15,3 +15,10 @@ sl_auto_start (Auto-start matches) bool false
 
 # Lobby intermission in seconds before an auto-started match countdown.
 sl_auto_start_delay (Auto-start intermission) int 8 3 120
+
+# Edge length of each hollow underground cube (walls + interior).
+# The surface plane stays at y = 0; cubes tile below it.
+sl_cube_size (Underground cube size) int 8 4 32
+
+# How many monsters to spawn inside each generated cube.
+sl_cube_monsters (Monsters per cube) int 1 0 8
