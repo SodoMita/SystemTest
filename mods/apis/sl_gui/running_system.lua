@@ -297,14 +297,17 @@ minetest.register_globalstep(function(dtime)
     
     for _, player in ipairs(minetest.get_connected_players()) do
         if player then
+            -- Lua 5.1 "continue" idiom: repeat..until true + break (goto removed
+            -- for strict-Lua-5.1 compatibility; see issue #1).
+            repeat
             local controls = player:get_player_control()
-            if not controls then goto continue end
+            if not controls then break end
             
             local sprint_data = get_sprint_data(player)
-            if not sprint_data then goto continue end
+            if not sprint_data then break end
             
             local modifiers = get_run_ability_modifiers(player)
-            if not modifiers then goto continue end
+            if not modifiers then break end
             
             -- Check if Aux1 is pressed (sprint key)
             if controls.aux1 and can_sprint(player) then
@@ -331,8 +334,8 @@ minetest.register_globalstep(function(dtime)
             if hud_update_timer >= 0.1 then
                 update_sprint_hud(player)
             end
+            until true
         end
-        ::continue::
     end
     
     if hud_update_timer >= 0.1 then

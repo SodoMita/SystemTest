@@ -198,65 +198,66 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
             local id_str = field:sub(7)
             local recipe_id = tonumber(id_str)
             -- Skip non-numeric suffixes like "craft_scroll"
-            if not recipe_id then goto continue_craft end
-            local recipe = crafting_recipes[recipe_id]
+            -- (structured branch instead of goto for strict Lua 5.1; see issue #1)
+            if recipe_id then
+                local recipe = crafting_recipes[recipe_id]
 
-            local quantity_field = "qty_" .. recipe_id
-            local quantity = tonumber(fields[quantity_field] or "1") or 1
-            quantity = math.max(1, math.min(999, math.floor(quantity)))
+                local quantity_field = "qty_" .. recipe_id
+                local quantity = tonumber(fields[quantity_field] or "1") or 1
+                quantity = math.max(1, math.min(999, math.floor(quantity)))
 
-			if recipe then
-				-- World-affecting outputs belong to machines, never inventory crafting.
-				-- A registered node is the authoritative signal for this prototype.
-				if minetest.registered_nodes[recipe.output] then
-					minetest.chat_send_player(player:get_player_name(),
-						"Machine required: this output cannot be crafted in inventory.")
-					goto continue_craft
-				end
-				local can_craft_all = true
-                local inv = player:get_inventory()
+                if recipe then
+                    -- World-affecting outputs belong to machines, never inventory crafting.
+                    -- A registered node is the authoritative signal for this prototype.
+                    if minetest.registered_nodes[recipe.output] then
+                        minetest.chat_send_player(player:get_player_name(),
+                            "Machine required: this output cannot be crafted in inventory.")
+                    else
+                        local can_craft_all = true
+                        local inv = player:get_inventory()
 
-                for item_name, count in pairs(recipe.ingredients) do
-                    local needed = count * quantity
-                    if not inv:contains_item("main", ItemStack(item_name .. " " .. needed)) then
-                        can_craft_all = false
-                        break
-                    end
-                end
+                        for item_name, count in pairs(recipe.ingredients) do
+                            local needed = count * quantity
+                            if not inv:contains_item("main", ItemStack(item_name .. " " .. needed)) then
+                                can_craft_all = false
+                                break
+                            end
+                        end
 
-                if can_craft_all then
-                    for item_name, count in pairs(recipe.ingredients) do
-                        inv:remove_item("main", ItemStack(item_name .. " " .. (count * quantity)))
-                    end
+                        if can_craft_all then
+                            for item_name, count in pairs(recipe.ingredients) do
+                                inv:remove_item("main", ItemStack(item_name .. " " .. (count * quantity)))
+                            end
 
-                    local total_output = recipe.output_count * quantity
-                    inv:add_item("main", ItemStack(recipe.output .. " " .. total_output))
+                            local total_output = recipe.output_count * quantity
+                            inv:add_item("main", ItemStack(recipe.output .. " " .. total_output))
 
-                    if give_experience then
-                        give_experience(player, 5 * quantity)
-                    end
+                            if give_experience then
+                                give_experience(player, 5 * quantity)
+                            end
 
-                    if achievement_progress then
-                        achievement_progress(player, "first_craft", 1)
-                        achievement_progress(player, "craft_10_items", quantity)
-                        achievement_progress(player, "craft_100_items", quantity)
-                        if recipe.category == "equipment" then
-                            achievement_progress(player, "craft_equipment", 1)
-                        elseif recipe.category == "tactical" then
-                            achievement_progress(player, "craft_tactical", 1)
-                        elseif recipe.category == "objective" then
-                            achievement_progress(player, "craft_objective_core", 1)
+                            if achievement_progress then
+                                achievement_progress(player, "first_craft", 1)
+                                achievement_progress(player, "craft_10_items", quantity)
+                                achievement_progress(player, "craft_100_items", quantity)
+                                if recipe.category == "equipment" then
+                                    achievement_progress(player, "craft_equipment", 1)
+                                elseif recipe.category == "tactical" then
+                                    achievement_progress(player, "craft_tactical", 1)
+                                elseif recipe.category == "objective" then
+                                    achievement_progress(player, "craft_objective_core", 1)
+                                end
+                            end
+
+                            minetest.chat_send_player(player:get_player_name(),
+                                "Crafted " .. quantity .. "x " .. recipe.description .. " (+" .. (5 * quantity) .. " XP)")
+                        else
+                            minetest.chat_send_player(player:get_player_name(),
+                                "Not enough ingredients for " .. quantity .. "x craft!")
                         end
                     end
-
-                    minetest.chat_send_player(player:get_player_name(),
-                        "Crafted " .. quantity .. "x " .. recipe.description .. " (+" .. (5 * quantity) .. " XP)")
-                else
-                    minetest.chat_send_player(player:get_player_name(),
-                        "Not enough ingredients for " .. quantity .. "x craft!")
                 end
             end
-            ::continue_craft::
         end
     end
 

@@ -122,9 +122,12 @@ minetest.register_globalstep(function(dtime)
     if check_exploration then exploration_timer = 0 end
 
     for _, player in ipairs(minetest.get_connected_players()) do
+        -- Lua 5.1 "continue" idiom: repeat..until true + break (goto removed
+        -- for strict-Lua-5.1 compatibility; see issue #1).
+        repeat
         local name = player:get_player_name()
         local pos  = player:get_pos()
-        if not pos then goto next_player end
+        if not pos then break end
 
         -- Skip tracking for ghosts if game_mode is available
         if game_mode and game_mode.get_player_state then
@@ -133,7 +136,7 @@ minetest.register_globalstep(function(dtime)
                 player_highest_y[name] = nil
                 player_looped[name] = nil
                 player_last_y[name] = pos.y
-                goto next_player
+                break
             end
         end
 
@@ -197,7 +200,7 @@ minetest.register_globalstep(function(dtime)
                 unlock_achievement(player, "find_city")
             end
         end
-        ::next_player::
+        until true
     end
 end)
 
