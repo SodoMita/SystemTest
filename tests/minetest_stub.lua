@@ -35,7 +35,7 @@ M.current_modname = "sl_modebase"
 local handlers = {
 	joinplayer = {}, leaveplayer = {}, respawnplayer = {}, dieplayer = {},
 	punchplayer = {}, chat_message = {}, punchnode = {},
-	player_receive_fields = {}, mods_loaded = {},
+	player_receive_fields = {}, mods_loaded = {}, generated = {},
 }
 
 local function vhash(p)
@@ -329,7 +329,7 @@ function minetest.register_tool(name, def) return register_thing(minetest.regist
 function minetest.register_entity(name, def) minetest.registered_entities[name] = def end
 function minetest.register_abm(_) end
 function minetest.register_lbm(_) end
-function minetest.register_on_generated(_) end
+function minetest.register_on_generated(fn) table.insert(handlers.generated, fn) end
 function minetest.register_privilege(_, _) end
 function minetest.register_craft(_) end
 function minetest.register_globalstep(fn) table.insert(M.globalsteps, fn) end
@@ -371,6 +371,15 @@ end
 
 function M.run_mods_loaded()
 	for _, fn in ipairs(handlers.mods_loaded) do fn() end
+end
+
+-- Fire the registered on_generated handlers for one chunk, exactly like
+-- the engine would when a mapgen chunk materializes.
+function M.fire_on_generated(minp, maxp, blockseed)
+	for _, fn in ipairs(handlers.generated) do
+		fn({ x = minp.x, y = minp.y, z = minp.z },
+			{ x = maxp.x, y = maxp.y, z = maxp.z }, blockseed or 0)
+	end
 end
 
 -- Players

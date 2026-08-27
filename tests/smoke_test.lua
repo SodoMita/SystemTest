@@ -14,6 +14,7 @@
 --   * match timer, result screen, lobby reset (priv/box restore)
 --   * clean restart without stale state
 --   * neon grid arena: geometry, penned monsters, zero default-mod nodes
+--   * infinite flat neon grid floor under every generated chunk
 --
 -- Run from the repo root:  lua5.1 tests/smoke_test.lua
 -- ================================================================
@@ -410,6 +411,30 @@ for key, name in pairs(H.voxels) do
 end
 check(#leaked == 0, "generated map contains no default-mod nodes ("
 	.. table.concat(leaked, ", ") .. ")")
+
+section("PHASE 16 — infinite flat neon grid floor")
+-- Every chunk that crosses ground level gets a flat neon grid floor, so
+-- players can walk off the arena forever and never fall into the void.
+H.fire_on_generated({ x = 800, y = 0, z = -300 }, { x = 815, y = 15, z = -285 })
+check(vox(800, 0, -300) == "ground:square_neon", "far chunk floored (near corner)")
+check(vox(815, 0, -285) == "ground:square_neon", "far chunk floored (far corner)")
+check(vox(807, 0, -292) == "ground:square_neon", "far chunk floored (middle)")
+check(vox(807, 1, -292) == nil, "floor generation adds nothing above the surface")
+
+-- Negative coordinates are floored too: the plane is infinite both ways.
+H.fire_on_generated({ x = -5000, y = -32, z = 5000 }, { x = -4985, y = 47, z = 5015 })
+check(vox(-4992, 0, 5007) == "ground:square_neon", "negative-coordinate chunk floored")
+
+-- Chunks that do not cross ground level stay untouched.
+H.fire_on_generated({ x = 800, y = 32, z = 300 }, { x = 815, y = 47, z = 315 })
+H.fire_on_generated({ x = 900, y = -16, z = 300 }, { x = 915, y = -1, z = 315 })
+check(vox(807, 40, 307) == nil, "no floor in chunks above ground level")
+check(vox(907, -8, 307) == nil, "no floor in chunks below ground level")
+
+-- The arena floor and the infinite floor are one flat plane.
+check(vox(0, 0, 0) == "ground:square_neon", "arena sits on the same flat plane")
+check(gm.generate_floor({ x = 2000, y = 0, z = 0 }, { x = 2000, y = 0, z = 0 }) == 1,
+	"generate_floor reports the number of columns floored")
 
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 os.exit(fail_count == 0 and 0 or 1)

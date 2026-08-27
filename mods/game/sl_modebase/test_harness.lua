@@ -11,6 +11,8 @@
 -- Special cubes: the two beacon bases on the west/east edge, the ghost altar
 -- cell at the center with an open lobby deck floating above it, and the
 -- Monster Master base citadel on the north edge.
+-- The arena sits on the infinite flat neon grid floor from worldgen.lua, at
+-- the same ground level, so the cube grid is an island on an endless plane.
 local S = game_mode.S
 local state = game_mode.state
 local modname = game_mode.modname
@@ -19,7 +21,7 @@ local arena_built = false
 local arena_geo = nil       -- geometry of the last built arena
 local arena_monsters = {}   -- ObjRefs of the penned arena monsters
 
-local FLOOR_NODE = "ground:square_neon"
+local FLOOR_NODE = game_mode.FLOOR_NODE or "ground:square_neon"
 local WALL_NODE = "ground:square_neon_opaque"
 
 local function creative_only(name)
