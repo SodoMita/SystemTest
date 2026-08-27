@@ -376,6 +376,17 @@ function M.fire_punchnode(pos, node, puncher, pointed_thing)
 	end
 end
 
+-- Engine semantics: any handler returning non-nil cancels the damage.
+function M.fire_punchplayer(player, hitter, time_from_last_punch, tool_capabilities, dir, damage)
+	local canceled = false
+	for _, fn in ipairs(handlers.punchplayer) do
+		if fn(player, hitter, time_from_last_punch, tool_capabilities, dir, damage) ~= nil then
+			canceled = true
+		end
+	end
+	return canceled
+end
+
 function M.fire_receive_fields(name, formname, fields)
 	local player = M.players[name]
 	for _, fn in ipairs(handlers.player_receive_fields) do

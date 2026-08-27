@@ -143,8 +143,15 @@ minetest.register_entity(MONSTER_NAME, {
 		local pos = self.object:get_pos()
 		if not pos then return end
 
+		-- Lobby safety (owner directive): monsters stand down outside an
+		-- active match — no target acquisition, no attacks. The lobby
+		-- punch-guard in match.lua backstops this at the damage layer.
+		if not state.match_active then
+			self.current_target = nil
+		end
+
 		-- Target picking logic (pick every 10 seconds or if target lost)
-		if self.target_change_timer > 10 or not self.current_target then
+		if state.match_active and (self.target_change_timer > 10 or not self.current_target) then
 			self.target_change_timer = 0
 			local candidates = {}
 
@@ -215,8 +222,8 @@ minetest.register_entity(MONSTER_NAME, {
 			})
 				self.object:set_rotation(vector.dir_to_rotation(dir))
 
-				-- Attack logic
-				if dist < 2.5 and self.attack_timer >= 1.2 then
+				-- Attack logic (never during the lobby stage)
+				if state.match_active and dist < 2.5 and self.attack_timer >= 1.2 then
 					self.attack_timer = 0
 					if self.current_target.type == "player" then
 						local p = minetest.get_player_by_name(self.current_target.name)

@@ -7,6 +7,20 @@ local function random_vector(min, max)
 end
 
 -- Register the scary mob
+-- ================================================================
+-- Lobby safety (owner directive 2026-08): monsters must never attack
+-- players during the lobby stage (match not active). Damage sites and
+-- target acquisition below are gated through this helper. Without
+-- game_mode present (standalone use), behavior is unchanged.
+-- ================================================================
+local function attacks_allowed()
+    local gm = rawget(_G, "game_mode")
+    if gm and gm.state then
+        return gm.state.match_active == true
+    end
+    return true
+end
+
 minetest.register_entity("sl_scary:mob", {
     initial_properties = {
         physical = true, -- The mob can physically interact with the world
@@ -62,8 +76,10 @@ minetest.register_entity("sl_scary:mob", {
     on_step = function(self, dtime)
         self.timer = self.timer + dtime
 
-        -- Locate the nearest player
-        if not self.target_player or not self.target_player:is_player() then
+        -- Locate the nearest player (never during the lobby stage)
+        if not attacks_allowed() then
+            self.target_player = nil
+        elseif not self.target_player or not self.target_player:is_player() then
             local players = minetest.get_connected_players()
             local pos = self.object:get_pos()
 
@@ -151,8 +167,8 @@ minetest.register_entity("sl_scary:mob", {
         -- Check if the mob is within attack range
         self.attack_timer = self.attack_timer + dtime
         if self.attack_timer >= self.attack_time and distance <= self.attack_distance then
-            -- Attack the player
-            if self.target_player:is_player() then
+            -- Attack the player (never during the lobby stage)
+            if attacks_allowed() and self.target_player:is_player() then
                 local hp = self.target_player:get_hp()
                 if hp then
                     self.target_player:set_hp(hp - self.damage)
@@ -424,7 +440,7 @@ minetest.register_entity("sl_scary:nerobot", {
             end
         end
 
-        local player = self:get_player_in_view(pos)
+        local player = attacks_allowed() and self:get_player_in_view(pos) or nil
         if player then
             self.state = "chasing"
             self.target_player = player
@@ -480,7 +496,7 @@ minetest.register_entity("sl_scary:nerobot", {
         end
 
         local dist = vector.distance(pos, target_spot)
-        if dist <= 1 then
+        if dist <= 1 and attacks_allowed() then
             if self.timer > mob_config.search_wait_time then
                 self.timer = 0
                 local objs = minetest.get_objects_inside_radius(target_spot, 1)
@@ -523,6 +539,7 @@ minetest.register_entity("sl_scary:nerobot", {
             return
         end
 
+        if not attacks_allowed() then return end -- lobby safety
         self.target_player:punch(self.object, 1.0, {
             full_punch_interval = 1.0,
             damage_groups = {fleshy = 2},
@@ -762,6 +779,7 @@ end
 
 -- Helper: find nearest player (returns player + distance)
 local function find_nearest_player(pos, range)
+    if not attacks_allowed() then return nil, range end
     local players = minetest.get_connected_players()
     local nearest = nil
     local nearest_dist = range
@@ -894,6 +912,7 @@ minetest.register_entity("sl_scary:dredger", {
     end,
 
     do_attack = function(self, player, dtime)
+        if not attacks_allowed() then return end -- lobby safety
         self.attack_timer = self.attack_timer - dtime
         if self.attack_timer > 0 then return end
         local pos = self.object:get_pos()
@@ -1117,7 +1136,7 @@ minetest.register_entity("sl_scary:containment", {
                 set_sprite_anim(self, "idle")
                 return
             end
-            if dist <= self.attack_range and self.attack_timer <= 0 then
+            if attacks_allowed() and dist <= self.attack_range and self.attack_timer <= 0 then
                 set_sprite_anim(self, "attack")
                 local hp = self.target_player:get_hp()
                 if hp then
@@ -1282,7 +1301,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
             if not player_pos then return end
             local dist = vector.distance(pos, player_pos)
 
-            if dist <= self.attack_range then
+            if attacks_allowed() and dist <= self.attack_range then
                 set_sprite_anim(self, "attack")
                 if self.attack_timer <= 0 then
                     local hp = self.target_player:get_hp()
