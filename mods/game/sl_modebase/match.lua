@@ -144,10 +144,10 @@ function game_mode.send_results(winner, reason)
 		end
 	end
 
-	-- Formspec result screen
+	-- Formspec result screen -- FIX 2026-08-27: continue button too low partially below panel, moved from 5.9/0.7 to 5.8/0.6 and size 6.5->6.6
 	local fs = {
 		"formspec_version[4]",
-		"size[8,6.5]",
+		"size[8,6.6]",
 		"bgcolor[#0a0a12ee;true]",
 		"label[0.5,0.4;" .. minetest.formspec_escape(S("MATCH RESULTS")) .. "]",
 		"label[0.5,0.9;" .. minetest.formspec_escape(
@@ -164,7 +164,7 @@ function game_mode.send_results(winner, reason)
 	end
 	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;Player,Phase,Lives,Points;"
 		.. table.concat(rows, ";") .. ";0]")
-	table.insert(fs, "button_exit[3,5.9;2,0.7;close;Close]")
+	table.insert(fs, "button_exit[3,5.8;2,0.6;close;" .. minetest.formspec_escape(S("Continue")) .. "]")  -- FIX 2026-08-27: was 5.9/0.7 ending at 6.6 > 6.5 partially below panel, now 5.8/0.6=6.4 inside 6.6
 	local fs_str = table.concat(fs, "")
 	for _, player in ipairs(minetest.get_connected_players()) do
 		minetest.show_formspec(player:get_player_name(), "sl_modebase:results", fs_str)
