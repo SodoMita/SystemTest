@@ -858,3 +858,105 @@ if minetest.load_area then
 		end)
 	end)
 end
+
+-- ================================================================
+-- Containment enforcement  (WP3 — MATCH_LOOP_SPEC "Ghost cloud cage":
+-- ghosts "cannot freely return to the map during ordinary ghost state"
+-- and "may observe the match only through intentionally limited,
+-- designed channels".)
+--
+-- The cage geometry above is only scenery: a contained ghost holds the
+-- fly and noclip privileges it needs to exist up there, which also let
+-- it simply descend into the arena and watch the match from overhead.
+-- That is a silent information leak — a ghost is barred from *talking*
+-- to the living, but unrestricted looking is just as strong a channel
+-- when the summon ritual is supposed to be the costly way to buy it.
+--
+-- Enforcement is a soft leash rather than a wall, so it cannot trap a
+-- player or fight the engine:
+--   * inside the radius            -> nothing happens.
+--   * drifting past the boundary   -> one warning, then a pull back.
+--   * summoned to the altar        -> exempt; that is a designed channel.
+--   * evil ghosts                  -> exempt; map access is their bargain.
+-- ================================================================
+
+game_mode.CAGE_RADIUS = 24        -- horizontal free-roam radius inside the cage
+game_mode.CAGE_FLOOR_MARGIN = 12  -- how far below the cage floor is tolerated
+game_mode.CAGE_WARN_INTERVAL = 5  -- seconds between containment warnings
+
+-- Distance a contained ghost has strayed outside its cage, or nil when held.
+-- Exposed so tests and the soak harness can assert containment directly.
+function game_mode.cage_breach_distance(pos)
+	if not state.ghost_spawn then return nil end
+	local base = state.ghost_spawn
+	local dx, dz = pos.x - base.x, pos.z - base.z
+	local horizontal = math.sqrt(dx * dx + dz * dz)
+	local drop = base.y - pos.y
+
+	if horizontal > game_mode.CAGE_RADIUS then
+		return horizontal - game_mode.CAGE_RADIUS, "horizontal"
+	end
+	if drop > game_mode.CAGE_FLOOR_MARGIN then
+		return drop - game_mode.CAGE_FLOOR_MARGIN, "descent"
+	end
+	return nil
+end
+
+-- True when this player's phase/state must be held inside the cloud cage.
+function game_mode.is_contained(name)
+	local pl = state.players[name]
+	if not pl then return false end
+	if pl.phase ~= "ghost" then return false end        -- evil ghosts roam by design
+	if pl.ghost_summoned_by then return false end       -- designed altar channel
+	if pl.role == "monster_master" then return false end
+	return true
+end
+
+function game_mode.return_to_cage(player, reason)
+	if not state.ghost_spawn then return false end
+	local name = player:get_player_name()
+	local pl = game_mode.get_player_state(name)
+	player:set_pos(table.copy(state.ghost_spawn))
+	if player.set_velocity then
+		player:set_velocity({ x = 0, y = 0, z = 0 })
+	end
+
+	local now = game_mode.now()
+	if (pl.cage_warned_at or 0) + game_mode.CAGE_WARN_INTERVAL <= now then
+		pl.cage_warned_at = now
+		minetest.chat_send_player(name,
+			S("Containment holds. You cannot return to the map unaided."))
+	end
+	minetest.log("action", string.format("[game_mode] %s returned to cloud cage (%s)",
+		name, reason or "breach"))
+	return true
+end
+
+-- 1 Hz sweep; runs on the same tick budget as sabotage/possession.
+local cage_tick_accum = 0
+function game_mode.containment_step(dtime)
+	cage_tick_accum = cage_tick_accum + dtime
+	if cage_tick_accum < 1 then return end
+	cage_tick_accum = 0
+	if not state.match_active then return end
+
+	for _, player in ipairs(minetest.get_connected_players()) do
+		local name = player:get_player_name()
+		if game_mode.is_contained(name) then
+			local pos = player:get_pos()
+			if pos then
+				local breach, reason = game_mode.cage_breach_distance(pos)
+				if breach then
+					game_mode.return_to_cage(player, reason)
+				end
+			end
+		end
+	end
+end
+
+-- Additive wrapper again: reuse WP2's existing globalstep call site.
+local base_sabotage_step_cage = game_mode.sabotage_step
+function game_mode.sabotage_step(dtime)
+	base_sabotage_step_cage(dtime)
+	game_mode.containment_step(dtime)
+end

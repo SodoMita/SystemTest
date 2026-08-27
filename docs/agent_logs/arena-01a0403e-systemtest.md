@@ -128,3 +128,62 @@ WP4 (gate) + the owning WPs (files).
 All `sl_modebase` files — including this session's scanner — are strict-5.1
 clean, and `tests/smoke_test.lua` passes 67/67 under the stock Lua 5.1
 interpreter (same runtime class CI uses for that step).
+## 2026-08-26 — WP3: cloud-cage containment enforcement
+
+**Claimed:** still WP3. Continuing after the possession work; `tests/**` and
+`aaa_botmatch/**` remain untouched (WP4).
+
+**The gap.** `MATCH_LOOP_SPEC.md` says a contained ghost "cannot freely return
+to the map during ordinary ghost state" and "may observe the match only
+through intentionally limited, designed channels". Nothing enforced either.
+`spawn.lua` grants ghosts `fly` + `noclip` (which they need in order to exist
+at y=100) and then never checks their position again. The cage built by
+`build_cloud_cage()` is an 11x11 glass slab with four corner pylons — no
+walls, no ceiling, no floor under most of it. A dead player could fly straight
+down and watch the whole match from overhead.
+
+This is the same class of bug as the chat seal that was already fixed: a ghost
+is barred from *speaking* to the living, but unrestricted *looking* is an
+equally strong information channel — and it is free, which undercuts the
+Ghost Altar ritual whose entire design purpose is to make ghost information
+cost three rare components.
+
+**Implementation** (`nodes.lua`, ghost section):
+
+- `game_mode.cage_breach_distance(pos)` — pure helper, returns how far a
+  position lies outside the cage plus the reason (`horizontal`/`descent`), or
+  nil. Exposed so WP4 can assert containment without poking internals.
+- `game_mode.is_contained(name)` — the exemption policy in one place.
+- `game_mode.return_to_cage(player, reason)` — reposition + rate-limited
+  warning (one per 5 s, so a stuck ghost is not chat-spammed).
+- `game_mode.containment_step(dtime)` — 1 Hz sweep, wrapped additively onto
+  `sabotage_step` like the possession tick, reusing WP2's globalstep.
+
+Chose a **soft leash over a solid box**: a sealed cage would fight noclip,
+risk trapping a player on a bad spawn, and need far more committed geometry
+than WP1 has built yet. The leash degrades safely — worst case it teleports
+someone who was already out of bounds.
+
+**Exemptions** (each maps to a spec rule, verified in the checks below):
+altar-summoned ghosts (the designed channel), evil ghosts (map access is the
+revival bargain), the Monster Master, all living players, and any time no
+match is active.
+
+### Measured
+
+- `tests/smoke_test.lua` — 67/67, unchanged.
+- Containment checks (scratch harness): 9/9 — free movement inside, pull-back
+  on descent and on horizontal drift, breach helper correctness, and all four
+  exemption paths.
+- Possession checks re-run after chaining a second wrapper onto
+  `sabotage_step`: 16/16, no regression.
+- Lua syntax clean.
+
+### Skipped and why
+
+- Soak run — still no Luanti binary in this workspace (env exit code 2); CI
+  covers it.
+- Tuning `CAGE_RADIUS` / `CAGE_FLOOR_MARGIN` against a real arena: the current
+  24 / 12 are sized for the harness arena (cage at y+40). Once WP1 commits the
+  hand-built arena these want a balance pass — that is a `balance/*` branch
+  per §6, not this one.

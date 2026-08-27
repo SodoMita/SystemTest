@@ -15,6 +15,12 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
 - Cloud cage: ghosts are held at `ghost_spawn`, immortal, invisible,
   untargetable, flight-enabled, and a containment platform is materialized
   around the spawn on load (`/sl_build_cage` to rebuild).
+- Containment enforcement: the cage is a soft leash, not just scenery. A
+  contained ghost that flies past a 24-node radius or drops more than 12
+  nodes below the cage floor is warned and returned to `ghost_spawn`, so
+  flight cannot be used to observe the match from above. Exempt by design:
+  ghosts summoned to the altar, evil ghosts, the Monster Master, and every
+  living player; inert outside an active match.
 - Communication seal: ghost chat is blocked, and every registered chat
   command (including `/msg`, `/w`, `/tell`) is wrapped with a phase guard.
   Allowlist: `/sl_ghost_offer`, `/sl_state`, `/help` only.
