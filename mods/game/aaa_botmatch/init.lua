@@ -32,6 +32,11 @@ if not botmatch.enabled then
 	return
 end
 
+-- Coexistence: botmatch builds and owns its arena. Disable the standalone
+-- test_harness auto-arena (sl_modebase loads after this mod) so the two
+-- arena builders do not overwrite each other mid-run.
+minetest.settings:set("sl_test.auto_arena", "false")
+
 botmatch.config = {
 	bots = tonumber(minetest.settings:get("sl_botmatch.bots") or "4") or 4,
 	matches = tonumber(minetest.settings:get("sl_botmatch.matches") or "3") or 3,
@@ -67,6 +72,9 @@ if botmatch.config.turbo then
 	if not overridden("combat_damage") then botmatch.config.combat_damage = 10 end
 	if not overridden("respawn_delay") then botmatch.config.respawn_delay = 0.5 end
 	if not overridden("inter_match_delay") then botmatch.config.inter_match_delay = 1 end
+	-- Shorter possession window keeps the exorcism counterplay relevant
+	-- inside ~10 s matches (WP3's possession_setting reads this key).
+	turbo_possession_duration = 12
 end
 
 math.randomseed(botmatch.config.seed)
@@ -341,6 +349,9 @@ function botmatch.start_run()
 		local s = minetest.settings
 		if s:get("sl_botmatch.countdown") == nil then state.settings.countdown = 1 end
 		if s:get("sl_botmatch.beacon_hp") == nil then state.settings.beacon_hp = 20 end
+		if s:get("sl_botmatch.possession_duration") == nil then
+			state.settings.possession_duration = botmatch.config.turbo_possession_duration or 12
+		end
 	end
 
 	dofile(botmatch.modpath .. "/behavior.lua")

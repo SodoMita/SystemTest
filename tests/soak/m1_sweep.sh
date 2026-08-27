@@ -19,13 +19,13 @@ run() { # label, extra args...
 }
 
 # A: elimination-focused (turbo: adjacent bases, matches resolve in seconds)
-run a_elim  --turbo --matches 10 --lives 2 --match-duration 60 --seed 101
+run a_elim  --turbo --matches 10 --lives 3 --match-duration 60 --seed 101
 # B: timer-forced (huge lives, short clock -> draws)
 run b_timer --turbo --matches 10 --lives 50 --match-duration 8  --seed 202
 # C: mixed standard regime (turbo clocks, moderate lives)
-run c_mixed --turbo --matches 10 --lives 3 --match-duration 30 --seed 303
+run c_mixed --turbo --matches 10 --lives 6 --match-duration 25 --seed 303
 # D: wide roster (6 bots, 3v3)
-run d_wide  --turbo --matches 10 --bots 6 --lives 2 --match-duration 45 --seed 404
+run d_wide  --turbo --matches 10 --bots 6 --lives 3 --match-duration 45 --seed 404
 
 python3 tests/soak/m1_summary.py "$OUT"
 echo "SWEEP_DONE rc=$?"

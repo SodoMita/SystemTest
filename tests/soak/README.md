@@ -74,6 +74,18 @@ Requirements: a Luanti/Minetest server binary (`luanti`, `minetest`,
   harness (`[botmatch][BUG]` lines + `stats.bugs`); raw engine `ERROR` lines
   from `debug.txt` are collected separately. Any occurrence fails the run.
 
+## Headless-server pitfalls (learned the hard way)
+
+1. **Mapgen:** `mg_name` in `world.mt` is ignored by Luanti 5.10 (Debian);
+   the setting must go in the `--config` file. Without `singlenode`, v7
+   terrain regenerates over arena nodes whenever blocks are evicted.
+2. **Node writes:** `set_node` silently no-ops on blocks that were never
+   generated. The arena builder calls `load_area` on every arena block
+   FIRST, then builds; emerged blocks persist via `map.sqlite`.
+3. **Two arena builders:** `sl_modebase/test_harness.lua` also builds an
+   arena on worldgen; `aaa_botmatch` disables it at load time via
+   `sl_test.auto_arena = false` (manual `/sl_test_arena` still works).
+
 ## Balance loop
 
 Seed sweeps feed the balance work package:

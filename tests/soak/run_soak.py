@@ -92,6 +92,10 @@ def make_world(world: Path, args) -> Path:
                 "enable_damage = false",
                 "max_users = 8",
                 "time_speed = 0",
+                # NOTE: mg_name in world.mt is ignored by Luanti 5.10 (Debian);
+                # the config file is the reliable override. Without singlenode,
+                # v7 terrain regenerates over arena nodes on block eviction.
+                "mg_name = singlenode",
                 "sl_botmatch.enabled = true",
                 f"sl_botmatch.bots = {args.bots}",
                 f"sl_botmatch.matches = {args.matches}",

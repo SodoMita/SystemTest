@@ -55,12 +55,17 @@ function game_mode.build_test_arena(origin)
 end
 
 -- Generate the arena automatically when the origin map block is first generated.
-minetest.register_on_generated(function(minp, maxp)
-	if arena_built then return end
-	if minp.x <= 0 and maxp.x >= 0 and minp.z <= 0 and maxp.z >= 0 and minp.y <= 0 and maxp.y >= 0 then
-		game_mode.build_test_arena({x=0, y=0, z=0})
-	end
-end)
+-- Auto-arena on worldgen. Disabled when sl_test.auto_arena = "false" —
+-- aaa_botmatch sets that at load time (it loads first) because it builds
+-- and owns its own arena; the manual /sl_test_arena command still works.
+if minetest.settings:get("sl_test.auto_arena") ~= "false" then
+	minetest.register_on_generated(function(minp, maxp)
+		if arena_built then return end
+		if minp.x <= 0 and maxp.x >= 0 and minp.z <= 0 and maxp.z >= 0 and minp.y <= 0 and maxp.y >= 0 then
+			game_mode.build_test_arena({x=0, y=0, z=0})
+		end
+	end)
+end
 
 local function register_ai_entity()
 	minetest.register_entity(modname .. ":ai_player", {

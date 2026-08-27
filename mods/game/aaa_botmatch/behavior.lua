@@ -58,6 +58,24 @@ function botmatch.build_arena()
 	local bx = math.max(2, math.floor(botmatch.config.beacon_spacing / 2))
 	local floor_half = bx + 6
 
+	-- EMERGE FIRST, THEN BUILD: set_node silently no-ops on blocks that
+	-- were never generated, and headless servers have no players to
+	-- trigger mapgen. load_area synchronously emerges each block; once
+	-- emerged and saved, contents persist via map.sqlite across reloads.
+	-- (forceload_block additionally pins them, where the engine allows.)
+	local gs = state.ghost_spawn
+	for x = -floor_half, floor_half, 16 do
+		for z = -floor_half, floor_half, 16 do
+			for _, y in ipairs({ 0, 16 }) do
+				local p = { x = x, y = y, z = z }
+				if minetest.load_area then minetest.load_area(p) end
+				if minetest.forceload_block then minetest.forceload_block(p, true) end
+			end
+		end
+	end
+	if minetest.load_area then minetest.load_area(gs) end
+	if minetest.forceload_block then minetest.forceload_block(gs, true) end
+
 	-- Arena floor at y = 0
 	for x = -floor_half, floor_half do
 		for z = -floor_half, floor_half do
@@ -84,7 +102,7 @@ function botmatch.build_arena()
 
 	-- Ghost altar at midfield + one loot crate (sabotage/possession target)
 	minetest.set_node({ x = 0, y = 1, z = 0 }, { name = "sl_modebase:ghost_altar" })
-	local cx = math.min(5, floor_half - 2)
+	local cx = math.min(botmatch.config.turbo and 3 or 5, floor_half - 2)
 	minetest.set_node({ x = cx, y = 1, z = cx }, { name = "sl_modebase:loot_crate" })
 	botmatch.crate_pos = { x = cx, y = 1, z = cx }
 
@@ -238,7 +256,7 @@ function botmatch.behave_alive(bot, pl, dt)
 				and not botmatch.bots[other_name].dead then
 			local opl = game_mode.get_player_state(other_name)
 			local other = botmatch.bots[other_name]
-			if opl.phase == "evil_ghost" and dist2d(pos, other:get_pos()) < 5 then
+			if opl.phase == "evil_ghost" and dist2d(pos, other:get_pos()) < 3 then
 				if now >= bot.bm.next_attack then
 					bot.bm.next_attack = now + botmatch.config.attack_interval
 					botmatch.punch_player(bot, other)
@@ -314,10 +332,34 @@ function botmatch.behave_alive(bot, pl, dt)
 		table.insert(counter_points, botmatch.crate_pos)     -- loot crate
 	end
 	for _, cpos in ipairs(counter_points) do
-		if (game_mode.is_sabotaged(cpos) or game_mode.is_possessed(cpos))
-				and dist2d(pos, cpos) < 3 then
+		if game_mode.is_sabotaged(cpos) and dist2d(pos, cpos) < 4 then
 			botmatch.repair_node(bot, cpos)
 			return
+		end
+	end
+
+	-- 2b) Exorcism duty: the living bot closest to a possessed vessel is
+	-- designated to punch it out (deterministic counterplay, not luck).
+	for _, cpos in ipairs(counter_points) do
+		if game_mode.is_possessed(cpos) then
+			local nearest, nd = nil, 999
+			for _, other_name in ipairs(botmatch.bot_order) do
+				if botmatch.is_connected(other_name) and not botmatch.bots[other_name].dead then
+					local opl = game_mode.get_player_state(other_name)
+					if opl.phase == "alive" then
+						local d = dist2d(botmatch.bots[other_name]:get_pos(), cpos)
+						if d < nd then nearest, nd = other_name, d end
+					end
+				end
+			end
+			if nearest == bot:get_player_name() then
+				if dist2d(pos, cpos) < 4 then
+					botmatch.repair_node(bot, cpos)
+				else
+					step_toward(bot, cpos, dt)
+				end
+				return
+			end
 		end
 	end
 
@@ -375,10 +417,14 @@ function botmatch.behave_ghost(bot, pl, dt)
 	end
 
 	-- Voluntary revival after a bounded reflection period (~10 s as ghost;
-	-- compressed under turbo so 5-second matches still exercise the path).
+	-- ~1-3 s under turbo, or the altar economy consumes the whole window
+	-- before revival matures in 5-second matches).
 	if pl.ghost_summoned_by == nil and bot.bm.revived_at == 0 then
-		local base = botmatch.config.turbo and 3 or 10
-		bot.bm.revived_at = now + base + math.random(0, botmatch.config.turbo and 3 or 8)
+		if botmatch.config.turbo then
+			bot.bm.revived_at = now + 1 + math.random(0, 2)
+		else
+			bot.bm.revived_at = now + 10 + math.random(0, 8)
+		end
 	end
 	if bot.bm.revived_at > 0 and now >= bot.bm.revived_at and bot.bm.revived_at ~= -1 then
 		bot.bm.revived_at = -1
@@ -404,46 +450,81 @@ function botmatch.behave_evil(bot, pl, dt)
 	local state = game_mode.state
 	local now = now_s()
 
-	-- One bounded sabotage per revival, aimed at a random beacon.
-	if bot.bm.sabotage_target == nil then
-		local target_team = math.random() < 0.5 and "beacon_a" or "beacon_b"
-		local spawn = state.teams[target_team] and state.teams[target_team].spawn
-		bot.bm.sabotage_target = spawn and { x = spawn.x, y = spawn.y - 1, z = spawn.z } or false
-	end
-
-	if bot.bm.sabotage_target and bot.bm.sabotage_target ~= false then
-		local t = bot.bm.sabotage_target
-		if dist2d(bot:get_pos(), t) < 3 then
-			if now >= bot.bm.next_act then
-				bot.bm.next_act = now -- possession follow-up is immediate
-				botmatch.try_sabotage(bot, t)
-				bot.bm.sabotage_target = false
-			end
-		else
-			step_toward(bot, t, dt, 1.6) -- evil ghosts fly faster than the living
+	-- Objective blocks. Order alternates per revival (bot.bm.sab_first)
+	-- so BOTH mechanics get a window regardless of purge timing — a fixed
+	-- order starves whichever runs second.
+	local function possess_objective()
+		if bot.bm.possessed_done then return false end
+		if not bot:get_inventory():contains_item("main",
+				ItemStack("sl_modebase:possession_focus")) then
+			return false
 		end
-		return
-	end
-
-	-- After sabotaging, claim a vessel with the possession charm.
-	if bot.bm.sabotage_target == false and not bot.bm.possessed_done
-			and bot:get_inventory():contains_item("main", ItemStack("sl_modebase:possession_focus")) then
-		local altar = { x = 0, y = 1, z = 0 }
-		if dist2d(bot:get_pos(), altar) < 3 then
+		local vessel = botmatch.crate_pos or { x = 0, y = 1, z = 0 }
+		if dist2d(bot:get_pos(), vessel) < 3 then
 			if now >= bot.bm.next_act then
-				bot.bm.next_act = now + 5
-				if botmatch.try_possess(bot, altar) then
+				bot.bm.next_act = now + 2
+				if botmatch.try_possess(bot, vessel) then
 					bot.bm.possessed_done = true
 				end
 			end
 		else
-			step_toward(bot, altar, dt, 1.6) -- evil ghosts fly faster than the living
+			step_toward(bot, vessel, dt, 2.2) -- evil ghosts fly fast
+			return true
 		end
-		return
+		return false
 	end
 
-	-- Drift ominously over the arena (taunting presence, no direct attacks).
+	local function sabotage_objective()
+		if bot.bm.sabotage_target == nil then
+			local target_team = math.random() < 0.5 and "beacon_a" or "beacon_b"
+			local spawn = state.teams[target_team] and state.teams[target_team].spawn
+			bot.bm.sabotage_target = spawn
+				and { x = spawn.x, y = spawn.y - 1, z = spawn.z } or false
+		end
+		if not bot.bm.sabotage_target then return false end
+		local t = bot.bm.sabotage_target
+		if dist2d(bot:get_pos(), t) < 3 then
+			if now >= bot.bm.next_act then
+				bot.bm.next_act = now + 2
+				botmatch.try_sabotage(bot, t)
+				bot.bm.sabotage_target = false
+			end
+			return false
+		else
+			step_toward(bot, t, dt, 2.2)
+			return true
+		end
+	end
+
+	if bot.bm.sab_first then
+		if sabotage_objective() then return end
+		if possess_objective() then return end
+	else
+		if possess_objective() then return end
+		if sabotage_objective() then return end
+	end
+
+	-- Objectives done: kite away from living hunters (trickster survival —
+	-- faster than them, so kiting must never precede objectives or the
+	-- ghost stalemates into match end without ever acting), otherwise
+	-- drift ominously over the arena (taunting presence, no attacks).
+	local threat, td = nil, 99
+	for _, other_name in ipairs(botmatch.bot_order) do
+		if other_name ~= bot:get_player_name() and botmatch.is_connected(other_name)
+				and not botmatch.bots[other_name].dead then
+			local opl = game_mode.get_player_state(other_name)
+			if opl.phase == "alive" then
+				local d = dist2d(bot:get_pos(), botmatch.bots[other_name]:get_pos())
+				if d < td then threat, td = botmatch.bots[other_name], d end
+			end
+		end
+	end
 	local pos = bot:get_pos()
+	if threat and td < 6 then
+		local away = vector.subtract(pos, threat:get_pos())
+		step_toward(bot, { x = pos.x + away.x * 2, y = pos.y, z = pos.z + away.z * 2 }, dt, 2.2)
+		return
+	end
 	bot:set_pos({
 		x = math.sin(now * 0.4 + 1.3) * 10,
 		y = 4 + math.sin(now * 0.9) * 1.5,
@@ -547,8 +628,14 @@ function botmatch.try_revive(bot)
 	if game_mode.get_player_state(bot:get_player_name()).phase == "evil_ghost" and before == "ghost" then
 		botmatch.record_event("revivals", 1)
 		botmatch.record_bot_flag(bot:get_player_name(), "revived_evil")
-		bot.bm.next_act = 0          -- sabotage as soon as in range
+		bot.bm.next_act = 0          -- act as soon as in range
 		bot.bm.sabotage_target = nil -- re-pick a beacon target
+		bot.bm.sab_first = math.random() < 0.5 -- alternate objective order
+		-- Phase in at a random arena edge: ghosts die in melee, so reviving
+		-- at the death spot puts them instantly back inside hunter range
+		-- (purged before any objective). The trickster re-entries elsewhere.
+		local ang = math.random() * 2 * math.pi
+		bot:set_pos({ x = math.cos(ang) * 8, y = 3, z = math.sin(ang) * 8 })
 	end
 end
 
@@ -566,10 +653,25 @@ function botmatch.try_possess(bot, pos)
 	-- Fused WP3 system: reusable possession_focus tool, cooldown-bounded.
 	local def = minetest.registered_tools["sl_modebase:possession_focus"]
 	if not def or not def.on_use then return false end
+	local name = bot:get_player_name()
+	local pl = game_mode.get_player_state(name)
+	local had_focus = bot:get_inventory():contains_item("main",
+		ItemStack("sl_modebase:possession_focus"))
 	def.on_use(ItemStack("sl_modebase:possession_focus"), bot, { type = "node", under = pos })
 	if game_mode.is_possessed(pos) then
 		botmatch.record_event("possessions", 1)
 		return true
 	end
+	local node = minetest.get_node_or_nil(pos)
+	minetest.log("action", string.format(
+		"[botmatch][possess-debug] %s refused at %s: phase=%s focus=%s match_active=%s cd_left=%.1f node=%s possessable=%s possessed=%s sabotaged=%s crate_pos=%s",
+		name, minetest.pos_to_string(pos), tostring(pl.phase), tostring(had_focus),
+		tostring(game_mode.state.match_active),
+		math.max(0, (pl.possession_ready_at or 0) - game_mode.now()),
+		node and node.name or "nil",
+		tostring(node and game_mode.is_possessable(node.name)),
+		tostring(game_mode.is_possessed(pos)),
+		tostring(game_mode.is_sabotaged(pos)),
+		botmatch.crate_pos and minetest.pos_to_string(botmatch.crate_pos) or "nil"))
 	return false
 end
