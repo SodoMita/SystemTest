@@ -184,13 +184,20 @@ function botmatch.on_bot_lethal(bot)
 	botmatch.fire("dieplayer", bot, { type = "punch" })
 	-- Engine would show the respawn screen; simulate the delay.
 	minetest.after(2, function()
+		-- Purged/eliminated players stay out until the clean reset at
+		-- match end — respawning them would farm kills and skew stats.
+		local pl = game_mode.get_player_state(name)
+		if pl.eliminated then
+			minetest.log("action", "[botmatch] " .. name .. " eliminated; stays out until match end")
+			return
+		end
 		bot.dead = false
 		bot._hp = 1 -- respawn handlers (spawn_player) restore full HP
 		botmatch.fire("respawnplayer", bot)
 		-- Fixed starting equipment is re-issued every life, so the ritual
 		-- kit returns with its designated carrier after respawn.
 		if bot.bm.carrier and game_mode.state.match_active
-				and game_mode.get_player_state(bot:get_player_name()).phase == "alive" then
+				and game_mode.get_player_state(name).phase == "alive" then
 			local inv = bot:get_inventory()
 			inv:add_item("main", ItemStack("sl_modebase:ritual_ashen_relic"))
 			inv:add_item("main", ItemStack("sl_modebase:ritual_soul_shard"))
@@ -340,7 +347,8 @@ function botmatch.next_match()
 		bots = bots_stats,
 		events = {
 			ghost_summons = 0, offers = 0, revivals = 0,
-			sabotages = 0, repairs = 0, disconnects = 0, beacon_destructions = 0,
+			sabotages = 0, repairs = 0, possessions = 0, exorcisms = 0,
+			disconnects = 0, beacon_destructions = 0,
 		},
 	}
 	botmatch.summon_in_progress = false
@@ -412,7 +420,8 @@ local function compute_aggregate()
 		lives_used_total = 0,
 		avg_beacon_damage_taken = 0,
 		events = { ghost_summons = 0, offers = 0, revivals = 0, sabotages = 0,
-			repairs = 0, disconnects = 0, beacon_destructions = 0 },
+			repairs = 0, possessions = 0, exorcisms = 0,
+			disconnects = 0, beacon_destructions = 0 },
 	}
 	if #matches == 0 then return agg end
 	local dur_sum, dmg_sum = 0, 0
@@ -530,7 +539,8 @@ minetest.register_globalstep(function(dtime)
 		local n = #botmatch.bot_order
 		for i = 0, n - 1 do
 			local name = botmatch.bot_order[(botmatch.tick_n + i - 1) % n + 1]
-			if botmatch.is_connected(name) then
+			local bot = botmatch.bots[name]
+			if botmatch.is_connected(name) and not bot.dead then
 				botmatch.safe("behavior:" .. name, botmatch.behave, name, dt)
 			end
 		end

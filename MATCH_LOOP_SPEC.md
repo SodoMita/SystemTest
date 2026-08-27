@@ -26,6 +26,11 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
 - Sabotage: 30 s corruption with a visible marker; sabotaged beacons take
   corrosion damage; sabotaged interactables refuse use; living players repair
   by punching; everything is purged on match end/restart.
+- Possession (evil ghost): one bounded vessel per revival (crate, altar, or
+  terminal). The vessel refuses the living with no confirmation and whispers
+  the toucher's identity to its owner — an information channel, not damage.
+  Discoverable marker ("SOMETHING IS WATCHING"), 20 s duration, exorcism by
+  punching, purged on match end/restart.
 - Match timer + result screen (formspec scoreboard + chat log) + clean reset:
   phases, lives, points, inventories, sabotages, and ghost privileges are all
   normalized before the next match.
@@ -37,7 +42,6 @@ Still open (Phase A remainder):
 - Hand-built arena map committed to the repo (two beacons, lobby, cage,
   routes, cover, hand-placed pickups).
 - Direct-message UI polish and reconnect hardening pass.
-- Evil ghost possession of objects (only node sabotage exists so far).
 
 Live-engine soak test (August 2026): `tests/soak/run_soak.py` boots a real
 Luanti server where the `aaa_botmatch` harness runs simulated AI players

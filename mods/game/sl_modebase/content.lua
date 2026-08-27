@@ -441,6 +441,40 @@ minetest.register_tool(modname .. ":sabotage_charge", {
 	end,
 })
 
+-- Evil ghost possession: one bounded vessel per revival. The vessel
+-- refuses living users and whispers their identity to its owner.
+minetest.register_craftitem(modname .. ":possess_charm", {
+	description = S("Possession Charm\n(Evil Ghost Only; claims one vessel)"),
+	inventory_image = "sl_circuit_board.png^[colorize:#aa00ff:150",
+	groups = { not_in_creative_inventory = 1 },
+	on_use = function(itemstack, user, pointed_thing)
+		local pl = game_mode.get_player_state(user:get_player_name())
+		if pl.phase ~= "evil_ghost" then return itemstack end
+		if not pointed_thing or pointed_thing.type ~= "node" then return itemstack end
+		local pos = pointed_thing.under
+		local node = minetest.get_node_or_nil(pos)
+		if not node or not game_mode.can_possess(node.name) then
+			minetest.chat_send_player(user:get_player_name(),
+				S("Only crates, altars, and terminals can serve as vessels."))
+			return itemstack
+		end
+		if game_mode.is_possessed(pos) or game_mode.is_sabotaged(pos) then return itemstack end
+		-- One vessel per ghost: bounded by design.
+		for _, entry in pairs(game_mode.state.possession) do
+			if entry.owner == user:get_player_name() then
+				minetest.chat_send_player(user:get_player_name(),
+					S("You already hold a vessel."))
+				return itemstack
+			end
+		end
+		game_mode.register_possession(pos, user:get_player_name())
+		minetest.sound_play("alert", {pos = pos, gain = 0.4, max_hear_distance = 6})
+		minetest.chat_send_player(user:get_player_name(),
+			S("The vessel is yours. It will whisper who touches it."))
+		return ItemStack("")
+	end,
+})
+
 -- Reincarnation item for ghosts to become evil ghosts
 minetest.register_craftitem(modname .. ":reincarnate", {
 	description = S("Revive as Evil Ghost\n(Ghost Only; lose match points)"),

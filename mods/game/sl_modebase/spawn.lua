@@ -103,11 +103,13 @@ function game_mode.spawn_player(player)
 			selectionbox = is_evil and {-0.3, 0.0, -0.3, 0.3, 1.75, 0.3} or {0,0,0,0,0,0},
 		})
 		
-		-- Ghosts receive only a revival option; evil ghosts receive a bounded sabotage tool.
+		-- Ghosts receive only a revival option; evil ghosts receive bounded
+		-- sabotage and possession tools (one of each per revival).
 		local inv = player:get_inventory()
 		inv:set_list("main", {})
 		if is_evil then
 			inv:add_item("main", game_mode.modname .. ":sabotage_charge")
+			inv:add_item("main", game_mode.modname .. ":possess_charm")
 		else
 			inv:add_item("main", game_mode.modname .. ":reincarnate")
 		end

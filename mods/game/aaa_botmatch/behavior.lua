@@ -19,12 +19,12 @@ local function dist2d(a, b)
 end
 
 -- Move one tick toward target, ground-locked to the arena plane.
-local function step_toward(bot, target, dt)
+local function step_toward(bot, target, dt, speed_mult)
 	local pos = bot:get_pos()
 	local dx, dz = target.x - pos.x, target.z - pos.z
 	local d = math.sqrt(dx * dx + dz * dz)
 	if d < 0.15 then return true end
-	local speed = botmatch.config.bot_speed * dt
+	local speed = botmatch.config.bot_speed * (speed_mult or 1) * dt
 	-- slight deterministic weave so bots do not perfectly overlap
 	local weave = math.sin(now_s() * 1.7 + #bot:get_player_name() * 2.3) * 0.35
 	local nx, nz = dx / d, dz / d
@@ -137,10 +137,13 @@ function botmatch.on_match_inserted()
 	-- Per-bot match bookkeeping
 	for _, name in ipairs(botmatch.bot_order) do
 		local bot = botmatch.bots[name]
+		bot.dead = false -- clean reset returned everyone to the lobby
 		bot.bm.next_attack = 0
 		bot.bm.next_act = now_s() + 8 + math.random(0, 12)
 		bot.bm.offered = false
 		bot.bm.revived_at = 0
+		bot.bm.possessed_done = false
+		bot.bm.sabotage_target = nil
 	end
 
 	-- Disconnect/reconnect scenario: one random bot, mid-match.
@@ -214,7 +217,8 @@ function botmatch.behave_alive(bot, pl, dt)
 
 	-- 1) Purge nearby evil ghosts (counterplay policy)
 	for _, other_name in ipairs(botmatch.bot_order) do
-		if other_name ~= bot:get_player_name() and botmatch.is_connected(other_name) then
+		if other_name ~= bot:get_player_name() and botmatch.is_connected(other_name)
+				and not botmatch.bots[other_name].dead then
 			local opl = game_mode.get_player_state(other_name)
 			local other = botmatch.bots[other_name]
 			if opl.phase == "evil_ghost" and dist2d(pos, other:get_pos()) < 5 then
@@ -261,7 +265,8 @@ function botmatch.behave_alive(bot, pl, dt)
 	local enemy = botmatch.find_enemy_target(bot, pl)
 	if enemy then
 		local ed = dist2d(pos, enemy:get_pos())
-		local engage_range = bot.bm.runner and 2.5 or 6
+		-- Runners only fight at melee range; pushing the beacon wins the match.
+		local engage_range = bot.bm.runner and 1.8 or 6
 		if ed < engage_range then
 			if now >= bot.bm.next_attack then
 				bot.bm.next_attack = now + botmatch.config.attack_interval
@@ -276,18 +281,23 @@ function botmatch.behave_alive(bot, pl, dt)
 		end
 	end
 
-	-- 2) Repair a corrupted nearby beacon (visible cause -> counterplay)
-	local own = state.teams[pl.team]
+	-- 2) Counterplay: repair corrupted beacons and exorcise possessed
+	-- vessels nearby (visible cause -> living response).
 	local foe_id = enemy_team(pl.team)
-	local foe = state.teams[foe_id]
+	local counter_points = {}
 	for _, team_id in ipairs({ pl.team, foe_id }) do
 		local spawn = state.teams[team_id] and state.teams[team_id].spawn
 		if spawn then
-			local bpos = { x = spawn.x, y = spawn.y - 1, z = spawn.z }
-			if game_mode.is_sabotaged(bpos) and dist2d(pos, bpos) < 3 then
-				botmatch.repair_node(bot, bpos)
-				return
-			end
+			table.insert(counter_points, { x = spawn.x, y = spawn.y - 1, z = spawn.z })
+		end
+	end
+	table.insert(counter_points, { x = 0, y = 1, z = 0 })   -- altar
+	table.insert(counter_points, { x = 5, y = 1, z = 5 })   -- loot crate
+	for _, cpos in ipairs(counter_points) do
+		if (game_mode.is_sabotaged(cpos) or game_mode.is_possessed(cpos))
+				and dist2d(pos, cpos) < 3 then
+			botmatch.repair_node(bot, cpos)
+			return
 		end
 	end
 
@@ -322,7 +332,8 @@ end
 function botmatch.find_enemy_target(bot, pl)
 	local best, best_d = nil, 999
 	for _, other_name in ipairs(botmatch.bot_order) do
-		if other_name ~= bot:get_player_name() and botmatch.is_connected(other_name) then
+		if other_name ~= bot:get_player_name() and botmatch.is_connected(other_name)
+				and not botmatch.bots[other_name].dead then
 			local opl = game_mode.get_player_state(other_name)
 			if opl.team ~= pl.team and opl.phase == "alive" then
 				local d = dist2d(bot:get_pos(), botmatch.bots[other_name]:get_pos())
@@ -382,12 +393,29 @@ function botmatch.behave_evil(bot, pl, dt)
 		local t = bot.bm.sabotage_target
 		if dist2d(bot:get_pos(), t) < 3 then
 			if now >= bot.bm.next_act then
-				bot.bm.next_act = now + 5
+				bot.bm.next_act = now -- possession follow-up is immediate
 				botmatch.try_sabotage(bot, t)
 				bot.bm.sabotage_target = false
 			end
 		else
-			step_toward(bot, t, dt)
+			step_toward(bot, t, dt, 1.6) -- evil ghosts fly faster than the living
+		end
+		return
+	end
+
+	-- After sabotaging, claim a vessel with the possession charm.
+	if bot.bm.sabotage_target == false and not bot.bm.possessed_done
+			and bot:get_inventory():contains_item("main", ItemStack("sl_modebase:possess_charm")) then
+		local altar = { x = 0, y = 1, z = 0 }
+		if dist2d(bot:get_pos(), altar) < 3 then
+			if now >= bot.bm.next_act then
+				bot.bm.next_act = now + 5
+				if botmatch.try_possess(bot, altar) then
+					bot.bm.possessed_done = true
+				end
+			end
+		else
+			step_toward(bot, altar, dt, 1.6) -- evil ghosts fly faster than the living
 		end
 		return
 	end
@@ -409,6 +437,7 @@ end
 -- ================================================================
 
 function botmatch.punch_player(attacker, victim)
+	if victim.dead then return end -- never corpse-camp: one lethal, one kill
 	local damage = botmatch.config.combat_damage
 	local dir = vector.subtract(victim:get_pos(), attacker:get_pos())
 	-- Real registered_on_punchplayer chain (guards: ghosts cannot attack,
@@ -431,10 +460,14 @@ function botmatch.punch_beacon(bot, team_id, bpos)
 end
 
 function botmatch.repair_node(bot, pos)
-	local before = game_mode.is_sabotaged(pos)
+	local was_sabotaged = game_mode.is_sabotaged(pos)
+	local was_possessed = game_mode.is_possessed(pos)
 	botmatch.fire("punchnode", pos, minetest.get_node(pos), bot, { type = "node", under = pos })
-	if before and not game_mode.is_sabotaged(pos) then
+	if was_sabotaged and not game_mode.is_sabotaged(pos) then
 		botmatch.record_event("repairs", 1)
+	end
+	if was_possessed and not game_mode.is_possessed(pos) then
+		botmatch.record_event("exorcisms", 1)
 	end
 end
 
@@ -501,4 +534,15 @@ function botmatch.try_sabotage(bot, pos)
 	if game_mode.is_sabotaged(pos) and used then
 		botmatch.record_event("sabotages", 1)
 	end
+end
+
+function botmatch.try_possess(bot, pos)
+	local def = minetest.registered_craftitems["sl_modebase:possess_charm"]
+	if not def or not def.on_use then return false end
+	def.on_use(ItemStack("sl_modebase:possess_charm"), bot, { type = "node", under = pos })
+	if game_mode.is_possessed(pos) then
+		botmatch.record_event("possessions", 1)
+		return true
+	end
+	return false
 end

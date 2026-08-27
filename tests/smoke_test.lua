@@ -194,6 +194,28 @@ check(not gm.is_sabotaged({ x = 40, y = 9, z = 0 }), "punch repair cleared the s
 check(minetest.get_meta({ x = 40, y = 9, z = 0 }):get_int("sl_sabotaged_until") == 0,
 	"corruption marker cleared from meta")
 
+section("PHASE 10b — evil-ghost possession + exorcism")
+minetest.set_node({ x = 14, y = 10, z = 10 }, { name = "sl_modebase:loot_crate" })
+local charm_def = minetest.registered_craftitems["sl_modebase:possess_charm"]
+local used_stack = charm_def.on_use(ItemStack("sl_modebase:possess_charm"), alpha,
+	{ type = "node", under = { x = 14, y = 10, z = 10 } })
+check(gm.is_possessed({ x = 14, y = 10, z = 10 }), "possession claimed the vessel")
+check(used_stack:to_string() == "", "possession charm consumed")
+check(minetest.get_meta({ x = 14, y = 10, z = 10 }):get_string("infotext") == "SOMETHING IS WATCHING",
+	"discoverable possession marker set")
+local fs_before2 = #(H.formspecs.beta or {})
+minetest.registered_nodes["sl_modebase:loot_crate"].on_rightclick(
+	{ x = 14, y = 10, z = 10 }, minetest.get_node({ x = 14, y = 10, z = 10 }),
+	beta, ItemStack(""), nil)
+check(#(H.formspecs.beta or {}) == fs_before2, "possessed crate refused the living")
+local whisper = false
+for _, line in ipairs(H.chat_player.alpha or {}) do
+	if line:find("vessel was touched") then whisper = true end
+end
+check(whisper, "ghost owner received the identity whisper")
+H.fire_punchnode({ x = 14, y = 10, z = 10 }, minetest.get_node({ x = 14, y = 10, z = 10 }), beta, nil)
+check(not gm.is_possessed({ x = 14, y = 10, z = 10 }), "punch exorcised the vessel")
+
 section("PHASE 11 — match timer, result screen, lobby reset")
 state.settings.match_duration = 5
 state.match_started_at = H.now() - 4 -- backdate so the timer expires within 2 s
@@ -210,6 +232,7 @@ for _, line in ipairs(H.chat_all) do
 end
 check(scoreboard_seen, "result scoreboard broadcast to chat")
 check(next(state.sabotage) == nil, "all sabotages purged at match end")
+check(next(state.possession) == nil, "all possessions purged at match end")
 check(alpha:get_pos().x == state.lobby_spawn.x and alpha:get_pos().y == state.lobby_spawn.y,
 	"players returned to lobby")
 check(gamma:get_pos().y == state.lobby_spawn.y, "gamma returned to lobby too")

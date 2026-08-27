@@ -17,6 +17,7 @@ function game_mode.end_match(winner, reason)
 	-- Clean reset: cancel any pending ready check and neutralize live sabotages.
 	game_mode.cancel_ready_check()
 	game_mode.clear_all_sabotage()
+	game_mode.clear_all_possession()
 
 	-- Restore beacons and spawns from persistent storage
 	local storage = game_mode.storage or minetest.get_mod_storage()
@@ -249,6 +250,7 @@ function game_mode.start_new_match(initiator)
 	-- so no previous-match corruption leaks into the new simulation.
 	game_mode.cancel_ready_check()
 	game_mode.clear_all_sabotage()
+	game_mode.clear_all_possession()
 
 	-- Beacons start every match at full integrity. Without this, damage
 	-- taken in a previous match persists (stale-state violation of the

@@ -132,7 +132,7 @@ local function refuse_if_sabotaged(pos, clicker)
 	return false
 end
 
--- 1 Hz tick: corrode sabotaged beacons and expire finished sabotages.
+-- 1 Hz tick: corrode sabotaged beacons, expire sabotages and possessions.
 local sabotage_tick_accum = 0
 function game_mode.sabotage_step(dtime)
 	sabotage_tick_accum = sabotage_tick_accum + dtime
@@ -148,23 +148,89 @@ function game_mode.sabotage_step(dtime)
 			game_mode.damage_beacon(entry.team_id, 2, S("Corrosion"), true)
 		end
 	end
+	for _, entry in pairs(state.possession) do
+		if now >= entry.until_time then
+			game_mode.clear_possession_at(entry.pos)
+		end
+	end
 end
 
--- Living players repair corrupted systems by punching them.
+-- Living players repair corrupted systems by punching them, and
+-- exorcise possessed vessels the same way.
 minetest.register_on_punchnode(function(pos, node, puncher, pointed_thing)
 	if not puncher or not puncher:is_player() then return end
-	if not game_mode.is_sabotaged(pos) then return end
 	local pl = game_mode.get_player_state(puncher:get_player_name())
-	if pl.phase ~= "alive" then
+
+	if game_mode.is_sabotaged(pos) then
+		if pl.phase ~= "alive" then
+			minetest.chat_send_player(puncher:get_player_name(),
+				S("Only the living can repair corrupted systems."))
+			return
+		end
+		game_mode.clear_sabotage_at(pos)
 		minetest.chat_send_player(puncher:get_player_name(),
-			S("Only the living can repair corrupted systems."))
+			S("Corruption neutralized. System restored."))
+		minetest.sound_play("default_tool_break", { pos = pos, gain = 0.5, max_hear_distance = 8 })
 		return
 	end
-	game_mode.clear_sabotage_at(pos)
-	minetest.chat_send_player(puncher:get_player_name(),
-		S("Corruption neutralized. System restored."))
-	minetest.sound_play("default_tool_break", { pos = pos, gain = 0.5, max_hear_distance = 8 })
+
+	if game_mode.is_possessed(pos) then
+		if pl.phase ~= "alive" then return end
+		game_mode.clear_possession_at(pos)
+		minetest.chat_send_player(puncher:get_player_name(),
+			S("The presence recoils. The vessel is free."))
+		minetest.sound_play("default_tool_break", { pos = pos, gain = 0.5, max_hear_distance = 8 })
+	end
 end)
+
+-- ================================================================
+-- Evil-ghost possession: one bounded vessel per ghost. The vessel
+-- refuses the living and whispers their identity to its owner —
+-- information, not damage. Exorcism by punch; expires on a timer.
+-- ================================================================
+
+local POSSESSABLE = {
+	["sl_modebase:loot_crate"] = true,
+	["sl_modebase:ghost_altar"] = true,
+	["sl_modebase:ghost_task_terminal"] = true,
+}
+
+function game_mode.can_possess(node_name)
+	return POSSESSABLE[node_name] == true
+end
+
+function game_mode.register_possession(pos, owner_name)
+	local meta = minetest.get_meta(pos)
+	local entry = {
+		pos = vector.round(pos),
+		owner = owner_name,
+		until_time = game_mode.now() + (state.settings.possession_duration or 20),
+	}
+	state.possession[game_mode.pos_hash(entry.pos)] = entry
+	if meta:get_string("sl_prev_infotext") == "" then
+		meta:set_string("sl_prev_infotext", meta:get_string("infotext"))
+	end
+	meta:set_string("infotext", S("SOMETHING IS WATCHING"))
+	return entry
+end
+
+-- Returns true when the click was swallowed by a possession. Living
+-- players get no confirmation; the owning ghost learns who touched
+-- its vessel (bounded information channel, no public leak).
+local function possession_intercept(pos, clicker)
+	local entry = game_mode.get_possession(pos)
+	if not entry then return false end
+	local pname = clicker:get_player_name()
+	local pl = game_mode.get_player_state(pname)
+	if pl.phase ~= "alive" then return false end
+	minetest.chat_send_player(pname, S("The mechanism feels wrong. Nothing happens."))
+	local owner = minetest.get_player_by_name(entry.owner)
+	if owner then
+		minetest.chat_send_player(entry.owner,
+			S("Your vessel was touched by @1.", pname))
+	end
+	return true
+end
 
 minetest.register_node(game_mode.modname .. ":beacon_a", {
 	description = S("Beacon A"),
@@ -330,6 +396,7 @@ minetest.register_node(game_mode.modname .. ":loot_crate", {
 		local name = clicker:get_player_name()
 
 		if refuse_if_sabotaged(pos, clicker) then return itemstack end
+		if possession_intercept(pos, clicker) then return itemstack end
 
 		minetest.show_formspec(name, "sl_modebase:loot_crate",
 			"formspec_version[4]" ..
@@ -420,6 +487,7 @@ minetest.register_node(game_mode.modname .. ":ghost_task_terminal", {
 		local name = clicker:get_player_name()
 		local pl = game_mode.get_player_state(name)
 		if refuse_if_sabotaged(pos, clicker) then return end
+		if possession_intercept(pos, clicker) then return end
 		if pl.phase == "ghost" then
 			if not pl.ghost_summoned_by then
 				minetest.chat_send_player(name, S("No living player has summoned you."))
@@ -458,6 +526,7 @@ minetest.register_node(game_mode.modname .. ":ghost_altar", {
 		if not clicker or not clicker:is_player() then return itemstack end
 		local name = clicker:get_player_name()
 		if refuse_if_sabotaged(pos, clicker) then return itemstack end
+		if possession_intercept(pos, clicker) then return itemstack end
 		local caller = game_mode.get_player_state(name)
 		if not state.match_active or caller.phase ~= "alive" then
 			minetest.chat_send_player(name, S("The altar answers only to a living player during an active match."))

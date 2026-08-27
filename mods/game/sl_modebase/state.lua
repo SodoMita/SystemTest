@@ -46,6 +46,9 @@ local state = {
 	-- Active sabotages: [pos_hash] = { pos, kind = "node"|"beacon", team_id, until_time }
 	sabotage = {},
 
+	-- Active evil-ghost possessions: [pos_hash] = { pos, owner, until_time }
+	possession = {},
+
 	-- Win Conditions (Options)
 	win_conditions = {
 		elimination = true,
@@ -61,6 +64,7 @@ local state = {
 		ready_timeout = 60,     -- seconds to collect /sl_ready confirmations
 		countdown = 5,          -- insertion countdown length in seconds
 		sabotage_duration = 30, -- seconds a sabotage charge corrupts its target
+		possession_duration = 20, -- seconds an evil ghost holds a vessel
 	}
 }
 
@@ -208,5 +212,37 @@ function game_mode.clear_all_sabotage()
 		game_mode.clear_sabotage_at(entry.pos)
 	end
 	state.sabotage = {}
+end
+
+-- ================================================================
+-- Possession registry (evil ghosts): bounded, discoverable, with
+-- an information channel to the possessing ghost and an exorcism
+-- counterplay for the living.
+-- ================================================================
+
+function game_mode.get_possession(pos)
+	return state.possession[game_mode.pos_hash(pos)]
+end
+
+function game_mode.is_possessed(pos)
+	return game_mode.get_possession(pos) ~= nil
+end
+
+function game_mode.clear_possession_at(pos)
+	local hash = game_mode.pos_hash(pos)
+	local entry = state.possession[hash]
+	if not entry then return false end
+	state.possession[hash] = nil
+	local meta = minetest.get_meta(pos)
+	meta:set_string("infotext", meta:get_string("sl_prev_infotext") or "")
+	meta:set_string("sl_prev_infotext", "")
+	return true
+end
+
+function game_mode.clear_all_possession()
+	for _, entry in pairs(state.possession) do
+		game_mode.clear_possession_at(entry.pos)
+	end
+	state.possession = {}
 end
 
