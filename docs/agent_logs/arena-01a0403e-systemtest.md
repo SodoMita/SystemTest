@@ -187,3 +187,43 @@ match is active.
   24 / 12 are sized for the harness arena (cage at y+40). Once WP1 commits the
   hand-built arena these want a balance pass — that is a `balance/*` branch
   per §6, not this one.
+
+## 2026-08-26 — WP3 addendum: strict-5.1 verification + CI blast radius
+
+Follow-up to the CI diagnosis above, after rebasing the containment work onto
+the Signal Scanner commits.
+
+**Rebase note.** `origin/arena/01a0403e-systemtest` had advanced (Signal
+Scanner + CI diagnosis) while the containment branch was local. Rebased onto
+it per §5.1 rather than force-pushing. Three add/add conflicts, all resolved
+by keeping *both* sides: the spec bullet (their scanner sentence supersedes
+the shorter one), `content.lua` (scanner block + possession focus coexist),
+and this log (append-only — all four entries kept in order).
+
+Integration verified rather than assumed: the scanner detects a possession
+registered through `game_mode.possess_object` and its report contains no
+ghost identity (4/4 checks). The two features touch the same registry from
+opposite sides, so this was the interaction most likely to break.
+
+**Strict Lua 5.1 re-verification.** Both WP3 features chain additive wrappers
+onto `sabotage_step` / `clear_all_sabotage`, so I re-checked the whole mod
+under a *stock 5.1 parser* (not LuaJIT) — the same parser class as the CI
+gate:
+
+- all 11 `sl_modebase/*.lua` files parse clean;
+- `tests/smoke_test.lua` 67/67 under the strict-5.1 interpreter.
+
+No WP3 change contributes to the red gate; the six `goto` files remain the
+sole cause.
+
+**Blast radius, for whoever prioritises issue #1.** The syntax gate runs
+*before* the smoke and soak steps, so every push currently fails without
+executing a single assertion (run 33048253968: `Syntax check` red, smoke and
+soak both skipped). Until #1 is resolved the merge train in §5 has no working
+referee and DoD §3.2/§3.3 cannot be demonstrated in CI by *any* work package
+— this blocks M1's exit check, not just WP3.
+
+Tried to add this to issue #1 directly; the session token lacks issue-comment
+permission (`Resource not accessible by integration`), so it is recorded here
+instead. Still not patching the six files from this session per §7.6 — the
+gate is WP4-owned and the files are WP5/WP6/unassigned.
