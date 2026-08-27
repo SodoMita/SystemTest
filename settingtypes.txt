@@ -20,5 +20,6 @@ sl_auto_start_delay (Auto-start intermission) int 8 3 120
 # The surface plane stays at y = 0; cubes tile below it.
 sl_cube_size (Underground cube size) int 8 4 32
 
-# How many monsters to spawn inside each generated cube.
-sl_cube_monsters (Monsters per cube) int 1 0 8
+# Total monsters spawned once during mapgen (not per cube / per chunk).
+# They are placed in underground cubes around the origin, then never again.
+sl_cube_monsters (Mapgen monster count) int 12 0 64

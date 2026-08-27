@@ -1,22 +1,24 @@
 -- System Looting worldgen: no Minetest Game nodes.
--- y = 0  -> glasslike neon plane
+-- y = 0  -> glasslike neon plane (infinite)
 -- y < 0  -> hollow cubes of opaque neon (walls + floors)
--- cube interiors spawn monsters; origin surface is the monster-master base.
+-- origin surface is the monster-master base
+-- A FIXED number of monsters is spawned once when the origin is generated.
 
 local PLANE = "ground:square_neon"
 local SOLID = "ground:square_neon_opaque"
 
 local function cube_size()
-	local n = tonumber(minetest.settings:get("sl_cube_size") or "") or 8
+	local n = tonumber(minetest.settings:get("sl_cube_size")
+		or minetest.settings:get("sl_arena.cube_size") or "") or 8
 	return math.max(4, math.min(32, math.floor(n)))
 end
 
-local function monsters_per_cube()
-	local n = tonumber(minetest.settings:get("sl_cube_monsters") or "") or 1
-	return math.max(0, math.min(8, math.floor(n)))
+-- Total monsters for the whole world, spawned exactly once at mapgen.
+local function monster_budget()
+	local n = tonumber(minetest.settings:get("sl_cube_monsters") or "") or 12
+	return math.max(0, math.min(64, math.floor(n)))
 end
 
--- True when this node is a wall or floor of the cube lattice.
 local function is_cube_shell(x, y, z, size)
 	if y >= 0 then
 		return false
@@ -24,12 +26,32 @@ local function is_cube_shell(x, y, z, size)
 	return (x % size == 0) or (z % size == 0) or (y % size == 0)
 end
 
--- Deterministic per-cube seed so monsters spawn once per cube, not per chunk.
-local function cube_seed(ix, iy, iz)
-	return ix * 73856093 + iy * 19349663 + iz * 83492791
+local mm_base_done = false
+local monsters_done = false
+
+local function storage()
+	return minetest.get_mod_storage and minetest.get_mod_storage() or nil
 end
 
-local mm_base_done = false
+local function already_spawned()
+	if monsters_done then
+		return true
+	end
+	local st = storage()
+	if st and st:get_string("sl_mapgen_mobs") == "1" then
+		monsters_done = true
+		return true
+	end
+	return false
+end
+
+local function mark_spawned()
+	monsters_done = true
+	local st = storage()
+	if st then
+		st:set_string("sl_mapgen_mobs", "1")
+	end
+end
 
 local function place_mm_base()
 	if mm_base_done then
@@ -37,8 +59,6 @@ local function place_mm_base()
 	end
 	mm_base_done = true
 
-	-- Raised neon pad + walls for the monster master, sitting on the y=0 plane.
-	local origin = { x = 0, y = 0, z = 0 }
 	for x = -4, 4 do
 		for z = -4, 4 do
 			minetest.set_node({ x = x, y = 0, z = z }, { name = PLANE })
@@ -50,13 +70,11 @@ local function place_mm_base()
 			end
 		end
 	end
-	-- Roof
 	for x = -4, 4 do
 		for z = -4, 4 do
 			minetest.set_node({ x = x, y = 5, z = z }, { name = SOLID })
 		end
 	end
-	-- Door on +Z face
 	for y = 1, 2 do
 		minetest.set_node({ x = 0, y = y, z = 4 }, { name = "air" })
 	end
@@ -79,48 +97,61 @@ local function place_mm_base()
 	minetest.log("action", "[ground] monster master base placed at origin")
 end
 
-local function spawn_cube_monsters(minp, maxp, size)
-	local count = monsters_per_cube()
-	if count <= 0 then
+-- Place a fixed budget of monsters, one per underground cube around origin,
+-- never again for this world.
+local function spawn_fixed_monsters()
+	if already_spawned() then
 		return
 	end
 	if not (game_mode and game_mode.spawn_monster) then
 		return
 	end
 
-	local ix0 = math.floor(minp.x / size)
-	local ix1 = math.floor(maxp.x / size)
-	local iy0 = math.floor(minp.y / size)
-	local iy1 = math.floor(maxp.y / size)
-	local iz0 = math.floor(minp.z / size)
-	local iz1 = math.floor(maxp.z / size)
+	local budget = monster_budget()
+	if budget <= 0 then
+		mark_spawned()
+		return
+	end
 
+	local size = cube_size()
 	local variants = (game_mode.MONSTER_TYPE_ORDER) or { "stalker" }
+	local spawned = 0
+	-- First underground layer of cubes: iy = -1. Walk a square spiral in XZ.
+	local ix, iz = 0, 0
+	local dx, dz = 1, 0
+	local segment_len, walked, turns = 1, 0, 0
 
-	for ix = ix0, ix1 do
-		for iy = iy0, iy1 do
-			for iz = iz0, iz1 do
-				-- Cubes live strictly below the surface plane.
-				if iy < 0 then
-					local cx = ix * size + math.floor(size / 2)
-					local cy = iy * size + math.floor(size / 2)
-					local cz = iz * size + math.floor(size / 2)
-					if cx >= minp.x and cx <= maxp.x
-							and cy >= minp.y and cy <= maxp.y
-							and cz >= minp.z and cz <= maxp.z then
-						local rng = PseudoRandom(cube_seed(ix, iy, iz))
-						for n = 1, count do
-							local ox = rng:next(-math.floor(size / 4), math.floor(size / 4))
-							local oz = rng:next(-math.floor(size / 4), math.floor(size / 4))
-							local pos = { x = cx + ox, y = cy, z = cz + oz }
-							local variant = variants[(rng:next(1, #variants))]
-							game_mode.spawn_monster(pos, variant)
-						end
-					end
-				end
+	while spawned < budget do
+		local cx = ix * size + math.floor(size / 2)
+		local cy = -size + math.floor(size / 2)
+		local cz = iz * size + math.floor(size / 2)
+		-- Skip the cube directly under the MM pad so the base is not infested.
+		if not (ix == 0 and iz == 0) then
+			local variant = variants[(spawned % #variants) + 1]
+			game_mode.spawn_monster({ x = cx, y = cy, z = cz }, variant)
+			spawned = spawned + 1
+		end
+		ix = ix + dx
+		iz = iz + dz
+		walked = walked + 1
+		if walked == segment_len then
+			walked = 0
+			local ndx, ndz = -dz, dx
+			dx, dz = ndx, ndz
+			turns = turns + 1
+			if turns % 2 == 0 then
+				segment_len = segment_len + 1
 			end
 		end
+		-- Safety: never walk forever if budget is huge.
+		if segment_len > 32 then
+			break
+		end
 	end
+
+	mark_spawned()
+	minetest.log("action", "[ground] spawned " .. spawned
+		.. " mapgen monsters (fixed budget, once)")
 end
 
 minetest.register_on_generated(function(minp, maxp, blockseed)
@@ -145,7 +176,6 @@ minetest.register_on_generated(function(minp, maxp, blockseed)
 				elseif y < 0 and is_cube_shell(x, y, z, size) then
 					data[vi] = c_solid
 				else
-					-- Keep generated chunks empty of default stone / water.
 					if data[vi] == c_ignore then
 						data[vi] = c_air
 					end
@@ -160,11 +190,8 @@ minetest.register_on_generated(function(minp, maxp, blockseed)
 	vm:update_map()
 
 	if minp.x <= 0 and maxp.x >= 0 and minp.z <= 0 and maxp.z >= 0
-			and minp.y <= 0 and maxp.y >= 5 then
+			and minp.y <= 0 and maxp.y >= 0 then
 		minetest.after(0, place_mm_base)
+		minetest.after(0, spawn_fixed_monsters)
 	end
-
-	minetest.after(0, function()
-		spawn_cube_monsters(minp, maxp, size)
-	end)
 end)
