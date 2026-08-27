@@ -31,6 +31,7 @@ M.globalsteps = {}
 M.afters = {}
 M.luaentities = {}
 M.current_modname = "sl_modebase"
+M.entity_spawns = {}  -- list of { pos = ..., name = ... }, in spawn order
 
 local handlers = {
 	joinplayer = {}, leaveplayer = {}, respawnplayer = {}, dieplayer = {},
@@ -88,10 +89,20 @@ local InvMeta = {}
 InvMeta.__index = InvMeta
 
 local function new_inv(size)
-	return setmetatable({ lists = { main = {} }, size = size or 32 }, InvMeta)
+	return setmetatable({ lists = { main = {} }, sizes = {}, size = size or 32 }, InvMeta)
 end
 
-function InvMeta:get_size(_) return self.size end
+function InvMeta:get_size(list)
+	if list and self.sizes and self.sizes[list] then
+		return self.sizes[list]
+	end
+	return self.size
+end
+
+function InvMeta:set_size(list, size)
+	self.sizes = self.sizes or {}
+	self.sizes[list] = size
+end
 
 function InvMeta:get_stack(list, i)
 	return ItemStack((self.lists[list] or {})[i] or "")
@@ -114,7 +125,7 @@ end
 
 function InvMeta:get_list(list)
 	local out = {}
-	for i = 1, self.size do
+	for i = 1, self:get_size(list) do
 		out[i] = ItemStack((self.lists[list] or {})[i] or "")
 	end
 	return out
@@ -131,8 +142,8 @@ function InvMeta:contains_item(list, item)
 	local stack = ItemStack(item)
 	local want = stack:get_count()
 	local have = 0
-	for _, s in pairs(self.lists[list] or {}) do
-		local it = ItemStack(s)
+	for i = 1, self:get_size(list) do
+		local it = ItemStack(self.lists[list] and self.lists[list][i] or "")
 		if it:get_name() == stack:get_name() then
 			have = have + it:get_count()
 		end
@@ -145,14 +156,14 @@ function InvMeta:add_item(list, item)
 	local name, count = stack:get_name(), stack:get_count()
 	if name == "" or count == 0 then return ItemStack("") end
 	self.lists[list] = self.lists[list] or {}
-	for i = 1, self.size do
+	for i = 1, self:get_size(list) do
 		local cur = ItemStack(self.lists[list][i] or "")
 		if cur:get_name() == name then
 			self.lists[list][i] = name .. " " .. (cur:get_count() + count)
 			return ItemStack("")
 		end
 	end
-	for i = 1, self.size do
+	for i = 1, self:get_size(list) do
 		if not self.lists[list][i] then
 			self.lists[list][i] = name .. " " .. count
 			return ItemStack("")
@@ -165,7 +176,7 @@ function InvMeta:remove_item(list, item)
 	local stack = ItemStack(item)
 	local name, count = stack:get_name(), stack:get_count()
 	local removed = 0
-	for i = 1, self.size do
+	for i = 1, self:get_size(list) do
 		if removed >= count then break end
 		local cur = ItemStack(self.lists[list][i] or "")
 		if cur:get_name() == name and cur:get_count() > 0 then
@@ -365,6 +376,13 @@ function M.fire_punchnode(pos, node, puncher, pointed_thing)
 	end
 end
 
+function M.fire_receive_fields(name, formname, fields)
+	local player = M.players[name]
+	for _, fn in ipairs(handlers.player_receive_fields) do
+		fn(player, formname, fields)
+	end
+end
+
 function M.fire_joinplayer(p)
 	for _, fn in ipairs(handlers.joinplayer) do fn(p) end
 end
@@ -482,12 +500,20 @@ function minetest.add_item(_, stack)
 	local obj = { set_velocity = function() end, remove = function() end }
 	return obj
 end
-function minetest.add_entity(_, name)
+function minetest.add_entity(pos, name)
 	local obj = {
+		_pos = pos,
+		_props = {},
+		set_properties = function(self, props)
+			for k, v in pairs(props or {}) do self._props[k] = v end
+		end,
+		get_properties = function(self) return self._props end,
+		get_pos = function(self) return self._pos end,
 		set_velocity = function() end,
 		remove = function() end,
 		get_luaentity = function() return { name = name } end,
 	}
+	table.insert(M.entity_spawns, { pos = pos, name = name })
 	return obj
 end
 function minetest.add_particle(_) end

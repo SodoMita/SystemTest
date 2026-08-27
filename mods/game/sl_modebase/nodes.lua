@@ -131,6 +131,7 @@ local function refuse_if_sabotaged(pos, clicker)
 	end
 	return false
 end
+game_mode.refuse_if_sabotaged = refuse_if_sabotaged
 
 -- 1 Hz tick: corrode sabotaged beacons, expire sabotages and possessions.
 local sabotage_tick_accum = 0
@@ -560,6 +561,7 @@ local POSSESSABLE_NODES = {
 	[modname .. ":loot_crate"] = "system",
 	[modname .. ":item_pickup"] = "system",
 	[modname .. ":platform"] = "system",
+	[modname .. ":monster_spawner"] = "system",
 }
 
 local function possession_setting(key, fallback)

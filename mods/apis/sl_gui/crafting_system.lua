@@ -388,12 +388,34 @@ register_craft_recipe({
     category     = "equipment",
 })
 
+-- MM RESOURCE: Monster Essence fuels the Monster Spawner Unit (1 per spawn)
+register_craft_recipe({
+    output       = "sl_modebase:monster_essence",
+    output_count = 2,
+    ingredients  = { ["ground:square_neon"] = 4, ["sl_modebase:electronic_waste"] = 2 },
+    description  = "Monster Essence (spawner fuel)",
+    category     = "salvage",
+})
+
 -- TACTICAL: defense and utility
 register_craft_recipe({
     output       = "sl_scary:hide_spot",
     output_count = 1,
     ingredients  = {["construction:fire"] = 2, ["construction:plasma"] = 2},
     description  = "Shadow Hideout",
+    category     = "tactical",
+})
+
+register_craft_recipe({
+    output       = "sl_modebase:monster_spawner",
+    output_count = 1,
+    ingredients  = {
+        ["sl_modebase:loot_crate"]      = 1,
+        ["construction:plasma"]         = 4,
+        ["construction:fire"]           = 4,
+        ["sl_modebase:monster_essence"] = 2,
+    },
+    description  = "Monster Spawner Unit (Monster Master GUI: choose the creature, feed essence)",
     category     = "tactical",
 })
 

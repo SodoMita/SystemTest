@@ -69,6 +69,14 @@ The Monster Master is an asymmetric commander. The long-term design includes:
 
 The initial milestone may use only basic scripted monster deployment.
 
+Milestone progress: the **Monster Spawner Unit** node implements basic
+deployment. The Monster Master crafts and feeds the unit with **Monster
+Essence** (one per spawn), clicks it to open the spawner GUI, and chooses
+which creature to release from the list — **Stalker** (balanced), **Scout**
+(fast, fragile), **Brute** (slow, tanky, heavy hitter), plus the sl_scary
+horror mobs **Dredger**, **Signal Wraith** and **Containment Horror**.
+Only the Monster Master can operate the unit.
+
 ## Crafting Direction
 
 Crafting is deferred until the match loop is stable.

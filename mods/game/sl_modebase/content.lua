@@ -397,12 +397,8 @@ minetest.register_tool(modname .. ":summon_monster", {
 		local spawn_pos = vector.add(pos, vector.multiply(dir, 3))
 		spawn_pos.y = spawn_pos.y + 1
 
-		local obj = minetest.add_entity(spawn_pos, game_mode.MONSTER_NAME)
+		local obj = game_mode.spawn_monster(spawn_pos, "stalker", name)
 		if obj then
-			local lua = obj:get_luaentity()
-			if lua then
-				lua.monster_owner = name
-			end
 			minetest.sound_play("monster_idle", { pos = spawn_pos, gain = 0.8 })
 		end
 
@@ -412,6 +408,244 @@ minetest.register_tool(modname .. ":summon_monster", {
 		return itemstack -- Don't allow dropping
 	end,
 })
+
+-- ---------------------------------------------------------------
+-- Monster Master resources
+-- ---------------------------------------------------------------
+-- Monster Essence is the Monster Master's deployable resource: each
+-- spawner unit burns one per creature it produces. Craftable (see
+-- sl_gui crafting system) and gifted as a starter stack when a
+-- player takes the Monster Master role.
+game_mode.ESSENCE_ITEM = modname .. ":monster_essence"
+
+minetest.register_craftitem(game_mode.ESSENCE_ITEM, {
+	description = S("Monster Essence\\n(Monster Master resource; spawner fuel)"),
+	inventory_image = "sl_monster_essence.png",
+	groups = { component = 1, mm_resource = 1 },
+})
+
+-- ---------------------------------------------------------------
+-- Monster Spawner Unit
+-- ---------------------------------------------------------------
+-- A placeable, feedable machine. The Monster Master right-clicks it
+-- to open the spawner GUI: a list of every creature in
+-- game_mode.MONSTER_TYPES. Selecting one burns one Monster Essence
+-- from the unit's feed and spawns that creature beside the node.
+-- Anyone else who clicks it is told it is out of reach.
+-- ---------------------------------------------------------------
+
+-- Counts Monster Essence across a spawner feed inventory.
+function game_mode.count_feed_essence(inv)
+	local total = 0
+	for i = 1, inv:get_size("feed") do
+		local stack = inv:get_stack("feed", i)
+		if stack:get_name() == game_mode.ESSENCE_ITEM then
+			total = total + stack:get_count()
+		end
+	end
+	return total
+end
+
+-- Per-node spawner settings (spawn rate + minimal essence), stored in the
+-- node's own meta so every unit can be tuned independently. Defaults
+-- apply when a node predates the settings.
+local SPAWNER_CD_DEFAULT = 5  -- seconds between spawns
+local SPAWNER_MIN_DEFAULT = 1 -- minimum essence in the feed
+
+local function spawner_node_settings(meta)
+	local cd_raw = meta:get_string("spawner_cd")
+	local min_raw = meta:get_string("spawner_min")
+	local cooldown = (cd_raw ~= "") and math.max(0, math.floor(tonumber(cd_raw) or SPAWNER_CD_DEFAULT))
+		or SPAWNER_CD_DEFAULT
+	local min_essence = (min_raw ~= "") and math.max(1, math.floor(tonumber(min_raw) or SPAWNER_MIN_DEFAULT))
+		or SPAWNER_MIN_DEFAULT
+	return cooldown, min_essence
+end
+
+-- Shared spawner activation path (GUI field clicks and tests).
+-- Returns true when a creature was produced.
+function game_mode.spawner_activate(name, pos, variant)
+	if not game_mode.is_monster_master(name) then
+		minetest.chat_send_player(name, S("Only the Monster Master can operate this unit."))
+		return false
+	end
+
+	local def = game_mode.MONSTER_TYPES[variant]
+	if not def then
+		return false
+	end
+
+	local meta = minetest.get_meta(pos)
+	local feed = meta:get_inventory()
+	local now = game_mode.now()
+	local _, min_essence = spawner_node_settings(meta)
+
+	-- Node setting: minimal resource quantity to spawn.
+	local in_feed = game_mode.count_feed_essence(feed)
+	if in_feed < min_essence then
+		minetest.chat_send_player(name,
+			S("The unit needs at least @1 Monster Essence in the feed to run (has @2).",
+				tostring(min_essence), tostring(in_feed)))
+		return false
+	end
+
+	-- Node setting: spawn rate — a unit needs cooldown between spawns.
+	local ready_at = meta:get_int("sl_spawner_ready_at")
+	if now < ready_at then
+		minetest.chat_send_player(name,
+			S("The spawner is still spooling. (@1 s)",
+				tostring(math.ceil(ready_at - now))))
+		return false
+	end
+
+	local spawn_pos = {
+		x = pos.x + (math.random() - 0.5),
+		y = pos.y + 1,
+		z = pos.z + (math.random() - 0.5),
+	}
+	local obj = game_mode.spawn_monster(spawn_pos, variant, name)
+	if not obj then
+		-- No creature came out (e.g. its entity mod is not loaded):
+		-- the unit keeps the essence.
+		minetest.chat_send_player(name, S("The spawner sputtered and produced nothing."))
+		return false
+	end
+
+	-- Spawn confirmed: now burn the essence and start the spool-down.
+	feed:remove_item("feed", ItemStack(game_mode.ESSENCE_ITEM .. " 1"))
+	local cooldown = spawner_node_settings(meta)
+	meta:set_int("sl_spawner_ready_at", math.floor(now + cooldown))
+	meta:set_string("infotext",
+		S("Monster Spawner Unit (feed: @1)", tostring(game_mode.count_feed_essence(feed))))
+	minetest.sound_play("monster_idle", { pos = spawn_pos, gain = 0.8, max_hear_distance = 12 })
+	game_mode.broadcast(S("The spawner is producing a @1.", def.label))
+	return true
+end
+
+-- Spawner GUI: one button per creature (the monster list), a stat
+-- label per row, the unit's feed below, and the MM's inventory for
+-- loading essence. The node position rides in the form name so the
+-- field handler can find the clicked unit.
+local function spawner_formspec(pos, meta)
+	local essence = game_mode.count_feed_essence(meta:get_inventory())
+	local _, min_essence = spawner_node_settings(meta)
+	local cd_raw = meta:get_string("spawner_cd")
+	local min_raw = meta:get_string("spawner_min")
+	local fs = {
+		"formspec_version[4]",
+		"size[9,15.5]",
+		"bgcolor[#120a14ee;true]",
+		"label[0.3,0.2;MONSTER SPAWNER UNIT]",
+		"label[0.3,0.7;Essence in unit: " .. tostring(essence) .. "  (needs "
+			.. tostring(min_essence) .. ", 1 per spawn)]",
+	}
+	local y = 1.3
+	for _, id in ipairs(game_mode.MONSTER_TYPE_ORDER) do
+		local def = game_mode.MONSTER_TYPES[id]
+		table.insert(fs, string.format("button[0.3,%s;2.6,1;spawn_%s;%s]",
+			tostring(y), id, minetest.formspec_escape(def.label)))
+		table.insert(fs, string.format("label[3.2,%s;HP %d  SPD %s  DMG %d]",
+			tostring(y + 0.2), def.hp, tostring(def.speed), def.damage))
+		y = y + 1.1
+	end
+	table.insert(fs, string.format("label[0.3,%s;Load essence into the feed, then select a unit.]",
+		tostring(y)))
+	local feed_y = y + 0.5
+	table.insert(fs, string.format("list[nodemeta:%d,%d,%d;feed;0.3,%s;8,1;]",
+		pos.x, pos.y, pos.z, tostring(feed_y)))
+	table.insert(fs, string.format("list[current_player;main;0.3,%s;8,4;]",
+		tostring(feed_y + 1.1)))
+	table.insert(fs, string.format("listring[nodemeta:%d,%d,%d;feed]", pos.x, pos.y, pos.z))
+	table.insert(fs, "listring[current_player;main]")
+	-- Per-node settings (spawn rate + minimal essence), saved to this unit.
+	table.insert(fs, "label[0.3,13.9;UNIT SETTINGS]")
+	table.insert(fs, "label[0.3,14.5;Cooldown (s):]")
+	table.insert(fs, string.format("field[2.1,14.2;1.2,0.6;spawner_cd;;%s]",
+		cd_raw ~= "" and cd_raw or tostring(SPAWNER_CD_DEFAULT)))
+	table.insert(fs, "label[3.6,14.5;Min Essence:]")
+	table.insert(fs, string.format("field[5.2,14.2;1.2,0.6;spawner_min;;%s]",
+		min_raw ~= "" and min_raw or tostring(SPAWNER_MIN_DEFAULT)))
+	table.insert(fs, "button[6.7,14.2;2.0,0.6;save_spawner_cfg;Save]")
+	table.insert(fs, "button_exit[6,0.2;2.6,0.6;close;Close]")
+	return table.concat(fs, "")
+end
+
+minetest.register_node(modname .. ":monster_spawner", {
+	description = S("Monster Spawner Unit"),
+	inventory_image = "sl_monster_spawner.png",
+	drawtype = "mesh",
+	mesh = "ghost_altar.obj",
+	tiles = { "sl_monster_spawner.png" },
+	paramtype = "light",
+	light_source = 10,
+	groups = { cracky = 2, oddly_breakable_by_hand = 1 },
+	is_ground_content = false,
+	selection_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },
+	collision_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },
+
+	on_construct = function(pos)
+		local meta = minetest.get_meta(pos)
+		meta:get_inventory():set_size("feed", 10)
+		-- Per-unit settings, tunable from the spawner GUI.
+		meta:set_int("spawner_cd", SPAWNER_CD_DEFAULT)
+		meta:set_int("spawner_min", SPAWNER_MIN_DEFAULT)
+		meta:set_string("infotext", S("Monster Spawner Unit (feed: 0)"))
+	end,
+
+	on_rightclick = function(pos, node, clicker, itemstack)
+		if not clicker or not clicker:is_player() then return itemstack end
+		local name = clicker:get_player_name()
+		if game_mode.refuse_if_sabotaged(pos, clicker) then return itemstack end
+		if not game_mode.is_monster_master(name) then
+			minetest.chat_send_player(name,
+				S("Only the Monster Master can operate this unit."))
+			return itemstack
+		end
+		minetest.show_formspec(name,
+			"sl_modebase:monster_spawner:" .. game_mode.pos_hash(pos),
+			spawner_formspec(pos, minetest.get_meta(pos)))
+		return itemstack
+	end,
+})
+
+-- GUI field handler: the spawner GUI sends one "spawn_<variant>" field
+-- per click. Only a live Monster Master, on a real spawner node, gets
+-- a creature.
+minetest.register_on_player_receive_fields(function(player, formname, fields)
+	local _, _, x, y, z = formname:match("^sl_modebase:monster_spawner:([-]?%d+),([-]?%d+),([-]?%d+)$")
+	if not x then return end
+	local pos = { x = tonumber(x), y = tonumber(y), z = tonumber(z) }
+	local node = minetest.get_node_or_nil(pos)
+	if not node or node.name ~= modname .. ":monster_spawner" then return end
+	local name = player:get_player_name()
+
+	-- Saving this unit's own settings (spawn rate + minimal essence).
+	if fields.save_spawner_cfg ~= nil then
+		if not game_mode.is_monster_master(name) then
+			minetest.chat_send_player(name, S("Only the Monster Master can operate this unit."))
+			return
+		end
+		local meta = minetest.get_meta(pos)
+		local cd = math.max(0, math.floor(tonumber(fields.spawner_cd) or SPAWNER_CD_DEFAULT))
+		local mn = math.max(1, math.floor(tonumber(fields.spawner_min) or SPAWNER_MIN_DEFAULT))
+		meta:set_int("spawner_cd", cd)
+		meta:set_int("spawner_min", mn)
+		minetest.chat_send_player(name,
+			S("Spawner unit configured: cooldown @1 s, minimum @2 essence.",
+				tostring(cd), tostring(mn)))
+		return
+	end
+
+	local variant
+	for _, id in ipairs(game_mode.MONSTER_TYPE_ORDER) do
+		if fields["spawn_" .. id] ~= nil then
+			variant = id
+			break
+		end
+	end
+	if not variant then return end
+	game_mode.spawner_activate(name, pos, variant)
+end)
 
 -- Evil ghost sabotage: one bounded charge per revival, targeting a nearby node.
 minetest.register_tool(modname .. ":sabotage_charge", {
