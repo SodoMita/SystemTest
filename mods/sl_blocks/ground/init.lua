@@ -15,6 +15,20 @@ core.register_node("ground:square_neon", {
 	sounds = default.node_sound_glass_defaults(),
 })
 
+-- Opaque copy of the neon square grid. Same glowing grid lines, but on a
+-- solid dark plate (drawtype "normal", no alpha blending), so it can be used
+-- for load-bearing map structure: the walls of the generated arena cubes.
+core.register_node("ground:square_neon_opaque", {
+	description = "Neon square ground (opaque)",
+	drawtype = "normal",
+	tiles = { "square_neon_opaque.png" },
+	light_source = 14,
+	paramtype = "light",
+	paramtype2 = "facedir",
+	groups = { cracky = 3, oddly_breakable_by_hand = 3 },
+	sounds = default.node_sound_glass_defaults(),
+})
+
 core.register_node("ground:rhombus_neon", {
 -- 	description = S("Neon square ground"),
 	drawtype = "glasslike",

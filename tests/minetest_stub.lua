@@ -482,13 +482,49 @@ function minetest.add_item(_, stack)
 	local obj = { set_velocity = function() end, remove = function() end }
 	return obj
 end
-function minetest.add_entity(_, name)
+function minetest.add_entity(pos, name)
+	-- Tracked fake ObjectRef so tests can count spawned entities and sweep
+	-- them by position. Deliberately has no `.name` field: production code
+	-- (match.lua end_match) iterates minetest.luaentities and expects
+	-- luaentity-shaped entries there.
 	local obj = {
+		_pos = { x = pos.x, y = pos.y, z = pos.z },
+		_valid = true,
 		set_velocity = function() end,
-		remove = function() end,
-		get_luaentity = function() return { name = name } end,
+		remove = function(self)
+			self._valid = false
+			for i, o in ipairs(M.luaentities) do
+				if o == self then
+					table.remove(M.luaentities, i)
+					break
+				end
+			end
+		end,
+		get_luaentity = function(self)
+			if not self._valid then return nil end
+			return { name = self._entity_name }
+		end,
+		get_pos = function(self)
+			if not self._valid then return nil end
+			return { x = self._pos.x, y = self._pos.y, z = self._pos.z }
+		end,
 	}
+	obj._entity_name = name
+	table.insert(M.luaentities, obj)
 	return obj
+end
+function minetest.get_objects_inside_radius(center, radius)
+	local res = {}
+	local r2 = radius * radius
+	for _, obj in ipairs(M.luaentities) do
+		if obj._valid and obj._pos then
+			local dx, dy, dz = obj._pos.x - center.x, obj._pos.y - center.y, obj._pos.z - center.z
+			if dx * dx + dy * dy + dz * dz <= r2 then
+				table.insert(res, obj)
+			end
+		end
+	end
+	return res
 end
 function minetest.add_particle(_) end
 function minetest.sound_play(_, _) end

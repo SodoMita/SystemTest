@@ -15,3 +15,14 @@ sl_auto_start (Auto-start matches) bool false
 
 # Lobby intermission in seconds before an auto-started match countdown.
 sl_auto_start_delay (Auto-start intermission) int 8 3 120
+
+# Interior side length, in nodes, of the hollow cubes in the auto-generated
+# neon grid arena. The wall grid is one node thick and as tall as the cubes
+# are wide, so each cell is a sealed hollow cube with one penned monster.
+sl_arena.cube_size (Arena cube size) int 4 2 16
+
+# Number of monster cubes along the X (east-west) axis of the arena.
+sl_arena.grid_width (Arena grid width in cubes) int 5 2 32
+
+# Number of monster cubes along the Z (north-south) axis of the arena.
+sl_arena.grid_depth (Arena grid depth in cubes) int 3 2 32

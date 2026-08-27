@@ -3,8 +3,9 @@
 -- Headless smoke test for mods/game/sl_modebase against the engine
 -- stub. Exercises the MATCH_LOOP_SPEC rules that are implemented:
 --   * mod load path executes without error
---   * ghost chat + chat COMMAND seal (msg/w/tell guarded)
+--   * neon ground nodes register (arena building blocks)
 --   * cloud cage materialization
+--   * ghost chat + chat COMMAND seal (msg/w/tell guarded)
 --   * ready check -> countdown -> insertion
 --   * lives -> ghost cloud-cage transition
 --   * ghost altar ritual + information offer
@@ -12,6 +13,7 @@
 --   * sabotage corrosion, interaction refusal, punch repair
 --   * match timer, result screen, lobby reset (priv/box restore)
 --   * clean restart without stale state
+--   * neon grid arena: geometry, penned monsters, zero default-mod nodes
 --
 -- Run from the repo root:  lua5.1 tests/smoke_test.lua
 -- ================================================================
@@ -48,6 +50,22 @@ minetest.register_chatcommand("tell", {
 })
 
 section("PHASE 1 — mod load path")
+-- Load the real ground mod first so the neon arena nodes exist. The stub
+-- has no engine `core` alias and no `default` mod, so shim both.
+core = minetest
+default = {
+	node_sound_glass_defaults = function() return {} end,
+	node_sound_stone_defaults = function() return {} end,
+}
+H.current_modname = "ground"
+local ok_ground, err_ground = pcall(dofile, "mods/sl_blocks/ground/init.lua")
+check(ok_ground, "ground mod loads" .. (ok_ground and "" or (" -> " .. tostring(err_ground))))
+check(minetest.registered_nodes["ground:square_neon"] ~= nil, "neon grid floor node registered")
+local opaque_def = minetest.registered_nodes["ground:square_neon_opaque"]
+check(opaque_def ~= nil, "opaque neon grid node registered")
+check(opaque_def and opaque_def.drawtype == "normal" and opaque_def.use_texture_alpha == nil,
+	"opaque neon grid node is not alpha-blended (true copy, but opaque)")
+
 H.current_modname = "sl_modebase"
 local ok, err = pcall(dofile, "mods/game/sl_modebase/init.lua")
 check(ok, "init.lua loads without error" .. (ok and "" or (" -> " .. tostring(err))))
@@ -74,10 +92,10 @@ section("PHASE 2 — cloud cage materialization")
 H.run_mods_loaded()
 H.advance(3, 0.5) -- the builder runs 2 s after mods_loaded
 local gs = state.ghost_spawn
-check(H.voxels[H.vhash({ x = gs.x, y = gs.y - 1, z = gs.z })] == "default:glass",
-	"cage floor materialized below ghost spawn")
-check(H.voxels[H.vhash({ x = gs.x - 5, y = gs.y, z = gs.z - 5 })] == "default:obsidianbrick",
-	"cage corner pylon materialized")
+check(H.voxels[H.vhash({ x = gs.x, y = gs.y - 1, z = gs.z })] == "ground:square_neon",
+	"cage floor materialized below ghost spawn (neon grid)")
+check(H.voxels[H.vhash({ x = gs.x - 5, y = gs.y, z = gs.z - 5 })] == "ground:square_neon_opaque",
+	"cage corner pylon materialized (opaque neon)")
 
 section("PHASE 3 — players join into lobby")
 -- Three players: with only two, eliminating one ends the match instantly
@@ -305,6 +323,93 @@ H.remove_player("gamma")
 H.advance(6, 0.5)
 check(not state.match_active, "auto-start stays idle with fewer than 2 players")
 state.settings.auto_start = false
+
+section("PHASE 15 — neon grid arena (default tiny map)")
+-- Default settings: cube 4, grid 5x3 -> pitch 5, footprint 26x16,
+-- x0=-13, z0=-8. Four special cubes, the rest pen one monster each.
+local function vox(x, y, z)
+	return H.voxels[H.vhash({ x = x, y = y, z = z })]
+end
+local function count_monsters()
+	local n = 0
+	for _, obj in ipairs(H.luaentities) do
+		local le = obj.get_luaentity and obj:get_luaentity()
+		if le and le.name == "sl_modebase:monster" then n = n + 1 end
+	end
+	return n
+end
+
+check(gm.build_test_arena({ x = 0, y = 0, z = 0 }) == true, "arena build accepted")
+check(vox(-13, 0, -8) == "ground:square_neon", "floor is the transparent neon grid")
+check(vox(12, 0, 7) == "ground:square_neon", "neon grid floor covers the far corner")
+check(vox(-13, 1, 0) == "ground:square_neon_opaque", "cube walls are the opaque neon grid")
+check(vox(-8, 4, 0) == "ground:square_neon_opaque", "interior wall line present")
+check(vox(-8, 4, 0) ~= nil and vox(-8, 5, 0) == "air", "walls exactly as tall as the cubes")
+check(vox(-4, 1, -1) == "air", "cube interiors stay hollow")
+check(vox(-1, 1, -1) == "sl_modebase:ghost_altar", "ghost altar at the center cube")
+check(vox(-11, 1, -1) == "ground:square_neon_opaque" and vox(-11, 2, -1) == "sl_modebase:beacon_a",
+	"beacon A base: opaque neon pad + beacon")
+check(vox(9, 2, -1) == "sl_modebase:beacon_b", "beacon B base on the east edge")
+check(state.teams.beacon_a.spawn.x == -11 and state.teams.beacon_a.spawn.y == 3,
+	"beacon A team spawn follows the arena")
+check(vox(-1, 1, -6) == "ground:square_neon_opaque" and vox(-1, 2, -6) == "sl_modebase:spawn_mm",
+	"monster master base: neon plinth + spawn marker")
+check(state.monster_master.base_spawn.x == -1 and state.monster_master.base_spawn.y == 3,
+	"monster master spawn set on the base")
+check(vox(-1, 7, -1) == "ground:square_neon_opaque", "lobby deck floor above the altar cube")
+check(vox(-5, 8, -5) == "ground:square_neon_opaque", "lobby deck has a rim")
+check(state.lobby_spawn.x == -1 and state.lobby_spawn.y == 9,
+	"lobby spawn sits on the open deck")
+check(count_monsters() == 11, "one monster penned in every ordinary cube (got "
+	.. count_monsters() .. ")")
+do
+	local placed_ok = true
+	for _, obj in ipairs(H.luaentities) do
+		local le = obj.get_luaentity and obj:get_luaentity()
+		if le and le.name == "sl_modebase:monster" then
+			local p = obj:get_pos()
+			-- centered on a cube's floor node, never inside a wall line
+			if p.y ~= 1 or (p.x % 1) ~= 0.5 or (p.z % 1) ~= 0.5 then
+				placed_ok = false
+			end
+			local fx, fz = math.floor(p.x), math.floor(p.z)
+			if (fx - (-13)) % 5 == 0 or (fz - (-8)) % 5 == 0 then
+				placed_ok = false -- on a wall grid line
+			end
+		end
+	end
+	check(placed_ok, "monsters spawn centered inside their cubes, not in walls")
+end
+
+-- Rebuilds must not duplicate the penned monsters.
+gm.build_test_arena({ x = 0, y = 0, z = 0 })
+check(count_monsters() == 11, "arena rebuild does not duplicate monsters (got "
+	.. count_monsters() .. ")")
+
+-- The cube size is configurable from game settings.
+H.settings["sl_arena.cube_size"] = 2
+H.settings["sl_arena.grid_width"] = 3
+H.settings["sl_arena.grid_depth"] = 2
+gm.build_test_arena({ x = 0, y = 0, z = 0 })
+check(vox(-2, 1, 0) == "ground:square_neon_opaque" and vox(-2, 2, 0) == "ground:square_neon_opaque",
+	"cube size 2 -> wall pitch 3, walls two high")
+check(vox(-2, 3, 0) == "air", "smaller cubes leave no tall walls behind")
+check(state.lobby_spawn.y == 7, "lobby deck follows the configured cube size")
+check(count_monsters() == 2, "2x2-grid monster count follows the settings (got "
+	.. count_monsters() .. ")")
+H.settings["sl_arena.cube_size"] = nil
+H.settings["sl_arena.grid_width"] = nil
+H.settings["sl_arena.grid_depth"] = nil
+
+-- The whole generated map must be free of Minetest Game default nodes.
+local leaked = {}
+for key, name in pairs(H.voxels) do
+	if tostring(name):sub(1, 8) == "default:" then
+		table.insert(leaked, key .. "=" .. tostring(name))
+	end
+end
+check(#leaked == 0, "generated map contains no default-mod nodes ("
+	.. table.concat(leaked, ", ") .. ")")
 
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 os.exit(fail_count == 0 and 0 or 1)

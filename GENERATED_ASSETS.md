@@ -12,6 +12,7 @@ This asset pass was generated procedurally for prototype use.  It fills missing 
 - `mods/apis/sl_gui/sounds/` — `achievement_unlock.ogg` and `level_up.ogg`.
 - `mods/content/dark_skybox/sounds/` — `creepy_ambient.ogg` for the optional dark-skybox ambience hook.
 - `mods/sl_blocks/ground/textures/` — white/rainbow noise animated and still textures.
+- `mods/sl_blocks/ground/textures/square_neon_opaque.png` — the neon square grid composited onto a solid dark plate: the opaque twin of `square_neon.png`, used for the generated arena's cube walls (and cloud-cage pylons).
 - `menu/` — `header.png`, `background.png`, and `menu_music.ogg` for Luanti-compatible menu branding/audio.
 
 ## Notes

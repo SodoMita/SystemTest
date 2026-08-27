@@ -845,14 +845,14 @@ function game_mode.build_cloud_cage()
 	-- Floor slab one node below the spawn point.
 	for x = -5, 5 do
 		for z = -5, 5 do
-			fill({ x = base.x + x, y = base.y - 1, z = base.z + z }, "default:glass")
+			fill({ x = base.x + x, y = base.y - 1, z = base.z + z }, "ground:square_neon")
 		end
 	end
 
 	-- Corner pylons marking the containment perimeter.
 	for _, c in ipairs({ {-5, -5}, {-5, 5}, {5, -5}, {5, 5} }) do
 		for y = 0, 3 do
-			fill({ x = base.x + c[1], y = base.y + y, z = base.z + c[2] }, "default:obsidianbrick")
+			fill({ x = base.x + c[1], y = base.y + y, z = base.z + c[2] }, "ground:square_neon_opaque")
 		end
 	end
 
