@@ -19,7 +19,16 @@ function game_mode.spawn_player(player)
 	elseif pl.phase == "monster" or pl.phase == "master_monster" then
 		pos = table.copy(pl.last_death_pos or state.ghost_spawn)
 	elseif pl.team and state.teams[pl.team] then
-		pos = table.copy(state.teams[pl.team].spawn)
+		if state.teams[pl.team].spawn then
+			pos = table.copy(state.teams[pl.team].spawn)
+		elseif pl.phase == "alive" then
+			-- Beacon destroyed while this player was disconnected: the team
+			-- is out, so the returning player enters the cloud cage instead
+			-- of crashing on a nil spawn (found by the turbo soak sweep).
+			pl.lives = 0
+			pl.phase = "ghost"
+			pos = table.copy(state.ghost_spawn)
+		end
 	end
 
 	if not pos then

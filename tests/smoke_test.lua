@@ -257,6 +257,18 @@ check(alpha:get_pos().y == state.teams.beacon_a.spawn.y, "respawned at team spaw
 check(state.teams.beacon_b.hp == (state.settings.beacon_hp or 100),
 	"beacon HP restored at insertion (no stale damage; was " .. tostring(state.teams.beacon_b.hp) .. ")")
 
+section("PHASE 12b — rejoin after beacon destruction (regression: nil-spawn crash)")
+-- Simulate: beacon destroyed (spawn invalidated) while this player was
+-- disconnected; on return the respawn chain must demote, not crash.
+local saved_spawn = table.copy(state.teams.beacon_b.spawn)
+state.teams.beacon_b.spawn = nil
+local spawn_ok = pcall(gm.spawn_player, beta)
+check(spawn_ok, "spawn_player survives a destroyed-team spawn (no table.copy(nil))")
+check(state.players.beta.phase == "ghost", "returning player of a destroyed team enters the cage")
+check(beta:get_pos().y == state.ghost_spawn.y, "demoted player held at cage altitude")
+state.teams.beacon_b.spawn = saved_spawn
+state.players.beta.phase = "alive"
+
 section("PHASE 13 — HUD is present and identity-neutral")
 H.advance(1, 0.5) -- let the HUD globalstep refresh under the new match
 local hud_texts = {}
