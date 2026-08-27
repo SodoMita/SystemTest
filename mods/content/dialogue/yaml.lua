@@ -48,11 +48,19 @@ local function load_lines(lines)
   local function nextl() local l = lines[i]; i = i + 1; return l end
 
   local function parse_block(base_indent)
+    -- Structured control flow only (goto removed for strict Lua 5.1
+    -- compatibility; see issue #1). Blank/comment skipping that used to
+    -- re-enter the loop via goto is done with skip-ahead loops instead.
     local obj = {}
     while true do
+      -- Skip blank and comment lines
+      while true do
+        local blank = peek()
+        if not (blank and (blank:match("^%s*$") or blank:match("^%s*#"))) then break end
+        nextl()
+      end
       local line = peek()
       if not line then break end
-      if line:match("^%s*$") or line:match("^%s*#") then nextl() goto continue end
       local indent = count_indent(line)
       if indent < base_indent then break end
       -- trim leading spaces at base block
@@ -61,8 +69,13 @@ local function load_lines(lines)
         -- sequence at this level
         local arr = {}
         while true do
+          -- Skip blank and comment lines
+          while true do
+            local blank = peek()
+            if not (blank and (blank:match("^%s*$") or blank:match("^%s*#"))) then break end
+            nextl()
+          end
           local l = peek(); if not l then break end
-          if l:match("^%s*$") or l:match("^%s*#") then nextl() goto inner_continue end
           local ind = count_indent(l)
           if ind < base_indent then break end
           l = l:sub(base_indent + 1)
@@ -89,27 +102,26 @@ local function load_lines(lines)
               nextl()
             end
           end
-          ::inner_continue::
         end
         return arr
       else
         -- mapping entry
         local k, v = line:match("^([^:]+):%s*(.*)$")
-        if not k then -- invalid line, skip
+        if not k then
+          -- invalid line, skip
           nextl()
-          goto continue
-        end
-        k = trim(k)
-        if v == nil or v == '' then
-          nextl()
-          local child = parse_block(base_indent + 2)
-          obj[k] = child
         else
-          obj[k] = parse_value(v)
-          nextl()
+          k = trim(k)
+          if v == nil or v == '' then
+            nextl()
+            local child = parse_block(base_indent + 2)
+            obj[k] = child
+          else
+            obj[k] = parse_value(v)
+            nextl()
+          end
         end
       end
-      ::continue::
     end
     return obj
   end

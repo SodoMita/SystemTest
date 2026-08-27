@@ -69,9 +69,12 @@ minetest.register_globalstep(function(dtime)
   timer = 0
   for id, ar in pairs(areas) do
     for _, player in ipairs(minetest.get_connected_players() or {}) do
+      -- Lua 5.1 "continue" idiom: repeat..until true + break (goto removed
+      -- for strict-Lua-5.1 compatibility; see issue #1).
+      repeat
       local name = player:get_player_name()
       if ar.once and ar.fired_players[name] then
-        goto continue_player
+        break
       end
       local pos = player:get_pos()
       if aabb_contains(ar.aabb, pos) then
@@ -83,7 +86,7 @@ minetest.register_globalstep(function(dtime)
         end
         if ar.once then ar.fired_players[name] = true end
       end
-      ::continue_player::
+      until true
     end
   end
 end)

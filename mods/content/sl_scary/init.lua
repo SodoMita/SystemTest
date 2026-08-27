@@ -660,19 +660,22 @@ minetest.register_entity("sl_scary:nerobot", {
     get_player_in_view = function(self, pos)
         local players = minetest.get_connected_players()
         for _, player in ipairs(players) do
+            -- Lua 5.1 "continue" idiom: repeat..until true + break (goto removed
+            -- for strict-Lua-5.1 compatibility; see issue #1).
+            repeat
             if not player or not player:is_player() then
-                goto continue
+                break
             end
             
             local player_pos = player:get_pos()
             if not player_pos then
-                goto continue
+                break
             end
 
             -- Calculate distance to the player
             local dist = vector.distance(pos, player_pos)
             if dist > mob_config.view_distance then
-                goto continue
+                break
             end
 
             -- Calculate direction and angle between mob's yaw and player
@@ -685,8 +688,7 @@ minetest.register_entity("sl_scary:nerobot", {
             if angle <= mob_config.view_angle then
                 return player
             end
-
-            ::continue::
+            until true
         end
         return nil
     end,
