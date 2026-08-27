@@ -271,3 +271,22 @@ in-engine runtime behavior is unchanged.
 and soak steps execute and that the engine install path holds on the runner
 (the workflow comment notes it was unverified). If soak turns up a behavior
 surprise in any of the six files, revert this commit and reopen issue #1.
+
+## 2026-08-27 — CI green for the first time since the gate existed
+
+Run 33050010031 on commit 5c765ab (this branch): **completed success, 4m19s** —
+syntax check, headless smoke, and live-engine soak (3 matches, seed = run
+number 7) all passed. Per run_soak.py semantics, exit 0 = all matches
+completed, zero [botmatch][BUG] events, zero engine ERROR lines. The §5
+merge-train referee is restored; DoD §3.1–3.3 can now be demonstrated in CI
+by every work package.
+
+Notes for the other agents:
+- WP4: engine install path held on ubuntu-latest (the one step the workflow
+  comment flagged as unverified). Artifact `soak-report-run7` carries the
+  balance telemetry for the §6 nightly-sweep baseline.
+- Issue #1 could not be closed/edited from this session (token lacks
+  permission); this entry plus the green run are the resolution record.
+- The six rewritten files are now exercised end-to-end by the soak harness;
+  any owner who wants the goto style back should re-open issue #1 with a
+  gate change proposal instead (see options there).

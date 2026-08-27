@@ -441,38 +441,176 @@ minetest.register_tool(modname .. ":sabotage_charge", {
 	end,
 })
 
--- Evil ghost possession: one bounded vessel per revival. The vessel
--- refuses living users and whispers their identity to its owner.
-minetest.register_craftitem(modname .. ":possess_charm", {
-	description = S("Possession Charm\n(Evil Ghost Only; claims one vessel)"),
-	inventory_image = "sl_circuit_board.png^[colorize:#aa00ff:150",
+-- Evil-ghost loadout top-up. WP2's spawn.lua owns the base spawn kit
+-- (one bounded sabotage charge); WP3 adds its possession focus here rather
+-- than editing another package's file.
+function game_mode.grant_evil_ghost_kit(player)
+	if not player or not player:is_player() then return false end
+	local pl = game_mode.get_player_state(player:get_player_name())
+	if pl.phase ~= "evil_ghost" then return false end
+	local inv = player:get_inventory()
+	local focus = ItemStack(modname .. ":possession_focus")
+	if not inv:contains_item("main", focus) then
+		inv:add_item("main", focus)
+	end
+	return true
+end
+
+-- Re-issue the focus after any respawn that leaves the player evil.
+minetest.register_on_respawnplayer(function(player)
+	minetest.after(0, function()
+		local p = player and player:get_player_name()
+			and minetest.get_player_by_name(player:get_player_name())
+		if p then game_mode.grant_evil_ghost_kit(p) end
+	end)
+end)
+
+-- Evil ghost possession: seize one object at a time, on a cooldown.
+-- Reusable (unlike the one-shot sabotage charge) because the cooldown,
+-- the single-object limit, and punch-exorcism already bound it.
+minetest.register_tool(modname .. ":possession_focus", {
+	description = S("Possession Focus\n(Evil Ghost Only; one object at a time)"),
+	inventory_image = "sl_raw_crystal.png^[colorize:#ff00ff:150",
 	groups = { not_in_creative_inventory = 1 },
 	on_use = function(itemstack, user, pointed_thing)
-		local pl = game_mode.get_player_state(user:get_player_name())
-		if pl.phase ~= "evil_ghost" then return itemstack end
-		if not pointed_thing or pointed_thing.type ~= "node" then return itemstack end
-		local pos = pointed_thing.under
-		local node = minetest.get_node_or_nil(pos)
-		if not node or not game_mode.can_possess(node.name) then
-			minetest.chat_send_player(user:get_player_name(),
-				S("Only crates, altars, and terminals can serve as vessels."))
+		if not user or not user:is_player() then return itemstack end
+		local name = user:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		if pl.phase ~= "evil_ghost" then
+			minetest.chat_send_player(name, S("Only a revived evil ghost can possess objects."))
 			return itemstack
 		end
-		if game_mode.is_possessed(pos) or game_mode.is_sabotaged(pos) then return itemstack end
-		-- One vessel per ghost: bounded by design.
-		for _, entry in pairs(game_mode.state.possession) do
-			if entry.owner == user:get_player_name() then
-				minetest.chat_send_player(user:get_player_name(),
-					S("You already hold a vessel."))
-				return itemstack
+		if not pointed_thing or pointed_thing.type ~= "node" then
+			minetest.chat_send_player(name, S("Aim the focus at an object."))
+			return itemstack
+		end
+
+		local ok, err = game_mode.possess_object(pointed_thing.under, name)
+		if not ok then
+			minetest.chat_send_player(name, err or S("Possession failed."))
+		else
+			minetest.chat_send_player(name, S("You slip inside the object."))
+		end
+		return itemstack -- Not consumed; the cooldown is the limit.
+	end,
+	on_drop = function(itemstack, dropper, pos)
+		return itemstack -- Don't allow dropping
+	end,
+})
+
+-- ================================================================
+-- Signal Scanner — detection counterplay for sabotage and possession.
+--
+-- Spec ("Evil revival state"): every sabotage action needs "a way for
+-- living players to detect, prevent, or recover from it." Possession's
+-- visible cause (infotext, slamming doors) works at arm's length; the
+-- scanner is the at-range detector. It is an information-class tool:
+-- non-placeable, personally craftable, and strictly identity-neutral —
+-- it reports what is corrupted or possessed and how long it will last,
+-- never who corrupted or possessed it.
+--
+-- Additive to the WP3 possession registry (nodes.lua): reads only the
+-- public state tables and never mutates them.
+-- ================================================================
+
+local SCAN_RANGE = 24
+local SCAN_COOLDOWN = 5
+local scanner_ready_at = {} -- [player_name] = time of next allowed scan
+
+-- 8-point bearing without trig (portable across Lua 5.1 / LuaJIT).
+-- Engine convention: +X = east, +Z = north.
+local function compass_bearing(dx, dz)
+	local abs_x, abs_z = math.abs(dx), math.abs(dz)
+	if abs_x < 0.5 and abs_z < 0.5 then return "right here" end
+	local primary, secondary
+	if abs_x >= abs_z then
+		primary = (dx > 0) and "E" or "W"
+		if abs_z >= abs_x * 0.5 then
+			secondary = (dz > 0) and "N" or "S"
+		end
+	else
+		primary = (dz > 0) and "N" or "S"
+		if abs_x >= abs_z * 0.5 then
+			secondary = (dx > 0) and "E" or "W"
+		end
+	end
+	return primary .. (secondary or "")
+end
+
+minetest.register_tool(modname .. ":scanner", {
+	description = S("Signal Scanner\n(Living players: sweep for corrupted or possessed systems)"),
+	inventory_image = "sl_sensor_array.png^[colorize:#00ffff:100",
+	groups = { information = 1 },
+
+	on_use = function(itemstack, user, pointed_thing)
+		if not user or not user:is_player() then return itemstack end
+		local name = user:get_player_name()
+		local pl = game_mode.get_player_state(name)
+		local state = game_mode.state
+
+		if not state.match_active or pl.phase ~= "alive" then
+			minetest.chat_send_player(name, S("The scanner is silent outside of a live match."))
+			return itemstack
+		end
+
+		local now = game_mode.now()
+		if (scanner_ready_at[name] or 0) > now then
+			minetest.chat_send_player(name, S("The scanner is still recharging."))
+			return itemstack
+		end
+		scanner_ready_at[name] = now + SCAN_COOLDOWN
+
+		-- Nearest anomaly across both registries: sabotage (corruption /
+		-- beacon corrosion) and possession. Entries in both carry pos and
+		-- until_time; identity fields (team_id / ghost) are never read.
+		local origin = user:get_pos()
+		local best, best_dist, best_kind = nil, SCAN_RANGE, nil
+		for _, entry in pairs(state.sabotage) do
+			local dist = vector.distance(origin, entry.pos)
+			if dist <= best_dist then
+				best, best_dist = entry, dist
+				best_kind = (entry.kind == "beacon") and "beacon" or "sabotage"
 			end
 		end
-		game_mode.register_possession(pos, user:get_player_name())
-		minetest.sound_play("alert", {pos = pos, gain = 0.4, max_hear_distance = 6})
-		minetest.chat_send_player(user:get_player_name(),
-			S("The vessel is yours. It will whisper who touches it."))
-		return ItemStack("")
+		for _, entry in pairs(state.possession or {}) do
+			local dist = vector.distance(origin, entry.pos)
+			if dist <= best_dist then
+				best, best_dist, best_kind = entry, dist, "possession"
+			end
+		end
+
+		if not best then
+			minetest.chat_send_player(name,
+				S("SIGNAL SWEEP: no corrupted or possessed systems within @1 meters.",
+					tostring(SCAN_RANGE)))
+			return itemstack
+		end
+
+		local kind_label = (best_kind == "possession") and S("POSSESSION")
+			or (best_kind == "beacon") and S("BEACON CORROSION")
+			or S("CORRUPTION")
+		local remaining = math.max(0, math.ceil(best.until_time - now))
+		local delta = vector.subtract(best.pos, origin)
+		minetest.chat_send_player(name, minetest.colorize("#00ffff",
+			S("SIGNAL SWEEP: @1 — @2m @3, @4s remaining.",
+				kind_label,
+				tostring(math.floor(best_dist + 0.5)),
+				compass_bearing(delta.x, delta.z),
+				tostring(remaining))))
+		minetest.sound_play("click", { to_player = name, gain = 0.4 })
+		return itemstack
 	end,
+})
+
+-- Personal crafting: the scanner is non-placeable information equipment,
+-- which the ROADMAP keeps in the personal inventory crafting class.
+minetest.register_craft({
+	output = modname .. ":scanner",
+	recipe = {
+		{ "",                              modname .. ":raw_crystal",     "" },
+		{ modname .. ":electronic_waste", modname .. ":circuit_board",   modname .. ":electronic_waste" },
+		{ "",                              modname .. ":plastic_scrap",   "" },
+	},
 })
 
 -- Reincarnation item for ghosts to become evil ghosts
@@ -489,8 +627,11 @@ minetest.register_craftitem(modname .. ":reincarnate", {
 
 		pl.phase = "evil_ghost"
 		pl.points = 0
+		pl.possession_pos = nil
+		pl.possession_ready_at = nil
 		game_mode.broadcast(S("A containment breach has been detected."))
 		game_mode.spawn_player(user)
+		game_mode.grant_evil_ghost_kit(user)
 
 		return ItemStack("") -- Consumed
 	end,

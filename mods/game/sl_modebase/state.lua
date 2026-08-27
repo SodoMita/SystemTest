@@ -214,35 +214,9 @@ function game_mode.clear_all_sabotage()
 	state.sabotage = {}
 end
 
--- ================================================================
--- Possession registry (evil ghosts): bounded, discoverable, with
--- an information channel to the possessing ghost and an exorcism
--- counterplay for the living.
--- ================================================================
-
-function game_mode.get_possession(pos)
-	return state.possession[game_mode.pos_hash(pos)]
-end
-
-function game_mode.is_possessed(pos)
-	return game_mode.get_possession(pos) ~= nil
-end
-
-function game_mode.clear_possession_at(pos)
-	local hash = game_mode.pos_hash(pos)
-	local entry = state.possession[hash]
-	if not entry then return false end
-	state.possession[hash] = nil
-	local meta = minetest.get_meta(pos)
-	meta:set_string("infotext", meta:get_string("sl_prev_infotext") or "")
-	meta:set_string("sl_prev_infotext", "")
-	return true
-end
-
-function game_mode.clear_all_possession()
-	for _, entry in pairs(state.possession) do
-		game_mode.clear_possession_at(entry.pos)
-	end
-	state.possession = {}
-end
+-- Possession registry helpers (get_possession / is_possessed /
+-- release_possession / clear_all_possession / possess_object) are
+-- owned by the WP3 possession system in nodes.lua; state.possession
+-- schema: [pos_hash] = { pos, node_name, kind, ghost, until_time,
+-- hits, next_slam }.
 

@@ -194,14 +194,15 @@ check(not gm.is_sabotaged({ x = 40, y = 9, z = 0 }), "punch repair cleared the s
 check(minetest.get_meta({ x = 40, y = 9, z = 0 }):get_int("sl_sabotaged_until") == 0,
 	"corruption marker cleared from meta")
 
-section("PHASE 10b — evil-ghost possession + exorcism")
+section("PHASE 10b — evil-ghost possession (fused WP3 system) + exorcism")
 minetest.set_node({ x = 14, y = 10, z = 10 }, { name = "sl_modebase:loot_crate" })
-local charm_def = minetest.registered_craftitems["sl_modebase:possess_charm"]
-local used_stack = charm_def.on_use(ItemStack("sl_modebase:possess_charm"), alpha,
-	{ type = "node", under = { x = 14, y = 10, z = 10 } })
-check(gm.is_possessed({ x = 14, y = 10, z = 10 }), "possession claimed the vessel")
-check(used_stack:to_string() == "", "possession charm consumed")
-check(minetest.get_meta({ x = 14, y = 10, z = 10 }):get_string("infotext") == "SOMETHING IS WATCHING",
+local focus_def = minetest.registered_tools["sl_modebase:possession_focus"]
+check(focus_def ~= nil, "possession_focus tool registered")
+local focus_stack = ItemStack("sl_modebase:possession_focus")
+focus_def.on_use(focus_stack, alpha, { type = "node", under = { x = 14, y = 10, z = 10 } })
+check(gm.is_possessed({ x = 14, y = 10, z = 10 }), "focus claimed the vessel")
+check(not focus_stack:is_empty(), "focus is reusable (cooldown-bounded, not consumed)")
+check(minetest.get_meta({ x = 14, y = 10, z = 10 }):get_string("infotext") == "OBJECT POSSESSED",
 	"discoverable possession marker set")
 local fs_before2 = #(H.formspecs.beta or {})
 minetest.registered_nodes["sl_modebase:loot_crate"].on_rightclick(
@@ -214,7 +215,11 @@ for _, line in ipairs(H.chat_player.alpha or {}) do
 end
 check(whisper, "ghost owner received the identity whisper")
 H.fire_punchnode({ x = 14, y = 10, z = 10 }, minetest.get_node({ x = 14, y = 10, z = 10 }), beta, nil)
-check(not gm.is_possessed({ x = 14, y = 10, z = 10 }), "punch exorcised the vessel")
+check(gm.is_possessed({ x = 14, y = 10, z = 10 }), "first punch resisted (2-hit exorcism)")
+H.fire_punchnode({ x = 14, y = 10, z = 10 }, minetest.get_node({ x = 14, y = 10, z = 10 }), beta, nil)
+check(not gm.is_possessed({ x = 14, y = 10, z = 10 }), "second punch exorcised the vessel")
+check((state.players.alpha.possession_ready_at or 0) > H.now(),
+	"exorcism applied the re-possession cooldown penalty")
 
 section("PHASE 11 — match timer, result screen, lobby reset")
 state.settings.match_duration = 5

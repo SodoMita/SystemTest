@@ -15,6 +15,12 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
 - Cloud cage: ghosts are held at `ghost_spawn`, immortal, invisible,
   untargetable, flight-enabled, and a containment platform is materialized
   around the spawn on load (`/sl_build_cage` to rebuild).
+- Containment enforcement: the cage is a soft leash, not just scenery. A
+  contained ghost that flies past a 24-node radius or drops more than 12
+  nodes below the cage floor is warned and returned to `ghost_spawn`, so
+  flight cannot be used to observe the match from above. Exempt by design:
+  ghosts summoned to the altar, evil ghosts, the Monster Master, and every
+  living player; inert outside an active match.
 - Communication seal: ghost chat is blocked, and every registered chat
   command (including `/msg`, `/w`, `/tell`) is wrapped with a phase guard.
   Allowlist: `/sl_ghost_offer`, `/sl_state`, `/help` only.
@@ -23,14 +29,19 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
   `/sl_summon_ghost` and `/sl_ghost_offer`.
 - Evil ghost revival: voluntary via the revival item, burns all match points,
   targetable (purgeable), one bounded sabotage charge per revival.
+- Evil ghost possession: an evil ghost seizes one allowlisted object at a time
+  with the Possession Focus (doors, hatches, terminals, crates, pickups,
+  platforms — never beacons, never the Ghost Altar). Possessed objects show
+  `OBJECT POSSESSED`, refuse use, and slam if they are doors; the living
+  exorcise them with two punches. 20 s duration, 45 s cooldown (+30 s when
+  exorcised), purged on match end. A refused touch whispers the toucher's
+  identity to the possessing ghost (bounded information channel, no public
+  leak, no damage). Detection counterplay: the craftable Signal Scanner
+  sweeps sabotage and possession within 24 m (kind, distance, bearing, time
+  left) without revealing identities.
 - Sabotage: 30 s corruption with a visible marker; sabotaged beacons take
   corrosion damage; sabotaged interactables refuse use; living players repair
   by punching; everything is purged on match end/restart.
-- Possession (evil ghost): one bounded vessel per revival (crate, altar, or
-  terminal). The vessel refuses the living with no confirmation and whispers
-  the toucher's identity to its owner — an information channel, not damage.
-  Discoverable marker ("SOMETHING IS WATCHING"), 20 s duration, exorcism by
-  punching, purged on match end/restart.
 - Match timer + result screen (formspec scoreboard + chat log) + clean reset:
   phases, lives, points, inventories, sabotages, and ghost privileges are all
   normalized before the next match.

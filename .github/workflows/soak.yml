@@ -19,26 +19,27 @@ jobs:
       - name: Install Lua + Luanti engine
         run: |
           sudo apt-get update
-          sudo apt-get install -y lua5.1
+          sudo apt-get install -y lua5.1 luajit
           # Distro package first; fall back to the minetestdevs PPA.
-          # NOTE: engine install path is the one step not verified in the
-          # original dev sandbox (which used the Debian trixie package).
           sudo apt-get install -y minetest \
             || sudo apt-get install -y luanti \
             || { sudo add-apt-repository -y ppa:minetestdevs/stable \
                  && sudo apt-get update \
                  && sudo apt-get install -y minetest; }
 
-      - name: Syntax check all mod Lua files
+      - name: Syntax check all mod Lua files (LuaJIT - the engine's parser)
         run: |
+          # LuaJIT is the actual Luanti runtime, so goto and other 5.2+
+          # extensions are legal game code. The old luac5.1 gate wrongly
+          # rejected them; do not reintroduce a stricter-than-engine check.
           fail=0
           for f in $(find mods -name '*.lua'); do
-            luac5.1 -p "$f" || { echo "SYNTAX FAIL: $f"; fail=1; }
+            luajit -bl "$f" >/dev/null || { echo "SYNTAX FAIL: $f"; fail=1; }
           done
           exit $fail
 
-      - name: Headless stub smoke test (67 assertions)
-        run: lua5.1 tests/smoke_test.lua
+      - name: Headless stub smoke test
+        run: luajit tests/smoke_test.lua
 
       - name: Live-engine soak test (AI players, 3 matches)
         run: |

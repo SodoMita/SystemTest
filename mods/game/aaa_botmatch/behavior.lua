@@ -405,7 +405,7 @@ function botmatch.behave_evil(bot, pl, dt)
 
 	-- After sabotaging, claim a vessel with the possession charm.
 	if bot.bm.sabotage_target == false and not bot.bm.possessed_done
-			and bot:get_inventory():contains_item("main", ItemStack("sl_modebase:possess_charm")) then
+			and bot:get_inventory():contains_item("main", ItemStack("sl_modebase:possession_focus")) then
 		local altar = { x = 0, y = 1, z = 0 }
 		if dist2d(bot:get_pos(), altar) < 3 then
 			if now >= bot.bm.next_act then
@@ -462,7 +462,11 @@ end
 function botmatch.repair_node(bot, pos)
 	local was_sabotaged = game_mode.is_sabotaged(pos)
 	local was_possessed = game_mode.is_possessed(pos)
-	botmatch.fire("punchnode", pos, minetest.get_node(pos), bot, { type = "node", under = pos })
+	-- Exorcism needs two punches (WP3 rule); repairs need one.
+	local punches = was_possessed and 2 or 1
+	for _ = 1, punches do
+		botmatch.fire("punchnode", pos, minetest.get_node(pos), bot, { type = "node", under = pos })
+	end
 	if was_sabotaged and not game_mode.is_sabotaged(pos) then
 		botmatch.record_event("repairs", 1)
 	end
@@ -537,9 +541,10 @@ function botmatch.try_sabotage(bot, pos)
 end
 
 function botmatch.try_possess(bot, pos)
-	local def = minetest.registered_craftitems["sl_modebase:possess_charm"]
+	-- Fused WP3 system: reusable possession_focus tool, cooldown-bounded.
+	local def = minetest.registered_tools["sl_modebase:possession_focus"]
 	if not def or not def.on_use then return false end
-	def.on_use(ItemStack("sl_modebase:possess_charm"), bot, { type = "node", under = pos })
+	def.on_use(ItemStack("sl_modebase:possession_focus"), bot, { type = "node", under = pos })
 	if game_mode.is_possessed(pos) then
 		botmatch.record_event("possessions", 1)
 		return true
