@@ -230,15 +230,17 @@ local function update_sprint_hud(player)
     end
     
     -- Create HUD if it doesn't exist
+    -- FIX 2026-08-27: was at y=0.95 overlapping hotbar in narrow aspect; moved to 0.83 above lobby (0.88)
     if not sprint_huds[name] then
         local success, hud_id = pcall(function()
             return player:hud_add({
+                hud_elem_type = "text",
                 type = "text",
-                position = {x = 0.5, y = 0.95},
-                offset = {x = 0, y = 0},
-                text = "🏃 Stamina: 100/100",
+                position = {x = 0.5, y = 0.83},
+                offset = {x = 0, y = -15},
+                text = "Stamina: 100/100",
                 alignment = {x = 0, y = 0},
-                scale = {x = 100, y = 100},
+                scale = {x = 200, y = 18},
                 number = 0xFFFFFF,
             })
         end)

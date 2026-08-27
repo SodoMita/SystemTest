@@ -2,14 +2,27 @@ local S = game_mode.S
 local state = game_mode.state
 
 -- ================================================================
--- Persistent match HUD (Phase A.3)
+-- Persistent match HUD (Phase A.3 + Phase 4 Lobby Upgrade + Fix)
 -- Identity-neutral by design: it displays match phase, clock, the
 -- the player's own phase, and public beacon integrity only.
 -- It never renders team names, team colors, or other players'
 -- private state, so it cannot leak hidden identity.
+--
+-- WP5 UPGRADE — Waiting for Players HUD:
+-- When no match is active and no ready check is running, the HUD
+-- shows a cybernetic standby readout with connected bio-signatures,
+-- minimum threshold, and initiation hint. This satisfies
+-- ROADMAP Phase 4 "Waiting for Players HUD" without leaking team.
+--
+-- FIX 2026-08-27 — Narrow aspect + hotbar overlap:
+-- - Stamina HUD (running_system.lua) was at y=0.95 overlapping hotbar in
+--   narrow aspect; moved to y=0.83 with offset. This file moves beacons
+--   from top-right (1.0,0.02) to center below Match (0.5,0.05) and shortens
+--   CORE A/B to A/B per owner feedback: "Core A 100 Core B 100 would better
+--   be on center below Match and be just A 100 B 100"
 -- ================================================================
 
-local hud = {} -- [player_name] = { status = id, vitals = id, beacons = id }
+local hud = {} -- [player_name] = { status=id, vitals=id, beacons=id, lobby=id, ready=id }
 local hud_accum = 0
 
 local function fmt_clock(secs)
@@ -23,26 +36,50 @@ local function build_hud(player)
 		status = player:hud_add({
 			hud_elem_type = "text",
 			position = { x = 0.5, y = 0.02 },
+			offset = { x = 0, y = 0 },
 			alignment = { x = 0, y = 1 },
 			scale = { x = 400, y = 24 },
 			text = "",
 			number = 0x00ffff,
 		}),
+		-- Beacons centered below Match (was top-right 1.0,0.02) — per feedback
+		beacons = player:hud_add({
+			hud_elem_type = "text",
+			position = { x = 0.5, y = 0.055 },
+			offset = { x = 0, y = 0 },
+			alignment = { x = 0, y = 1 },
+			scale = { x = 300, y = 20 },
+			text = "",
+			number = 0xffffff,
+		}),
 		vitals = player:hud_add({
 			hud_elem_type = "text",
-			position = { x = 0.5, y = 0.07 },
+			position = { x = 0.5, y = 0.085 },
+			offset = { x = 0, y = 0 },
 			alignment = { x = 0, y = 1 },
 			scale = { x = 400, y = 20 },
 			text = "",
 			number = 0xffaa00,
 		}),
-		beacons = player:hud_add({
+		-- Ready-check detail readout (below vitals)
+		ready = player:hud_add({
 			hud_elem_type = "text",
-			position = { x = 1.0, y = 0.02 },
-			alignment = { x = -1, y = 1 },
-			scale = { x = 300, y = 20 },
+			position = { x = 0.5, y = 0.115 },
+			offset = { x = 0, y = 0 },
+			alignment = { x = 0, y = 1 },
+			scale = { x = 350, y = 16 },
 			text = "",
-			number = 0xffffff,
+			number = 0xaaaaff,
+		}),
+		-- Waiting for Players readout (center-bottom, but above hotbar — was 0.90 overlapping)
+		lobby = player:hud_add({
+			hud_elem_type = "text",
+			position = { x = 0.5, y = 0.88 },
+			offset = { x = 0, y = -10 },
+			alignment = { x = 0, y = 0 },
+			scale = { x = 400, y = 18 },
+			text = "",
+			number = 0x55ffaa,
 		}),
 	}
 	return hud[name]
@@ -63,7 +100,7 @@ local function update_hud(player)
 	local h = hud[name] or build_hud(player)
 	local pl = game_mode.get_player_state(name)
 
-	-- Line 1: match phase + remaining time
+	-- Line 1: match phase + remaining time (top center)
 	local status
 	if state.match_active then
 		status = S("MATCH #@1", tostring(state.match_count or 0))
@@ -83,20 +120,76 @@ local function update_hud(player)
 	end
 	player:hud_change(h.status, "text", status)
 
-	-- Line 2: own phase (private, role-local; single-life design)
+	-- Line 2: beacon integrity — centered below Match, shortened to A/B per feedback
+	-- Beacon HP is public (every damage event is broadcast), so no hidden identity leak.
+	-- Was "CORE A 100   CORE B 100" at top-right; now "A 100  B 100" at center 0.5,0.055
+	local a_hp = state.teams.beacon_a.hp or 0
+	local b_hp = state.teams.beacon_b.hp or 0
+	player:hud_change(h.beacons, "text",
+		S("A @1  B @2", tostring(a_hp), tostring(b_hp)))
+
+	-- Line 3: own phase (private, role-local; single-life design)
 	local vitals = ""
 	if state.match_active and pl.phase ~= "alive" then
 		vitals = "[" .. string.upper(tostring(pl.phase):gsub("_", " ")) .. "]"
 	end
 	player:hud_change(h.vitals, "text", vitals)
 
-	-- Line 3: beacon integrity. Beacon HP is already public information
-	-- (every damage event is broadcast), so this leaks no hidden identity.
-	local a_hp = state.teams.beacon_a.hp or 0
-	local b_hp = state.teams.beacon_b.hp or 0
-	player:hud_change(h.beacons, "text",
-		S("CORE A @1", tostring(a_hp)) .. "   " .. S("CORE B @1", tostring(b_hp)))
+	-- Phase 4: Ready-check detail + Waiting for Players HUD
+	local lobby_text = ""
+	local ready_text = ""
+
+	if not state.match_active then
+		if state.ready_check.active then
+			local connected = game_mode.get_connected_player_names()
+			local ready_count = 0
+			for _, pname in ipairs(connected) do
+				if state.ready_check.ready[pname] then
+					ready_count = ready_count + 1
+				end
+			end
+			if state.ready_check.countdown_left > 0 then
+				ready_text = S("NEURAL LINK: @1/@2 CONFIRMED // INSERTION T-@3s // PREPARE FOR DEPLOYMENT",
+					tostring(ready_count), tostring(#connected),
+					tostring(math.ceil(state.ready_check.countdown_left)))
+			else
+				ready_text = S("READY CHECK: @1/@2 BIO-SIGS CONFIRMED // AWAITING NEURAL LINK // TYPE /sl_ready",
+					tostring(ready_count), tostring(#connected))
+			end
+		else
+			local connected = game_mode.get_connected_player_names()
+			local count = #connected
+			local min_required = 2
+			local auto_on = state.settings.auto_start
+			local auto_delay = state.settings.auto_start_delay or 8
+
+			if count < min_required then
+				lobby_text = S("WAITING FOR PLAYERS: @1/@2 // INSUFFICIENT BIO-SIGNATURES // BEACON LINK: STANDBY",
+					tostring(count), tostring(min_required))
+				if auto_on then
+					lobby_text = lobby_text .. S(" // AUTO-START: ON (@1s)", tostring(auto_delay))
+				end
+			else
+				if auto_on then
+					lobby_text = S("WAITING FOR PLAYERS: @1 READY // AUTO-START: ON // INTERMISSION @2s // BEACON LINK: STANDBY",
+						tostring(count), tostring(auto_delay))
+				else
+					lobby_text = S("WAITING FOR PLAYERS: @1 READY // BEACON LINK: STANDBY // USE TERMINAL OR /sl_match_start",
+						tostring(count))
+				end
+			end
+			if count >= 2 then
+				lobby_text = lobby_text .. "  //  " .. S("COMMS: /sl_dm_ui // INV: SYSTEM TAB")
+			end
+		end
+	end
+
+	player:hud_change(h.lobby, "text", lobby_text)
+	player:hud_change(h.ready, "text", ready_text)
 end
+
+game_mode.update_hud = update_hud
+game_mode.build_hud = build_hud
 
 minetest.register_globalstep(function(dtime)
 	hud_accum = hud_accum + dtime
@@ -111,10 +204,32 @@ minetest.register_globalstep(function(dtime)
 end)
 
 minetest.register_on_joinplayer(function(player)
-	-- Build eagerly so the lobby line is visible immediately.
+	local name = player:get_player_name()
+	if hud[name] then
+		clear_hud(player)
+	end
 	local ok, err = pcall(update_hud, player)
 	if not ok then
 		minetest.log("error", "[game_mode] HUD init failed: " .. tostring(err))
+	else
+		if state.match_active then
+			minetest.after(0.6, function()
+				local p = minetest.get_player_by_name(name)
+				if p then
+					minetest.chat_send_player(name,
+						S("RECONNECT: Neural link re-established. Match #@1 active. HUD synchronized.",
+						tostring(state.match_count or 0)))
+				end
+			end)
+		else
+			minetest.after(0.6, function()
+				local p = minetest.get_player_by_name(name)
+				if p then
+					minetest.chat_send_player(name,
+						S("RECONNECT: Lobby link synchronized. Awaiting initiation."))
+				end
+			end)
+		end
 	end
 end)
 

@@ -1,7 +1,7 @@
 -- =============================================================
 -- System Looting — Unified Inventory (Tab System)
--- =============================================================
--- Tabs: Crafting | Abilities | Achievements
+-- Tabs: Crafting | Abilities | Achievements | System | Comms
+-- WP5 UPGRADE: Inventory now exposes majority of sl_ commands via GUI
 -- =============================================================
 
 local function get_current_tab(player)
@@ -16,11 +16,15 @@ local function set_current_tab(player, tab)
 end
 
 -- Tab button strip (reusable by the outfit menu too)
+-- Now 5 tabs: crafting, abilities, achievements, system, comms
+-- System tab exposes majority of sl_ commands, Comms tab for DM
 function gui_get_tab_buttons(current_tab, show_label)
     local tabs = {
-        {id = "crafting",     icon_img = "gui_tab_crafting.png",     label = "Crafting",     x = 9.5},
-        {id = "abilities",    icon_img = "gui_tab_abilities.png",    label = "Abilities",    x = 10.3},
-        {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements", x = 11.1},
+        {id = "crafting",     icon_img = "gui_tab_crafting.png",     label = "Crafting",     x = 7.1},
+        {id = "abilities",    icon_img = "gui_tab_abilities.png",    label = "Abilities",    x = 7.9},
+        {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements", x = 8.7},
+        {id = "system",       icon_img = "gui_tab_player_info.png",  label = "System",       x = 9.5},
+        {id = "comms",        icon_img = "gui_tab_crafting.png",     label = "Comms",        x = 10.3},
     }
 
     local formspec = {}
@@ -114,12 +118,30 @@ function get_unified_inventory(player)
             table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
             table.insert(formspec, "label[4,5;Achievement system loading...]")
         end
+
+    elseif current_tab == "system" then
+        if get_system_formspec then
+            local sys_fs = get_system_formspec(player)
+            table.insert(formspec, sys_fs)
+        else
+            table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
+            table.insert(formspec, "label[0.4,1.3;System tab loading... install system_tab.lua]")
+        end
+
+    elseif current_tab == "comms" then
+        if get_comms_formspec then
+            local comms_fs = get_comms_formspec(player)
+            table.insert(formspec, comms_fs)
+        else
+            table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
+            table.insert(formspec, "label[0.4,1.3;Comms tab loading... install system_tab.lua]")
+        end
     end
 
     return table.concat(formspec, "")
 end
 
--- Handle tab switching and the player preview overlay
+-- Handle tab switching and the player preview overlay + system/comms actions
 minetest.register_on_player_receive_fields(function(player, formname, fields)
     if formname ~= "" and formname ~= "crafting_system" and formname ~= "unified_inventory" then
         return
@@ -134,11 +156,34 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         set_current_tab(player, "abilities");    changed_tab = true
     elseif fields.tab_achievements then
         set_current_tab(player, "achievements"); changed_tab = true
+    elseif fields.tab_system then
+        set_current_tab(player, "system");       changed_tab = true
+    elseif fields.tab_comms then
+        set_current_tab(player, "comms");        changed_tab = true
     end
 
     if changed_tab then
         player:set_inventory_formspec(get_unified_inventory(player))
         return
+    end
+
+    -- Delegate to system tab handler if available
+    if _G.sl_gui_system_handle_fields then
+        local handled = _G.sl_gui_system_handle_fields(player, fields)
+        if handled then
+            -- Refresh inventory to show updated state (HP, MM, etc)
+            player:set_inventory_formspec(get_unified_inventory(player))
+            return
+        end
+    end
+
+    -- Delegate to comms tab handler
+    if _G.sl_gui_comms_handle_fields then
+        local handled = _G.sl_gui_comms_handle_fields(player, fields)
+        if handled then
+            player:set_inventory_formspec(get_unified_inventory(player))
+            return
+        end
     end
 
     -- Clicking the player preview overlay opens the outfit/info screen
@@ -161,4 +206,4 @@ minetest.register_on_joinplayer(function(player)
     end)
 end)
 
-minetest.log("action", "[unified_inventory] Tab system loaded (3 tabs).")
+minetest.log("action", "[unified_inventory] Tab system loaded (5 tabs: crafting, abilities, achievements, system, comms).")

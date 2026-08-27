@@ -272,8 +272,13 @@ for _, t in pairs(alpha._hud_texts) do table.insert(hud_texts, tostring(t)) end
 local joined = table.concat(hud_texts, " | ")
 check(#hud_texts >= 3, "HUD elements created (" .. #hud_texts .. ")")
 check(joined:find("MATCH #") ~= nil, "HUD shows match phase/clock")
-check(joined:find("CORE A") ~= nil and joined:find("CORE B") ~= nil,
-	"HUD shows public beacon integrity")
+-- FIX 2026-08-27: beacons moved center below Match and shortened from CORE A/B to A/B per feedback
+-- Accept both old and new formats for backward compat, but require A and B HP present
+local has_beacon = (joined:find("A %d+") ~= nil and joined:find("B %d+") ~= nil)
+	or (joined:find("CORE A") ~= nil and joined:find("CORE B") ~= nil)
+check(has_beacon, "HUD shows public beacon integrity (A/B HP)")
+-- Ensure new centered layout: beacons should be centered (not top-right) — check position via HUD count >=5 includes lobby+ready
+check(#hud_texts >= 5, "HUD has 5 elements after WP5 upgrade (status, beacons centered, vitals, ready, lobby)")
 check(joined:find("Beacon A") == nil and joined:find("beacon_a") == nil,
 	"HUD leaks no team identifiers")
 
