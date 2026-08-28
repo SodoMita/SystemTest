@@ -391,3 +391,122 @@ minetest.register_chatcommand("sl_build_cage", {
 	end,
 })
 
+-- ================================================================
+-- Map system commands: type selection, handmade-map listing,
+-- manual (re)build and arena export to a handmade map.
+-- ================================================================
+
+local MAP_TYPE_HELP = "procedural | test | schematic [name] | seed <n> | list | build | save <name>"
+
+minetest.register_chatcommand("sl_map", {
+	params = MAP_TYPE_HELP,
+	description = S("Show or configure the match map (type, handmade map, seed)"),
+	func = function(name, param)
+		local map = game_mode.map
+		if not map then
+			return false, S("Map system unavailable.")
+		end
+		local arg = (param or ""):match("^(%S*)")
+		local rest = (param or ""):match("^%S+%s+(.-)$")
+		local is_admin = minetest.check_player_privs(name, { sl_admin = true })
+
+		local function admin_only()
+			if is_admin then return true end
+			return false, S("Map configuration requires the sl_admin privilege.")
+		end
+
+		if arg == "" or arg == "status" then
+			local cur = map.current
+			local lines = {}
+			if cur then
+				table.insert(lines, S("Current map: @1 (type @2, seed @3), mobs: @4",
+					tostring(cur.name), tostring(cur.type), tostring(cur.seed),
+					tostring(#(cur.mobs or {}))))
+				table.insert(lines, S("Volume: @1 .. @2",
+					minetest.pos_to_string(cur.minp), minetest.pos_to_string(cur.maxp)))
+			else
+				table.insert(lines, S("No map prepared yet — the next match builds one."))
+			end
+			table.insert(lines, S("Next match: type '@1', handmade map '@2'",
+				tostring(map.runtime.type or minetest.settings:get("sl_map.type") or "procedural"),
+				tostring(map.runtime.schematic or minetest.settings:get("sl_map.schematic") or "random")))
+			return true, table.concat(lines, "\n")
+		end
+
+		if arg == "list" then
+			local maps = map.list_schematic_maps()
+			local names = {}
+			for n in pairs(maps) do table.insert(names, n) end
+			table.sort(names)
+			if #names == 0 then
+				return true, S("No handmade maps installed. Drop map.mts + map.conf into mods/game/sl_modebase/maps/<name>/ or <world>/maps/<name>/.")
+			end
+			return true, S("Handmade maps: @1", table.concat(names, ", "))
+		end
+
+		if arg == "procedural" or arg == "test" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			map.runtime.type = arg
+			map.persist()
+			return true, S("Next match uses the '@1' map type.", arg)
+		end
+
+		if arg == "schematic" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			if rest and rest ~= "" then
+				local maps = map.list_schematic_maps()
+				if rest ~= "random" and not maps[rest] then
+					return false, S("Handmade map '@1' not found. Use /sl_map list.", rest)
+				end
+				map.runtime.schematic = rest
+			end
+			map.runtime.type = "schematic"
+			map.persist()
+			return true, S("Next match uses the handmade map '@1'.",
+				tostring(map.runtime.schematic or "random"))
+		end
+
+		if arg == "seed" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			local seed = tonumber(rest or "") or 0
+			map.runtime.seed = seed ~= 0 and math.floor(seed) or nil
+			map.persist()
+			if map.runtime.seed then
+				return true, S("Map seed pinned to @1 (same arena every match).", tostring(map.runtime.seed))
+			end
+			return true, S("Map seed unpinned: every match generates a fresh arena.")
+		end
+
+		if arg == "build" or arg == "rebuild" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			local ok, err = map.prepare()
+			if ok then
+				return true, S("Map '@1' materialized (seed @2).",
+					tostring(map.current.name), tostring(map.current.seed))
+			end
+			return false, tostring(err)
+		end
+
+		if arg == "save" then
+			if not minetest.settings:get_bool("creative_mode") then
+				return false, S("Map export is available only in creative mode.")
+			end
+			local sname = (rest or ""):match("^(%S+)$")
+			if not sname then
+				return false, S("Usage: /sl_map save <name>")
+			end
+			local ok, res = map.save_current(sname)
+			if ok then
+				return true, S("Map exported to @1. Adjust its map.conf and select it with /sl_map schematic @2.", tostring(res), sname)
+			end
+			return false, res
+		end
+
+		return false, S("Usage: /sl_map @1", MAP_TYPE_HELP)
+	end,
+})
+

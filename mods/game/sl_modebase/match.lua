@@ -19,9 +19,17 @@ function game_mode.end_match(winner, reason)
 	game_mode.clear_all_sabotage()
 	game_mode.clear_all_possession()
 
+	-- Map reset: restore the arena to its initial state (nodes,
+	-- beacons, spawns), purge every mob and any match residue.
+	if game_mode.map and game_mode.map.reset then
+		game_mode.map.reset()
+	end
+
+	local restored_from_map = game_mode.map and game_mode.map.current
+
 	-- Restore beacons and spawns from persistent storage
 	local storage = game_mode.storage or minetest.get_mod_storage()
-	if storage then
+	if not restored_from_map and storage then
 		local spawns_str = storage:get_string("spawns")
 		if spawns_str and spawns_str ~= "" then
 			local data = minetest.deserialize(spawns_str)
@@ -40,7 +48,8 @@ function game_mode.end_match(winner, reason)
 		end
 	end
 
-	-- Remove all monsters
+	-- Remove all monsters (belt and braces: the map reset above also
+	-- purges every registered mob entity).
 	for _, obj in pairs(minetest.luaentities) do
 		if obj.name == game_mode.MONSTER_NAME then
 			obj.object:remove()
@@ -251,6 +260,16 @@ function game_mode.start_new_match(initiator)
 	game_mode.clear_all_sabotage()
 	game_mode.clear_all_possession()
 
+	-- Map: (re)materialize the selected map type to its initial state
+	-- and open the node-change journal for the coming match. Spawns
+	-- (beacons, MM base, ghost cage, lobby) come from the map.
+	if game_mode.map and game_mode.map.prepare then
+		local ok, err = game_mode.map.prepare()
+		if ok == false and err then
+			minetest.log("warning", "[game_mode] map prepare: " .. tostring(err))
+		end
+	end
+
 	-- Beacons start every match at full integrity. Without this, damage
 	-- taken in a previous match persists (stale-state violation of the
 	-- "same match started again without stale state" scenario).
@@ -281,6 +300,12 @@ function game_mode.start_new_match(initiator)
 			end
 			game_mode.spawn_player(player)
 		end
+	end
+
+	-- The map's initial mob population exists only while a match runs:
+	-- spawned fresh at every game start, purged when it ends.
+	if game_mode.map and game_mode.map.spawn_initial_mobs then
+		game_mode.map.spawn_initial_mobs()
 	end
 
 	local cond_list = {}

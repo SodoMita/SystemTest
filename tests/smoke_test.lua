@@ -464,10 +464,14 @@ check(canceled_lobby == true, "punch damage cancelled in lobby (pipeline guard)"
 local ok_scary = pcall(dofile, "mods/content/sl_scary/init.lua")
 check(ok_scary, "sl_scary loads under the stub harness")
 local dredger = minetest.registered_entities["sl_scary:dredger"]
-local dpos = alpha:get_pos()
 local fake_self = {
 	attack_timer = 0, attack_range = 3, attack_damage = 4, attack_cooldown = 0,
-	object = { get_pos = function() return { x = dpos.x, y = dpos.y, z = dpos.z } end },
+	-- Live position: the player may have been inserted at a beacon
+	-- since this stub was built (map spawns move between matches).
+	object = { get_pos = function()
+		local p = alpha:get_pos()
+		return { x = p.x, y = p.y, z = p.z }
+	end },
 }
 dredger.do_attack(fake_self, alpha, 1)
 check(alpha:get_hp() == 20, "horror mob attack does nothing in the lobby")
@@ -494,6 +498,190 @@ H.advance(1, 0.5)
 local canceled_after = H.fire_punchplayer(alpha, beta, 1.0,
 	{ full_punch_interval = 1.0, damage_groups = { fleshy = 5 } }, nil, 5)
 check(canceled_after == true, "punch damage cancelled again after match end")
+
+section("PHASE 17 — procedural map: prepare, journal, initial-state reset")
+local function is_air(pos)
+	local v = H.voxels[H.vhash(pos)]
+	return v == nil or v == "air"
+end
+local mmap = gm.map
+check(mmap ~= nil, "map system loaded")
+check(mmap.current ~= nil and mmap.current.type == "procedural",
+	"default match maps are procedural")
+local seed_a = mmap.current.seed
+mmap.prepare({ type = "procedural", seed = 4242 })
+local d1 = mmap.current
+check(d1.type == "procedural" and d1.seed == 4242, "explicit prepare pins type and seed")
+check(mmap.journal_active == true, "node journal armed at map prepare")
+check(H.voxels[H.vhash(d1.anchor.beacon_a)] == "sl_modebase:beacon_a"
+	and H.voxels[H.vhash(d1.anchor.beacon_b)] == "sl_modebase:beacon_b",
+	"beacon nodes materialized at their anchors")
+check(H.voxels[H.vhash({ x = d1.origin.x, y = d1.origin.y, z = d1.origin.z })] == "ground:square_neon",
+	"arena floor generated at the map origin")
+check(state.teams.beacon_a.spawn.x == d1.anchor.beacon_a.x
+	and state.teams.beacon_a.spawn.y == d1.anchor.beacon_a.y + 1,
+	"team spawns derive from map anchors")
+check(minetest.get_meta(d1.anchor.beacon_a):get_int("hp") == 100, "beacon meta starts at full HP")
+-- Determinism: same seed rebuilds the same arena.
+local d1_mobs = {}
+for _, m in ipairs(d1.mobs) do table.insert(d1_mobs, m.pos.x .. ":" .. m.pos.z) end
+mmap.prepare({ type = "procedural", seed = 4242 })
+check(mmap.current.anchor.beacon_a.x == d1.anchor.beacon_a.x,
+	"same seed -> identical arena layout")
+local same = true
+for i, m in ipairs(mmap.current.mobs) do
+	if m.pos.x .. ":" .. m.pos.z ~= d1_mobs[i] then same = false end
+end
+check(same, "same seed -> identical mob layout")
+mmap.prepare({ type = "procedural", seed = 777 })
+local diff = false
+for i, m in ipairs(mmap.current.mobs) do
+	if m.pos.x .. ":" .. m.pos.z ~= d1_mobs[i] then diff = true end
+end
+check(diff, "different seed -> different arena layout")
+
+local cur = mmap.current
+-- Match-time edits: inside the volume (rebuild covers) and outside
+-- (journal covers), plus node metadata on an outside edit.
+H.fire_placenode({ x = cur.origin.x + 1, y = cur.origin.y + 1, z = cur.origin.z },
+	{ name = "default:stone" })
+H.fire_dignode({ x = cur.origin.x, y = cur.origin.y, z = cur.origin.z + 1 })
+local outside = { x = 300, y = 8, z = 300 }
+local outside2 = { x = 310, y = 8, z = 300 }
+minetest.get_meta(outside2):set_string("owner", "tester")
+H.fire_dignode(outside2)
+H.fire_placenode(outside, { name = "default:cobble" })
+check(#mmap.journal == 4, "journal recorded the four match edits (got " .. #mmap.journal .. ")")
+gm.damage_beacon("beacon_a", 30, "phase17", true)
+check(state.teams.beacon_a.hp == 70, "beacon damaged during the match")
+
+mmap.reset()
+check(is_air({ x = cur.origin.x + 1, y = cur.origin.y + 1, z = cur.origin.z }),
+	"node placed inside the arena during the match was removed (rebuild)")
+check(H.voxels[H.vhash({ x = cur.origin.x, y = cur.origin.y, z = cur.origin.z + 1 })] == "ground:square_neon",
+	"dug floor node restored to the generated initial state")
+check(is_air(outside), "out-of-arena placed node journaled and restored")
+check(is_air(outside2), "out-of-arena dug node journaled and restored")
+check(minetest.get_meta(outside2):get_string("owner") == "tester",
+	"node metadata restored with the journaled node")
+check(#mmap.journal == 0 and mmap.journal_active == false, "journal closed and cleared at reset")
+check(state.teams.beacon_a.hp == (state.settings.beacon_hp or 100),
+	"beacon HP restored at reset")
+check(minetest.get_meta(mmap.current.anchor.beacon_a):get_int("hp") == 100,
+	"beacon meta refreshed at reset")
+
+section("PHASE 18 — mob lifecycle: purge at match end, respawn at game start")
+mmap.prepare({ type = "procedural", seed = 4242 })
+local spawned = mmap.spawn_initial_mobs()
+check(spawned == #mmap.current.mobs and spawned > 0,
+	"initial mob population spawned at game start (" .. spawned .. ")")
+local function mob_count()
+	local n = 0
+	for _, e in pairs(H.luaentities) do
+		if mmap.is_mob_name(e.name) then
+			n = n + 1
+		end
+	end
+	return n
+end
+check(mob_count() == spawned, "map mobs registered as live entities")
+-- The Monster Master deploys extra monsters during the match...
+gm.spawn_monster({ x = 0, y = 40, z = 0 }, "brute", "beta")
+local dredger_obj = minetest.add_entity({ x = 0, y = 40, z = 0 }, "sl_scary:dredger")
+check(mob_count() == spawned + 2, "MM-spawned and sl_scary mobs also live entities")
+-- ...and dropped items pile up inside the arena.
+local item_inside = minetest.add_item({ x = 0, y = 40, z = 0 }, ItemStack("default:cobble"))
+local item_outside = minetest.add_item({ x = 500, y = 8, z = 500 }, ItemStack("default:cobble"))
+mmap.reset()
+check(mob_count() == 0, "every mob is gone once the match ends (incl. MM + horror mobs)")
+check(item_inside._removed == true, "dropped items inside the arena purged at reset")
+check(item_outside._removed ~= true, "items outside the arena volume survive")
+mmap.spawn_initial_mobs()
+check(mob_count() == spawned, "mobs respawn fresh at the next game start")
+
+section("PHASE 19 — handmade map from schematic (.lua variant, map.conf anchors)")
+H.dir_tree["mods/game/sl_modebase/maps"] =
+	{ dirs = { "neon_crossfire", "mini_test" }, files = {} }
+local list_ok, list_msg = minetest.registered_chatcommands.sl_map.func("alpha", "list")
+check(list_ok == true and tostring(list_msg):find("mini_test") ~= nil
+	and tostring(list_msg):find("neon_crossfire") ~= nil,
+	"/sl_map lists installed handmade maps")
+H.player_privs.alpha = { server = true } -- stub treats server as admin
+H.schematic_placements = {}
+mmap.prepare({ type = "schematic", name = "mini_test", seed = 5 })
+local sd = mmap.current
+check(sd.type == "schematic" and sd.name == "Mini Test",
+	"handmade map loaded from its directory")
+local place_min = { x = -10, y = 30, z = -10 } -- origin {0,30,0} centered on 21x21
+check(sd.minp.x == place_min.x - 1 and sd.minp.y == place_min.y - 2 and sd.minp.z == place_min.z - 1,
+	"map volume pads the schematic box (reset volume)")
+check(#H.schematic_placements == 1 and H.schematic_placements[1].pos.x == place_min.x
+	and H.schematic_placements[1].pos.y == place_min.y
+	and H.schematic_placements[1].force == true,
+	"schematic force-placed at the computed min corner")
+check(sd.anchor.beacon_a.x == place_min.x + 5 and sd.anchor.beacon_a.y == place_min.y + 2
+	and sd.anchor.beacon_a.z == place_min.z + 10,
+	"beacon anchors come from map.conf (schematic-relative)")
+check(H.voxels[H.vhash(sd.anchor.beacon_a)] == "sl_modebase:beacon_a",
+	"beacon node placed on the handmade map's dais")
+check(H.voxels[H.vhash({ x = place_min.x, y = place_min.y, z = place_min.z })] == "ground:square_neon",
+	"schematic floor materialized")
+check(#sd.mobs == 3 and sd.mobs[1].variant == "stalker" and sd.mobs[3].variant == "brute",
+	"map.conf defines the initial mob population")
+-- Reset contract on the handmade map: re-place + journal restore.
+local hm_outside = { x = 400, y = 8, z = 400 }
+H.fire_placenode(hm_outside, { name = "default:stone" })
+H.fire_placenode({ x = place_min.x + 10, y = place_min.y + 4, z = place_min.z + 10 },
+	{ name = "default:cobble" }) -- inside the schematic volume
+mmap.reset()
+check(#H.schematic_placements == 2, "reset re-places the handmade schematic")
+check(is_air(hm_outside), "out-of-map edit restored")
+check(is_air({ x = place_min.x + 10, y = place_min.y + 4, z = place_min.z + 10 }),
+	"node placed inside the handmade map was wiped by the re-placement")
+check(H.voxels[H.vhash({ x = place_min.x, y = place_min.y, z = place_min.z })] == "ground:square_neon",
+	"handmade floor back to its initial state")
+
+-- .mts variant (binary schematic, WorldEdit-style): conf parsing and
+-- anchor math (the stub records placements without decoding the file).
+mmap.prepare({ type = "schematic", name = "neon_crossfire", seed = 5 })
+local nd = mmap.current
+check(nd.type == "schematic" and nd.name == "Neon Crossfire", ".mts handmade map discovered")
+check(nd.minp.x == -25 and nd.minp.z == -25 and nd.minp.y == 28,
+	".mts centered on origin (padded volume)")
+check(nd.anchor.beacon_a.x == -24 + 6 and nd.anchor.beacon_a.y == 30 + 2
+	and nd.anchor.beacon_a.z == -24 + 24,
+	".mts beacon anchors read from map.conf")
+check(#nd.mobs == 5, ".mts map.conf mob list parsed")
+
+section("PHASE 20 — /sl_map commands and the test-procedural map type")
+H.player_privs.beta = {} -- not an admin
+local denied = minetest.registered_chatcommands.sl_map.func("beta", "procedural")
+check(denied == false, "non-admin cannot change the map type")
+local set_ok = minetest.registered_chatcommands.sl_map.func("alpha", "test")
+check(set_ok == true, "/sl_map test accepted")
+mmap.prepare()
+check(mmap.current.type == "test", "test-procedural map built on next prepare")
+check(mmap.current.anchor.beacon_a.x == -12 and mmap.current.anchor.beacon_a.y == 2,
+	"deterministic test arena layout (beacon A at -12)")
+check(state.lobby_spawn.y == 5 and state.ghost_spawn.y == 40,
+	"test arena registers lobby and cage spawns")
+local status_ok, status_msg = minetest.registered_chatcommands.sl_map.func("alpha", "")
+check(status_ok == true and tostring(status_msg):find("test") ~= nil,
+	"/sl_map status reports the active map")
+-- Map export (create_schematic route); io is stubbed out so nothing
+-- is written to the real repository during tests.
+local real_io_open = io.open
+io.open = function() return nil end
+local save_ok, save_msg = mmap.save_current("exporttest")
+io.open = real_io_open
+check(save_ok == true, "current map exports to a handmade map (/sl_map save)")
+check(H.created_schematics["mods/game/sl_modebase/maps/exporttest/map.mts"] ~= nil,
+	"export writes <maps>/<name>/map.mts")
+-- Restore the default configuration for any later phases.
+mmap.runtime.type = nil
+mmap.runtime.schematic = nil
+mmap.runtime.seed = nil
+mmap.prepare({ type = "procedural", seed = seed_a })
 
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 os.exit(fail_count == 0 and 0 or 1)

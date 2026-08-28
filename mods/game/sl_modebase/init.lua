@@ -22,6 +22,7 @@ end
 
 include_files(
 	"state.lua",    -- persistent state, teams, helpers
+	"map.lua",      -- map types (procedural / test / handmade .mts) + reset
 	"spawn.lua",    -- spawn logic and join/respawn hooks
 	"match.lua",    -- match lifecycle and win conditions
 	"matchmaking.lua", -- matchmaking UI and lobby terminal

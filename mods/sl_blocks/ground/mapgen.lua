@@ -14,6 +14,14 @@ local function cube_size()
 end
 
 -- Total monsters for the whole world, spawned exactly once at mapgen.
+-- DISABLED BY DEFAULT since the match map system landed: mobs are match
+-- entities now — purged when a match ends, (re)spawned from the map's
+-- initial population when the next match starts. Set sl_map.mapgen_mobs
+-- = true to restore the old ambient-worldgen monsters.
+local function mapgen_mobs_enabled()
+	return minetest.settings:get_bool("sl_map.mapgen_mobs", false)
+end
+
 local function monster_budget()
 	local n = tonumber(minetest.settings:get("sl_cube_monsters") or "") or 12
 	return math.max(0, math.min(64, math.floor(n)))
@@ -192,6 +200,8 @@ minetest.register_on_generated(function(minp, maxp, blockseed)
 	if minp.x <= 0 and maxp.x >= 0 and minp.z <= 0 and maxp.z >= 0
 			and minp.y <= 0 and maxp.y >= 0 then
 		minetest.after(0, place_mm_base)
-		minetest.after(0, spawn_fixed_monsters)
+		if mapgen_mobs_enabled() then
+			minetest.after(0, spawn_fixed_monsters)
+		end
 	end
 end)
