@@ -50,11 +50,27 @@ for icon in glob.glob(f"{work}/res/mipmap*/ic_launcher.png"):
 PYEOF
 
 apktool b "$WORK/work" -o "$WORK/rebuilt.apk" --use-aapt2
+audit_sizes() {
+    python3 - "$1" <<'PYAUDIT'
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1])
+total = 0
+for i in sorted(z.infolist(), key=lambda x: -x.compress_size)[:6]:
+    m = {0: "STORED", 8: "DEFLATED"}.get(i.compress_type, str(i.compress_type))
+    print(f"  {i.filename}: {m} raw={i.file_size//1048576}MB packed={i.compress_size//1048576}MB")
+    total += i.compress_size
+print(f"  top6 packed total: {total//1048576}MB")
+PYAUDIT
+}
+echo "[audit] rebuilt.apk ($(stat -c%s "$WORK/rebuilt.apk") bytes):"; audit_sizes "$WORK/rebuilt.apk"
 python3 "$SCRIPT_DIR/slim_apk.py" "$WORK/rebuilt.apk" "$WORK/slim.apk"
+echo "[audit] slim.apk ($(stat -c%s "$WORK/slim.apk") bytes):"; audit_sizes "$WORK/slim.apk"
 zipalign -f 4 "$WORK/slim.apk" "$WORK/aligned.apk"
+echo "[audit] aligned.apk: $(stat -c%s "$WORK/aligned.apk") bytes"
 apksigner sign --ks "$KEYSTORE" --ks-pass pass:android --key-pass pass:android \
     --out "$OUT_APK" "$WORK/aligned.apk"
 apksigner verify "$OUT_APK"
+echo "[audit] final: $(stat -c%s "$OUT_APK") bytes"
 
 # Assert the identity actually took
 BADGING="$(aapt dump badging "$OUT_APK" 2>/dev/null)"
