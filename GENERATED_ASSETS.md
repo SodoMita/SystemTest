@@ -116,3 +116,12 @@ All remaining `dirt ^ overlay` ground nodes rebuilt procedurally
   composite (`dirt.png^..._side.png`) shows the real dirt.
 - `permafrost_with_stones`: `default_stones.png` / `default_stones_side.png`
   are transparent pale-blue pebble outlines composited over permafrost.
+
+## Tool icons v3 — fully procedural (2026-08-28)
+
+All 24 `default_tool_*.png` are now drawn by `tools/neon_tools.py` (no AI
+generation): one pixel-map per archetype (sword / pickaxe / axe / shovel),
+one palette per material (wood / stone / steel / bronze / mese / diamond).
+Strict 4-color palette per icon: material bright line + dim halo (~40%) +
+near-black handle + amber pommel/grip accent. Preview maps with
+`python3 tools/neon_tools.py --preview`.
