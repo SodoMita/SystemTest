@@ -2887,6 +2887,7 @@ default.register_mesepost("default:mese_post_light_aspen_wood", {
 minetest.register_node("default:cloud", {
 	description = S("Cloud"),
 	tiles = {"default_cloud.png"},
+	use_texture_alpha = "clip",
 	is_ground_content = false,
 	sounds = default.node_sound_defaults(),
 	groups = {not_in_creative_inventory = 1},

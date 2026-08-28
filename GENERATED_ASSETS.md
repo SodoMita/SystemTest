@@ -29,6 +29,45 @@ These are intentionally lightweight placeholders: suitable for loading the game 
 
 ---
 
+# 16x16 Node Texture Pass
+
+A follow-up asset pass replaced the 64×64 (and larger) placeholder node/item textures
+with crisp **16×16 hard-edge pixel** versions so block sides, items, and cloud/cage
+nodes render at the canonical Minetest/Luanti texture scale without blur or
+anti-aliasing.
+
+## What changed
+
+- **`mods/default/textures/default_cloud.png`** — the previous file was a solid
+  16×16 white tile, so `default:cloud` looked like a white cuboid. Replaced with a
+  transparent white/pale-blue cloud silhouette and set `use_texture_alpha = "clip"`
+  on the node so the cloud reads as fluff, not a solid block.
+- **`mods/content/sl_characters/textures/sl_boxman_neon.png`** — 2×2 placeholder
+  upgraded to the intended neon-outlined 16×16 identity-neutral boxman used by the
+  player model, spawn markers, and ghost/evil-ghost colorize overlays.
+- **`mods/content/sl_mvp_assets/textures/`** — `terminal_texture.png`,
+  `door_texture.png`, `platform_texture.png`, and `item_texture.png` now 16×16.
+- **`mods/game/sl_modebase/textures/`** — loot crate, monster spawner, objective
+  core, and all crafting/salvage/tactical item icons replaced with 16×16 pixel art
+  (the previous `sl_objective_core_icon.png` was a 512×512 AI-style image).
+- **`mods/content/sl_scary/textures/`** — `hide_spot_top/side/bottom.png` now 16×16.
+- **`mods/content/workshops/textures/`** — all 50 workshop node textures regenerated
+  as 16×16 tiles (workbench, anvil, assembly table, drawers, lockers, desks, racks,
+  server/control panels, vents, pipes, caution tape, warning signs, windows).
+- **`mods/sl_blocks/ground/textures/`** — `square_neon.png`, `rhombus_neon.png`,
+  `x_neon.png`, `x2_neon.png`, and `square_neon_opaque.png` now 16×16 hard-edge
+  neon tiles (previously 32×32 or larger).
+
+## Notes
+
+- All regenerated images are **16×16 RGBA PNGs** with no gradient smoothing;
+  the 16×16 sprite sheets/door/window textures are intentionally left larger where
+  the code animates or otherwise expects a multi-frame sheet.
+- The generation scripts were run from a **temporary outside-the-repo directory**
+  and were **not added** to the repository.
+
+---
+
 # Sound Replacement Pass
 
 A follow-up pass replaced **every** `.ogg` in the game with a freshly synthesised,
