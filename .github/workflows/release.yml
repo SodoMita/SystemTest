@@ -40,7 +40,7 @@ jobs:
         run: |
           set -e
           WORK=$(mktemp -d)
-          curl -sL -o "$WORK/win.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-win64.zip"
+          curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o "$WORK/win.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-win64.zip"
           unzip -q "$WORK/win.zip" -d "$WORK/win"
           ROOT=$(find "$WORK/win" -maxdepth 1 -mindepth 1 -type d | head -1)
           mkdir -p "$ROOT/games/$GAME_ID"
@@ -50,7 +50,7 @@ jobs:
           ls -la SystemLoot-Windows.zip
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
+          curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip
           chmod +x linux-amd64/butler
           ./linux-amd64/butler -V
@@ -69,7 +69,7 @@ jobs:
           WORK=$(mktemp -d)
           mkdir -p "$WORK/mac"
           for ARCH in arm64 x86_64; do
-            curl -sL -o "$WORK/mac-$ARCH.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti_${LUANTI_VERSION}_macos12.3_${ARCH}.zip"
+            curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o "$WORK/mac-$ARCH.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti_${LUANTI_VERSION}_macos12.3_${ARCH}.zip"
             unzip -q "$WORK/mac-$ARCH.zip" -d "$WORK/mac/SystemLoot-macOS-$ARCH" -x "__MACOSX/*"
             APP=$(find "$WORK/mac/SystemLoot-macOS-$ARCH" -maxdepth 3 -name "*.app" -not -path "*__MACOSX*" | head -1)
             [ -n "$APP" ] || { echo "no .app found in mac-$ARCH.zip"; exit 1; }
@@ -81,7 +81,7 @@ jobs:
           ls -la mac/
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
+          curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip
           chmod +x linux-amd64/butler
           ./linux-amd64/butler -V
@@ -142,7 +142,7 @@ jobs:
           ls -la SystemLoot-Linux.tar.gz
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
+          curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip
           chmod +x linux-amd64/butler
           ./linux-amd64/butler -V
@@ -168,7 +168,7 @@ jobs:
             -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
             -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           for ABI in arm64-v8a armeabi-v7a x86_64; do
-            curl -sL -o "$WORK/base-$ABI.apk" \
+            curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o "$WORK/base-$ABI.apk" \
               "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-${ABI}.apk"
             python3 tools/repack_apk.py "$WORK/base-$ABI.apk" . "$WORK/unsigned-$ABI.apk"
             zipalign -f 4 "$WORK/unsigned-$ABI.apk" "$WORK/aligned-$ABI.apk"
@@ -179,7 +179,7 @@ jobs:
           ls -la apks/
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
+          curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip
           chmod +x linux-amd64/butler
           ./linux-amd64/butler -V
@@ -193,6 +193,9 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24   # luanti-wasm's install_emsdk.sh requires Node >= 24.18
       - name: Install build prerequisites
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake tclsh
       - name: Build the Luanti WASM client (paradust7/luanti-wasm)
@@ -211,7 +214,7 @@ jobs:
           ls -la www/
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
+          curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip
           chmod +x linux-amd64/butler
           ./linux-amd64/butler -V
