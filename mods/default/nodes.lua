@@ -238,9 +238,9 @@ default:mese_post_light_aspen_wood
 Misc
 ----
 
-default:cloud
-
 --]]
+
+-- Sky/cloud nodes live in mods/sl_blocks/sky (sky:cloud).
 
 -- Required wrapper to allow customization of default.after_place_leaves
 local function after_place_leaves(...)
@@ -2883,15 +2883,6 @@ default.register_mesepost("default:mese_post_light_aspen_wood", {
 --
 -- Misc
 --
-
-minetest.register_node("default:cloud", {
-	description = S("Cloud"),
-	tiles = {"default_cloud.png"},
-	use_texture_alpha = "clip",
-	is_ground_content = false,
-	sounds = default.node_sound_defaults(),
-	groups = {not_in_creative_inventory = 1},
-})
 
 --
 -- register trees for leafdecay

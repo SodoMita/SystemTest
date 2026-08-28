@@ -38,10 +38,11 @@ anti-aliasing.
 
 ## What changed
 
-- **`mods/default/textures/default_cloud.png`** — the previous file was a solid
-  16×16 white tile, so `default:cloud` looked like a white cuboid. Replaced with a
-  transparent white/pale-blue cloud silhouette and set `use_texture_alpha = "clip"`
-  on the node so the cloud reads as fluff, not a solid block.
+- **`mods/sl_blocks/sky/`** — new `sky` mod in the `sl_blocks` modpack holds the
+  sky/cloud nodes (the cloud node no longer lives in `mods/default`). It registers
+  `sky:cloud` with a 16×16 transparent cloud silhouette
+  (`mods/sl_blocks/sky/textures/cloud.png`, `use_texture_alpha = "clip"`), plus
+  aliases `cloud` and `default:cloud` so old worlds keep loading.
 - **`mods/content/sl_characters/textures/sl_boxman_neon.png`** — 2×2 placeholder
   upgraded to the intended neon-outlined 16×16 identity-neutral boxman used by the
   player model, spawn markers, and ghost/evil-ghost colorize overlays.
@@ -65,6 +66,36 @@ anti-aliasing.
   the code animates or otherwise expects a multi-frame sheet.
 - The generation scripts were run from a **temporary outside-the-repo directory**
   and were **not added** to the repository.
+
+---
+
+# Bloom Bake Pass
+
+A follow-up pass baked a small additive halo into the **bright node-light
+textures** that are used with alpha-blend or opaque node faces. The bloom is
+distance-limited (about 1–2 px at 16×16) so the hard pixel edges remain crisp
+but the light sources pick up a short neon glow.
+
+## Applied to (node lights only)
+
+- `mods/sl_blocks/ground/textures/` — `square_neon.png`,
+  `square_neon_opaque.png`, `rhombus_neon.png`, `x_neon.png`, `x2_neon.png`
+  (neon grid tiles, `use_texture_alpha = "blend"` or opaque, `light_source = 14`).
+- `mods/content/sl_mvp_assets/textures/terminal_texture.png`
+  (terminal mesh face, `light_source = 8`).
+- `mods/game/sl_modebase/textures/` — `sl_monster_spawner.png`,
+  `sl_objective_core.png`, `sl_objective_core_icon.png`, `sl_power_cell.png`,
+  `sl_blast_shield.png`, `sl_signal_relay.png`, `sl_sensor_array.png`
+  (placeable tactical/objective node lights, `light_source` 8–14).
+
+## Not applied
+
+- Tool and item icon textures (`sl_combat_blade.png`, `sl_scrap_metal.png`,
+  `sl_circuit_board.png`, flare, medkit, ritual/data-pad icons, etc.) — no
+  additional bloom needed on inventory icons.
+- Non-light world textures (clouds, hide spots, doors, platforms, etc.).
+- Stock `mods/default` textures, which stay untouched to avoid changing MTG
+  scaffolding wholesale.
 
 ---
 
