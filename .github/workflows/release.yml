@@ -201,13 +201,16 @@ jobs:
       - name: Build the Luanti WASM client (paradust7/luanti-wasm)
         run: |
           set -e
-          git clone --depth 1 https://github.com/paradust7/luanti-wasm
-          cd luanti-wasm
+          # Clone OUTSIDE the checkout — rsyncing the workspace into the
+          # game dir would otherwise recurse into the build tree
+          # (gotcha ledger #1 — do not repeat it).
+          git clone --depth 1 https://github.com/paradust7/luanti-wasm "$RUNNER_TEMP/luanti-wasm"
+          cd "$RUNNER_TEMP/luanti-wasm"
           ./build_all.sh   # emsdk auto-downloads; ~30-45 min
       - name: Embed SystemTest into the virtual FS + repack www
         run: |
           set -e
-          cd luanti-wasm
+          cd "$RUNNER_TEMP/luanti-wasm"
           mkdir -p build/fsroot/luanti/games/SystemTest
           rsync -a --exclude=.git --exclude=.github "$GITHUB_WORKSPACE/" build/fsroot/luanti/games/SystemTest/
           ./build_www.sh
@@ -221,4 +224,4 @@ jobs:
       - name: Push to itch (web)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./linux-amd64/butler push luanti-wasm/www "$ITCH_TARGET:web" --userversion "wasm-${GITHUB_SHA::7}"
+        run: ./linux-amd64/butler push "$RUNNER_TEMP/luanti-wasm/www" "$ITCH_TARGET:web" --userversion "wasm-${GITHUB_SHA::7}"
