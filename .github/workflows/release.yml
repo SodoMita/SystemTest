@@ -177,6 +177,11 @@ jobs:
           #!/bin/sh
           DIR="$(cd "$(dirname "$0")" && pwd)"
           export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          # Guarantee game discovery even on machines where a system
+          # minetest/luanti share dir exists (engine prefers its compiled
+          # STATIC_SHAREDIR over the bundled ../builtin in that case, but
+          # MINETEST_SUBGAME_PATH is always honored for games).
+          export MINETEST_SUBGAME_PATH="$DIR/games${MINETEST_SUBGAME_PATH:+:$MINETEST_SUBGAME_PATH}"
           # SystemTest is the product: default the engine to it
           # (default_game stays 'minetest' otherwise; extra args can override).
           exec "$DIR/bin/luanti" --gameid SystemTest "$@"
@@ -191,7 +196,16 @@ jobs:
           SMOKE_WORLD="$WORK/smokeworld"
           mkdir -p "$SMOKE_WORLD"
           printf 'gameid = SystemTest\nbackend = sqlite3\nmg_name = singlenode\n' > "$SMOKE_WORLD/world.mt"
+          # Hide system share dirs so the smoke run reproduces a CLEAN
+          # machine (engine falls back to the bundled ../builtin instead of
+          # the compiled STATIC_SHAREDIR=/usr/share/games/minetest).
+          for sysdir in /usr/share/games/minetest /usr/share/minetest /usr/share/luanti /usr/share/games/luanti; do
+            [ -d "$sysdir" ] && sudo mv "$sysdir" "$sysdir.smoke-hidden" || true
+          done
           timeout -s INT 30 "$bundle/run-game.sh" --server --world "$SMOKE_WORLD" > "$WORK/smoke.log" 2>&1 || true
+          for sysdir in /usr/share/games/minetest /usr/share/minetest /usr/share/luanti /usr/share/games/luanti; do
+            [ -d "$sysdir.smoke-hidden" ] && sudo mv "$sysdir.smoke-hidden" "$sysdir" || true
+          done
           grep -qE "Server for gameid|listening" "$WORK/smoke.log" || { echo "server smoke FAILED:"; tail -30 "$WORK/smoke.log"; exit 1; }
           grep -q "Loaded core PvP game mode" "$WORK/smoke.log" || { echo "sl_modebase did not load:"; tail -30 "$WORK/smoke.log"; exit 1; }
           echo "server smoke OK: engine + SystemTest + sl_modebase boot from the bundle"
