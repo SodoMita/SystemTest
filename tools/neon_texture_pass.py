@@ -50,62 +50,62 @@ def sheet(name, cells, kind, size=(16, 16)):
 
 # ---- B01 stone & ground basics ----------------------------------------------
 sheet("B01_stone_ground", [
-    ("default_stone.png",             "dark graphite stone panel tile with a faint thin cyan-blue wire grid and subtle diagonal chisel marks"),
-    ("default_cobble.png",            "irregular rounded cobblestone cells outlined with pale cyan glow on dark graphite, seamless tile"),
-    ("default_mossycobble.png",       "cobblestone cells with neon green glowing moss filling the joints, seamless tile"),
-    ("default_stone_brick.png",       "two rows of offset bricks, thin glowing cyan mortar lines on dark graphite, seamless tile"),
-    ("default_stone_block.png",       "smooth dark slab tile, single hairline cyan border and one faint inner cross seam"),
-    ("default_gravel.png",            "scatter of small pebbles outlined in pale blue-white glow on near-black, dense seamless tile"),
-    ("default_sand.png",              "dark sand tile with dotted amber scan-line ripples, subtle dune curves"),
-    ("default_silver_sand.png",       "pale blue-white glowing speckle field on blue-black, seamless tile"),
-    ("default_clay.png",              "smooth dull violet-grey clay tile with faint purple tracery lines"),
-    ("default_dirt.png",              "dark brown-black soil tile with sparse tiny amber specks"),
-    ("default_dry_dirt.png",          "cracked dark earth tile, thin glowing orange crack lines branching across"),
-    ("default_permafrost.png",        "blue-black frozen soil tile with tiny pale ice-crystal glints"),
-    ("default_grass.png",             "dark green-black turf tile with a crisp neon green grid of grass blades, seamless"),
-    ("default_dry_grass.png",         "olive-black turf tile with sparse amber-yellow glowing grass grid"),
-    ("default_snow.png",              "near-black frost tile with a delicate white-blue glitter lattice"),
-    ("default_ice.png",               "deep navy translucent ice tile with glowing white-blue fracture lines"),
+    ("default_stone.png",             "[hue cyan #29E6FF] dark stone panel, thin cyan neon wire grid, corner ticks"),
+    ("default_cobble.png",            "[hue cyan #29E6FF] cobblestone cells outlined by thin cyan neon seams on near-black, seamless tile"),
+    ("default_mossycobble.png",       "[hue green #39FF6E] cobblestone cells with neon green glow in the joints, seamless tile"),
+    ("default_stone_brick.png",       "[hue cyan #29E6FF] offset bricks, thin glowing cyan neon mortar lines, seamless tile"),
+    ("default_stone_block.png",       "[hue cyan #29E6FF] smooth dark slab, hairline cyan neon border, faint inner cross seam"),
+    ("default_gravel.png",            "[hue pale blue #9FD8FF] small pebbles outlined in pale blue neon on near-black, dense seamless tile"),
+    ("default_sand.png",              "[hue amber #FFB347] dark sand tile with dotted amber neon ripples"),
+    ("default_silver_sand.png",       "[hue ice blue #BFE8FF] speckle field of tiny ice-blue neon dots on blue-black"),
+    ("default_clay.png",              "[hue violet #B78CFF] dark clay tile with sparse violet neon tracery"),
+    ("default_dirt.png",              "[hue amber #FFB347] black-brown soil with a few tiny dim amber neon specks"),
+    ("default_dry_dirt.png",          "[hue orange #FF7A2F] cracked dark earth, thin glowing orange neon crack lines"),
+    ("default_permafrost.png",        "[hue ice blue #BFE8FF] blue-black frozen soil with tiny pale ice neon glints"),
+    ("default_grass.png",             "[hue green #39FF6E] black turf tile with a crisp grid of neon green grass blade lines, seamless"),
+    ("default_dry_grass.png",         "[hue amber #FFC44D] black turf tile with sparse amber neon grass lines"),
+    ("default_snow.png",              "[hue ice blue #BFE8FF] near-black frost tile with delicate ice-blue neon glitter lattice"),
+    ("default_ice.png",               "[hue ice blue #BFE8FF] deep black ice tile with glowing ice-blue neon fracture lines"),
 ], "tile")
 
 # ---- B02 desert / sandstone / obsidian --------------------------------------
 sheet("B02_desert_obsidian", [
-    ("default_desert_sand.png",           "dark rust-red sand tile with orange glowing scan ripples"),
-    ("default_desert_cobble.png",         "warm red-brown cobble cells with orange glow joints, seamless tile"),
-    ("default_desert_stone.png",          "dark maroon stone panel with faint red wire grid"),
-    ("default_desert_stone_block.png",    "smooth maroon slab with red hairline border"),
-    ("default_desert_stone_brick.png",    "maroon bricks with glowing red mortar lines"),
-    ("default_sandstone.png",             "dark amber slab tile with faint horizontal glowing strata lines"),
-    ("default_sandstone_block.png",       "neat amber panel tile with warm gold border grid"),
-    ("default_sandstone_brick.png",       "amber bricks with warm gold glowing mortar"),
-    ("default_silver_sandstone.png",      "cool blue slab tile with ice-white border grid"),
-    ("default_silver_sandstone_block.png","smooth blue-grey panel with pale blue hairline frame"),
-    ("default_silver_sandstone_brick.png","blue-grey bricks with ice-blue glowing mortar"),
-    ("default_obsidian.png",              "near-black violet obsidian tile with deep purple wire grid"),
-    ("default_obsidian_block.png",        "black slab tile with violet border glow"),
-    ("default_obsidian_brick.png",        "dark violet bricks with purple glowing mortar"),
-    ("default_moss.png",                  "neon green fuzzy moss patch glow on dark surface, seamless tile"),
-    ("default_cloud.png",                 "soft white-blue glowing voxel cloud puffs with faint cyan grid on dark slate, seamless tile"),
+    ("default_desert_sand.png",           "[hue orange #FF7A2F] dark rust sand tile with orange neon ripples"),
+    ("default_desert_cobble.png",         "[hue orange #FF7A2F] cobble cells with orange neon seams"),
+    ("default_desert_stone.png",          "[hue red #FF4D6B] dark maroon panel with faint red neon wire grid"),
+    ("default_desert_stone_block.png",    "[hue red #FF4D6B] maroon slab with red neon hairline border"),
+    ("default_desert_stone_brick.png",    "[hue red #FF4D6B] maroon bricks with red neon mortar"),
+    ("default_sandstone.png",             "[hue amber #FFB347] dark amber slab with faint horizontal amber neon strata"),
+    ("default_sandstone_block.png",       "[hue amber #FFB347] amber panel with amber neon border grid"),
+    ("default_sandstone_brick.png",       "[hue amber #FFB347] amber bricks with amber neon mortar"),
+    ("default_silver_sandstone.png",      "[hue ice blue #BFE8FF] cool blue slab with ice-blue neon border grid"),
+    ("default_silver_sandstone_block.png","[hue ice blue #BFE8FF] blue-grey panel with pale blue neon frame"),
+    ("default_silver_sandstone_brick.png","[hue ice blue #BFE8FF] blue-grey bricks with ice-blue neon mortar"),
+    ("default_obsidian.png",              "[hue violet #A96CFF] near-black obsidian with violet neon wire grid"),
+    ("default_obsidian_block.png",        "[hue violet #A96CFF] black slab with violet neon border"),
+    ("default_obsidian_brick.png",        "[hue violet #A96CFF] dark violet bricks with violet neon mortar"),
+    ("default_moss.png",                  "[hue green #39FF6E] neon green moss patch glow on near-black, seamless tile"),
+    ("default_cloud.png",                 "[hue ice blue #BFE8FF] soft cloud puffs outlined in faint ice-blue neon grid on dark slate"),
 ], "tile")
 
 # ---- B03 sides, litter, ground overlays --------------------------------------
 sheet("B03_sides_overlays", [
-    ("default_grass_side.png",              "side of a soil block: dark soil with a glowing neon green strip along the very top edge, tile"),
-    ("default_dry_grass_side.png",          "soil block side with amber-yellow glow strip along the top edge, tile"),
-    ("default_snow_side.png",               "soil block side with white-blue glow strip along the top edge, tile"),
-    ("default_moss_side.png",               "stone block side with neon green dripping glow veins from the top edge, tile"),
-    ("default_stones_side.png",             "soil block side with a few small glowing pale pebbles embedded near the top edge, small pure-black gaps elsewhere"),
-    ("default_stones.png",                  "a few small glowing pale-blue pebbles scattered on pure black empty background"),
-    ("default_coniferous_litter.png",       "dark pine forest floor tile with tiny glowing teal needles scattered"),
-    ("default_coniferous_litter_side.png",  "soil side with a thin teal needle fringe glowing along the top edge, small pure-black gaps"),
-    ("default_rainforest_litter.png",       "dark humus floor tile with tiny green-gold glowing specks"),
-    ("default_rainforest_litter_side.png",  "soil side with green glowing fringe along the top edge, small pure-black gaps"),
-    ("default_footprint.png",               "one glowing cyan boot footprint outline on pure black empty background"),
-    ("default_invisible_node_overlay.png",  "four tiny faint white corner brackets near the edges on pure black empty background"),
-    ("default_papyrus.png",                 "three tall green neon reeds with glowing stems on pure black"),
-    ("default_kelp.png",                    "one tall wavy green neon seaweed strand with small leaflets on pure black"),
-    ("default_glass_detail.png",            "a few tiny cyan sparkle glints scattered on pure black empty background"),
-    ("default_obsidian_glass_detail.png",   "a few tiny violet sparkle glints scattered on pure black empty background"),
+    ("default_grass_side.png",              "[hue green #39FF6E] side tile: black soil with ONE neon green strip along the very top edge only"),
+    ("default_dry_grass_side.png",          "[hue amber #FFC44D] side tile: black soil with one amber neon strip along the top edge"),
+    ("default_snow_side.png",               "[hue ice blue #BFE8FF] side tile: black soil with one ice-blue neon strip along the top edge"),
+    ("default_moss_side.png",               "[hue green #39FF6E] side tile: black stone with neon green drip veins from the top edge"),
+    ("default_stones_side.png",             "[hue pale blue #9FD8FF] side tile: black soil with a few small pale-blue neon pebbles near the top edge"),
+    ("default_stones.png",                  "[hue pale blue #9FD8FF] a few small pale-blue neon pebbles on pure black"),
+    ("default_coniferous_litter.png",       "[hue teal #2FE8C8] black forest floor tile with tiny teal neon needles scattered"),
+    ("default_coniferous_litter_side.png",  "[hue teal #2FE8C8] side tile: black soil with a thin teal neon needle fringe along the top edge"),
+    ("default_rainforest_litter.png",       "[hue green #6EFF5E] black humus floor tile with tiny green neon specks"),
+    ("default_rainforest_litter_side.png",  "[hue green #6EFF5E] side tile: black soil with a thin green neon fringe along the top edge"),
+    ("default_footprint.png",               "[hue cyan #29E6FF] one cyan neon boot footprint outline on pure black"),
+    ("default_invisible_node_overlay.png",  "[hue white #EAF6FF] four tiny faint white corner brackets near the edges on pure black"),
+    ("default_papyrus.png",                 "[hue green #39FF6E] three tall thin neon green reeds on pure black"),
+    ("default_kelp.png",                    "[hue green #4DFFB8] one tall wavy neon green seaweed strand on pure black"),
+    ("default_glass_detail.png",            "[hue cyan #29E6FF] a few tiny cyan neon sparkle glints on pure black"),
+    ("default_obsidian_glass_detail.png",   "[hue violet #A96CFF] a few tiny violet neon sparkle glints on pure black"),
 ], "sprite")
 for t in ["default_grass_side.png", "default_dry_grass_side.png", "default_snow_side.png",
           "default_moss_side.png", "default_coniferous_litter.png", "default_rainforest_litter.png"]:
@@ -141,22 +141,22 @@ for t in ["default_tree.png", "default_tree_top.png", "default_jungletree.png",
 
 # ---- B05 wood planks & fences --------------------------------------------------
 sheet("B05_wood_fences", [
-    ("default_wood.png",                 "oak planks tile: dark amber boards with thin glowing warm seams, horizontal"),
-    ("default_junglewood.png",           "jungle planks tile: dark magenta-brown boards with glowing magenta seams"),
-    ("default_pine_wood.png",            "pine planks tile: dark teal boards with glowing teal seams"),
-    ("default_aspen_wood.png",           "aspen planks tile: pale dark boards with glowing pale cyan seams"),
-    ("default_acacia_wood.png",          "acacia planks tile: dark red-orange boards with glowing orange seams"),
-    ("default_fence_wood.png",           "one vertical amber-glowing fence post with two horizontal rails, sprite on pure black"),
-    ("default_fence_junglewood.png",     "vertical fence post with rails glowing magenta, sprite on pure black"),
-    ("default_fence_pine_wood.png",      "vertical fence post with rails glowing teal, sprite on pure black"),
-    ("default_fence_aspen_wood.png",     "vertical fence post with rails glowing pale cyan, sprite on pure black"),
-    ("default_fence_acacia_wood.png",    "vertical fence post with rails glowing red-orange, sprite on pure black"),
-    ("default_fence_rail_wood.png",      "two thin horizontal glowing amber rails with small posts, sprite on pure black"),
-    ("default_fence_rail_junglewood.png","two thin horizontal rails glowing magenta with small posts, sprite on pure black"),
-    ("default_fence_rail_pine_wood.png", "two thin horizontal rails glowing teal with small posts, sprite on pure black"),
-    ("default_fence_rail_aspen_wood.png","two thin horizontal rails glowing pale cyan with small posts, sprite on pure black"),
-    ("default_fence_rail_acacia_wood.png","two thin horizontal rails glowing red-orange with small posts, sprite on pure black"),
-    ("default_fence_overlay.png",        "neutral grey-white glowing fence rails overlay shape, sprite on pure black"),
+    ("default_wood.png",                 "[hue amber #FFB347] oak planks tile: near-black boards with thin amber neon seams, horizontal"),
+    ("default_junglewood.png",           "[hue magenta #FF4DC4] jungle planks tile: near-black boards with magenta neon seams"),
+    ("default_pine_wood.png",            "[hue teal #2FE8C8] pine planks tile: near-black boards with teal neon seams"),
+    ("default_aspen_wood.png",           "[hue pale cyan #9FD8FF] aspen planks tile: near-black boards with pale cyan neon seams"),
+    ("default_acacia_wood.png",          "[hue orange #FF7A2F] acacia planks tile: near-black boards with orange neon seams"),
+    ("default_fence_wood.png",           "[hue amber #FFB347] one vertical fence post with two horizontal rails, thin amber neon outline, sprite on pure black"),
+    ("default_fence_junglewood.png",     "[hue magenta #FF4DC4] vertical fence post with rails, magenta neon outline, sprite on pure black"),
+    ("default_fence_pine_wood.png",      "[hue teal #2FE8C8] vertical fence post with rails, teal neon outline, sprite on pure black"),
+    ("default_fence_aspen_wood.png",     "[hue pale cyan #9FD8FF] vertical fence post with rails, pale cyan neon outline, sprite on pure black"),
+    ("default_fence_acacia_wood.png",    "[hue orange #FF7A2F] vertical fence post with rails, orange neon outline, sprite on pure black"),
+    ("default_fence_rail_wood.png",      "[hue amber #FFB347] two thin horizontal rails with small posts, amber neon outline, sprite on pure black"),
+    ("default_fence_rail_junglewood.png","[hue magenta #FF4DC4] two thin horizontal rails, magenta neon outline, sprite on pure black"),
+    ("default_fence_rail_pine_wood.png", "[hue teal #2FE8C8] two thin horizontal rails, teal neon outline, sprite on pure black"),
+    ("default_fence_rail_aspen_wood.png","[hue pale cyan #9FD8FF] two thin horizontal rails, pale cyan neon outline, sprite on pure black"),
+    ("default_fence_rail_acacia_wood.png","[hue orange #FF7A2F] two thin horizontal rails, orange neon outline, sprite on pure black"),
+    ("default_fence_overlay.png",        "[hue cyan #29E6FF] thin fence rails drawn as cyan neon outline overlay, sprite on pure black"),
 ], "sprite")
 for t in ["default_wood.png", "default_junglewood.png", "default_pine_wood.png",
           "default_aspen_wood.png", "default_acacia_wood.png"]:
@@ -164,22 +164,22 @@ for t in ["default_wood.png", "default_junglewood.png", "default_pine_wood.png",
 
 # ---- B06 leaves (alpha tiles) ---------------------------------------------------
 sheet("B06_leaves", [
-    ("default_leaves.png",                "dense oak canopy tile, dark emerald leaf clusters outlined by a neon green vein web, small pure-black gaps between clusters, fills the whole square"),
-    ("default_leaves_simple.png",         "sparse neon green leaf vein web tile with larger pure-black gaps, fills the square"),
-    ("default_jungleleaves.png",          "dense jungle canopy tile with magenta and teal glowing veins, small pure-black gaps"),
-    ("default_jungleleaves_simple.png",   "sparse jungle canopy web, magenta glow, larger gaps"),
-    ("default_pine_needles.png",          "dense glowing teal pine needle mesh tile with tiny pure-black gaps"),
-    ("default_acacia_leaves.png",         "fine red-orange glowing foliage web tile with small pure-black gaps"),
-    ("default_acacia_leaves_simple.png",  "sparse red-orange foliage web tile, larger gaps"),
-    ("default_aspen_leaves.png",          "pale cyan-green glowing canopy web tile with small gaps"),
-    ("default_blueberry_bush_leaves.png", "green glowing bush canopy tile dotted with tiny bright blue berries, small gaps"),
-    ("default_sapling.png",               "tiny oak sapling: thin amber-glowing trunk with a small neon green leaf tuft, sprite on pure black"),
-    ("default_junglesapling.png",         "jungle sapling: thin trunk with magenta-green glowing leaves, sprite on pure black"),
-    ("default_pine_sapling.png",          "small pine sapling: teal glowing triangular needle tiers, sprite on pure black"),
-    ("default_acacia_sapling.png",        "small acacia sapling with red-orange glowing canopy, sprite on pure black"),
-    ("default_aspen_sapling.png",         "slender aspen sapling with pale cyan leaves glow, sprite on pure black"),
-    ("default_emergent_jungle_sapling.png","tall jungle sapling with layered magenta glow canopy, sprite on pure black"),
-    ("default_bush_sapling.png",          "small bush sapling with green glow leaves, sprite on pure black"),
+    ("default_leaves.png",                "[hue green #39FF6E] dense oak canopy: leaf clusters webbed by neon green vein lines, small pure-black gaps, fills the whole square"),
+    ("default_leaves_simple.png",         "[hue green #39FF6E] sparse neon green leaf vein web, larger pure-black gaps, fills the square"),
+    ("default_jungleleaves.png",          "[hue magenta #FF4DC4] dense jungle canopy webbed by magenta neon veins, small pure-black gaps"),
+    ("default_jungleleaves_simple.png",   "[hue magenta #FF4DC4] sparse magenta neon canopy web, larger gaps"),
+    ("default_pine_needles.png",          "[hue teal #2FE8C8] dense teal neon needle mesh, tiny pure-black gaps"),
+    ("default_acacia_leaves.png",         "[hue orange #FF7A2F] fine orange neon foliage web, small pure-black gaps"),
+    ("default_acacia_leaves_simple.png",  "[hue orange #FF7A2F] sparse orange neon foliage web, larger gaps"),
+    ("default_aspen_leaves.png",          "[hue pale cyan #9FD8FF] pale cyan neon canopy web, small gaps"),
+    ("default_blueberry_bush_leaves.png", "[hue green #39FF6E] green neon bush canopy web dotted with a few bright blue neon berries, small gaps"),
+    ("default_sapling.png",               "[hue green #39FF6E] tiny oak sapling: thin dark trunk with a small neon green leaf tuft, sprite on pure black"),
+    ("default_junglesapling.png",         "[hue magenta #FF4DC4] jungle sapling: thin trunk with magenta neon leaves, sprite on pure black"),
+    ("default_pine_sapling.png",          "[hue teal #2FE8C8] small pine sapling: teal neon triangular needle tiers, sprite on pure black"),
+    ("default_acacia_sapling.png",        "[hue orange #FF7A2F] small acacia sapling with orange neon canopy, sprite on pure black"),
+    ("default_aspen_sapling.png",         "[hue pale cyan #9FD8FF] slender aspen sapling with pale cyan neon leaves, sprite on pure black"),
+    ("default_emergent_jungle_sapling.png","[hue magenta #FF4DC4] tall jungle sapling with layered magenta neon canopy, sprite on pure black"),
+    ("default_bush_sapling.png",          "[hue green #39FF6E] small bush sapling with green neon leaves, sprite on pure black"),
 ], "tilea")
 for t in ["default_sapling.png", "default_junglesapling.png", "default_pine_sapling.png",
           "default_acacia_sapling.png", "default_aspen_sapling.png",
@@ -208,22 +208,22 @@ sheet("B07_plants", [
 
 # ---- B08 bush saplings, fruits, small items -----------------------------------
 sheet("B08_items_plants", [
-    ("default_acacia_bush_sapling.png",   "small sapling with red-orange glowing leaf puffs, sprite on pure black"),
-    ("default_pine_bush_sapling.png",     "small sapling with teal glowing needle puffs, sprite on pure black"),
-    ("default_blueberry_bush_sapling.png","small bush sapling with green leaves and tiny blue glow dots, sprite on pure black"),
-    ("default_apple.png",                 "one round red-glowing apple with a tiny green leaf and stem, sprite on pure black"),
-    ("default_blueberries.png",           "cluster of three blue-glowing berries, sprite on pure black"),
-    ("default_snowball.png",              "white-blue glowing snowball sphere, sprite on pure black"),
-    ("default_stick.png",                 "one diagonal thin amber-glowing stick, sprite on pure black"),
-    ("default_paper.png",                 "white-glowing paper sheet rectangle, sprite on pure black"),
-    ("default_book.png",                  "closed book with cyan-glowing cover edge and amber spine, sprite on pure black"),
-    ("default_flint.png",                 "sharp grey flint flake with white edge glow, sprite on pure black"),
-    ("default_clay_lump.png",             "small dull violet-glowing clay blob, sprite on pure black"),
-    ("default_clay_brick.png",            "brick shape with red-violet glow edges, sprite on pure black"),
-    ("default_coal_lump.png",             "black coal lump with white-hot glowing facets, sprite on pure black"),
-    ("default_iron_lump.png",             "rough rust-orange glowing ore lump, sprite on pure black"),
-    ("default_copper_lump.png",           "round orange-glowing copper lump, sprite on pure black"),
-    ("default_tin_lump.png",              "silvery pale-blue glowing tin lump, sprite on pure black"),
+    ("default_acacia_bush_sapling.png",   "[hue orange #FF7A2F] small sapling with orange neon leaf puffs, sprite on pure black"),
+    ("default_pine_bush_sapling.png",     "[hue teal #2FE8C8] small sapling with teal neon needle puffs, sprite on pure black"),
+    ("default_blueberry_bush_sapling.png","[hue green #39FF6E] small bush sapling with green neon leaves and tiny blue glow dots, sprite on pure black"),
+    ("default_apple.png",                 "[hue red #FF3355] one large round apple drawn as a thick neon red outline circle with dark fill, tiny stem and one small leaf tick, centered sprite on pure black"),
+    ("default_blueberries.png",           "[hue blue #4D9FFF] cluster of three small blue neon circle berries, sprite on pure black"),
+    ("default_snowball.png",              "[hue ice blue #BFE8FF] one snowball: ice-blue neon circle outline with dark fill, sprite on pure black"),
+    ("default_stick.png",                 "[hue amber #FFB347] one diagonal thin amber neon stick, two pixels thick, sprite on pure black"),
+    ("default_paper.png",                 "[hue pale cyan #9FD8FF] paper sheet: pale cyan neon rectangle outline, dark fill, sprite on pure black"),
+    ("default_book.png",                  "[hue cyan #29E6FF] closed book: cyan neon outline with a brighter spine edge, sprite on pure black"),
+    ("default_flint.png",                 "[hue pale blue #9FD8FF] sharp flint flake: pale blue neon edge outline, sprite on pure black"),
+    ("default_clay_lump.png",             "[hue violet #B78CFF] small clay blob: violet neon outline, sprite on pure black"),
+    ("default_clay_brick.png",            "[hue violet #B78CFF] brick shape: violet neon outline, sprite on pure black"),
+    ("default_coal_lump.png",             "[hue white-hot #FFE8C8] black coal lump with white-hot neon facet lines, sprite on pure black"),
+    ("default_iron_lump.png",             "[hue orange #FF7A2F] rough ore lump: orange neon outline, sprite on pure black"),
+    ("default_copper_lump.png",           "[hue orange #FFA03F] round copper lump: orange neon outline, sprite on pure black"),
+    ("default_tin_lump.png",              "[hue silver-blue #C8E0FF] round tin lump: silver-blue neon outline, sprite on pure black"),
 ], "sprite")
 
 # ---- B09 liquids, glass, lights ------------------------------------------------
@@ -292,24 +292,24 @@ sheet("B11_metal_blocks", [
 for t in ["default_bookshelf_slot.png", "default_chest_lock.png", "default_book_written.png"]:
     B[t]["kind"] = "sprite"
 
-# ---- B12 furnace, signs --------------------------------------------------------
+# ---- B12 furnace, signs, steel/bronze tools ------------------------------------
 sheet("B12_furnace_signs", [
-    ("default_furnace_front.png", "furnace front: dark steel panel with cyan-glowing frame and a dark arched fire mouth in the lower center"),
-    ("default_furnace_side.png",  "furnace side: dark steel panel with cyan hairline border"),
-    ("default_furnace_top.png",   "furnace top: dark steel plate with cyan border and small vent grid"),
-    ("default_furnace_bottom.png","furnace bottom: plain dark plate with faint border"),
-    ("default_sign_wood.png",     "wooden sign: dark amber board with glowing edge frame, hanging sprite on pure black"),
-    ("default_sign_wall_wood.png","wooden wall sign board with amber glow frame, sprite on pure black"),
-    ("default_sign_steel.png",    "steel sign: dark plate with cyan glow frame, sprite on pure black"),
-    ("default_sign_wall_steel.png","steel wall sign plate with cyan glow frame, sprite on pure black"),
-    ("default_tool_steelaxe.png", "pixel art tool icon: axe with pale steel glowing head, dark handle with amber grip, diagonal, sprite on pure black"),
-    ("default_tool_steelpick.png","pickaxe with pale steel glowing head, dark handle with amber grip, diagonal, sprite on pure black"),
-    ("default_tool_steelshovel.png","shovel with pale steel glowing blade, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_steelsword.png","sword with pale steel glowing blade and amber guard, diagonal, sprite on pure black"),
-    ("default_tool_bronzeaxe.png","axe with warm amber-bronze glowing head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_bronzepick.png","pickaxe with bronze glowing head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_bronzeshovel.png","shovel with bronze glowing blade, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_bronzesword.png","sword with bronze glowing blade, diagonal, sprite on pure black"),
+    ("default_furnace_front.png",  "[hue cyan #29E6FF] furnace front tile: near-black steel panel with thin cyan neon frame and a dark arched fire mouth in the lower center"),
+    ("default_furnace_side.png",   "[hue cyan #29E6FF] furnace side tile: near-black steel panel with cyan neon hairline border"),
+    ("default_furnace_top.png",    "[hue cyan #29E6FF] furnace top tile: near-black plate with cyan neon border and small vent dashes"),
+    ("default_furnace_bottom.png", "[hue cyan #29E6FF] furnace bottom tile: near-black plate with faint cyan border"),
+    ("default_sign_wood.png",      "[hue amber #FFB347] wooden sign: dark board with amber neon edge frame, sprite on pure black"),
+    ("default_sign_wall_wood.png", "[hue amber #FFB347] wall sign board with amber neon frame, sprite on pure black"),
+    ("default_sign_steel.png",     "[hue cyan #29E6FF] steel sign: near-black plate with cyan neon frame, sprite on pure black"),
+    ("default_sign_wall_steel.png","[hue cyan #29E6FF] steel wall sign with cyan neon frame, sprite on pure black"),
+    ("default_tool_steelaxe.png",  "[hue steel-blue #9FD8FF] axe icon: head drawn as a pale steel-blue neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_steelpick.png", "[hue steel-blue #9FD8FF] pickaxe icon: head as pale steel-blue neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_steelshovel.png","[hue steel-blue #9FD8FF] shovel icon: blade as pale steel-blue neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_steelsword.png","[hue steel-blue #9FD8FF] sword icon: blade as pale steel-blue neon outline, near-black guard and grip, diagonal, sprite on pure black"),
+    ("default_tool_bronzeaxe.png", "[hue amber #FFB347] axe icon: head as amber neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_bronzepick.png","[hue amber #FFB347] pickaxe icon: head as amber neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_bronzeshovel.png","[hue amber #FFB347] shovel icon: blade as amber neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_bronzesword.png","[hue amber #FFB347] sword icon: blade as amber neon outline, near-black guard and grip, diagonal, sprite on pure black"),
 ], "tile")
 for t in ["default_sign_wood.png", "default_sign_wall_wood.png", "default_sign_steel.png",
           "default_sign_wall_steel.png", "default_tool_steelaxe.png", "default_tool_steelpick.png",
@@ -317,24 +317,24 @@ for t in ["default_sign_wood.png", "default_sign_wall_wood.png", "default_sign_s
           "default_tool_bronzepick.png", "default_tool_bronzeshovel.png", "default_tool_bronzesword.png"]:
     B[t]["kind"] = "sprite"
 
-# ---- B13 tools, mese / stone / wood ---------------------------------------------
+# ---- B13 tools: mese / stone / diamond / wood ------------------------------------
 sheet("B13_tools_1", [
-    ("default_tool_meseaxe.png",     "axe with yellow-green glowing crystal head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_mesepick.png",    "pickaxe with yellow-green glowing crystal head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_meseshovel.png",  "shovel with yellow-green glowing blade, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_mesesword.png",   "sword with yellow-green glowing crystal blade, diagonal, sprite on pure black"),
-    ("default_tool_stoneaxe.png",    "axe with rough grey stone head, faint blue glow edge, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_stonepick.png",   "pickaxe with rough grey stone head, faint blue glow edge, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_stoneshovel.png", "shovel with rough grey stone blade, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_stonesword.png",  "sword with rough grey stone blade, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_diamondaxe.png",  "axe with icy cyan-white glowing diamond head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_diamondpick.png", "pickaxe with icy cyan-white glowing diamond head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_diamondshovel.png","shovel with icy diamond glowing blade, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_diamondsword.png","sword with icy cyan-white glowing blade, diagonal, sprite on pure black"),
-    ("default_tool_woodaxe.png",     "axe with amber-glowing wooden head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_woodpick.png",    "pickaxe with amber-glowing wooden head, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_woodshovel.png",  "shovel with amber-glowing wooden blade, dark handle, diagonal, sprite on pure black"),
-    ("default_tool_woodsword.png",   "sword with amber-glowing wooden blade, diagonal, sprite on pure black"),
+    ("default_tool_meseaxe.png",      "[hue yellow-green #B8FF34] axe icon: head as yellow-green neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_mesepick.png",     "[hue yellow-green #B8FF34] pickaxe icon: head as yellow-green neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_meseshovel.png",   "[hue yellow-green #B8FF34] shovel icon: blade as yellow-green neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_mesesword.png",    "[hue yellow-green #B8FF34] sword icon: blade as yellow-green neon outline, near-black guard, diagonal, sprite on pure black"),
+    ("default_tool_stoneaxe.png",     "[hue cool grey-blue #8FB8D8] axe icon: head as faint cool grey-blue neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_stonepick.png",    "[hue cool grey-blue #8FB8D8] pickaxe icon: head as faint grey-blue neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_stoneshovel.png",  "[hue cool grey-blue #8FB8D8] shovel icon: blade as faint grey-blue neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_stonesword.png",   "[hue cool grey-blue #8FB8D8] sword icon: blade as faint grey-blue neon outline, near-black guard, diagonal, sprite on pure black"),
+    ("default_tool_diamondaxe.png",   "[hue icy #CFFAFF] axe icon: head as icy white-cyan neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_diamondpick.png",  "[hue icy #CFFAFF] pickaxe icon: head as icy white-cyan neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_diamondshovel.png","[hue icy #CFFAFF] shovel icon: blade as icy neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_diamondsword.png", "[hue icy #CFFAFF] sword icon: blade as icy white-cyan neon outline, near-black guard, diagonal, sprite on pure black"),
+    ("default_tool_woodaxe.png",      "[hue amber #FFB347] axe icon: head as warm amber neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_woodpick.png",     "[hue amber #FFB347] pickaxe icon: head as warm amber neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_woodshovel.png",   "[hue amber #FFB347] shovel icon: blade as warm amber neon outline, near-black handle, diagonal, sprite on pure black"),
+    ("default_tool_woodsword.png",    "[hue amber #FFB347] sword icon: blade as warm amber neon outline, near-black guard, diagonal, sprite on pure black"),
 ], "sprite")
 
 # ---- B14 remaining sprites + HUD bits -------------------------------------------
@@ -360,21 +360,19 @@ for t in ["default_chest_inside.png", "gui_hotbar_selected.png", "gui_hb_bg.png"
           "gui_furnace_arrow_bg.png", "gui_furnace_arrow_fg.png"]:
     B[t]["kind"] = "tilea"
 
-# ---- M01 misc 3x3 (fern frames, cracks) ------------------------------------------
+# ---- M01 misc 3x3 (fern frames) ----------------------------------------------
 sheet("M01_misc", [
-    ("default_fern_2.png",        "medium fern with glowing green fronds spread wide, sprite on pure black"),
-    ("default_fern_3.png",        "large lush fern with many glowing green fronds, sprite on pure black"),
-    ("crack_anylength_s1.png",    "thin white-cyan glowing crack: one short branching line near the center, rest pure black, fills the square"),
-    ("crack_anylength_s2.png",    "crack stage two: two branching glowing crack lines reaching toward the edges"),
-    ("crack_anylength_s3.png",    "crack stage three: several branching glowing cracks crossing most of the square"),
-    ("crack_anylength_s4.png",    "crack stage four: dense web of glowing cracks with small fragments"),
-    ("crack_anylength_s5.png",    "crack stage five: very dense shattered web of glowing cracks across the whole square"),
-    ("_spare_glow7.png",          "single small white glowing dot, sprite centered on pure black"),
-    ("_spare_glow8.png",          "single small cyan glowing dot, sprite centered on pure black"),
+    ("default_fern_2.png", "medium fern with glowing green fronds spread wide, sprite on pure black"),
+    ("default_fern_3.png", "large lush fern with many glowing green fronds, sprite on pure black"),
+    ("_unused_m01_1.png", "empty pure black cell"),
+    ("_unused_m01_2.png", "empty pure black cell"),
+    ("_unused_m01_3.png", "empty pure black cell"),
+    ("_unused_m01_4.png", "empty pure black cell"),
+    ("_unused_m01_5.png", "empty pure black cell"),
+    ("_unused_m01_6.png", "empty pure black cell"),
+    ("_unused_m01_7.png", "empty pure black cell"),
 ], "sprite")
-for t in ["crack_anylength_s1.png", "crack_anylength_s2.png", "crack_anylength_s3.png",
-          "crack_anylength_s4.png", "crack_anylength_s5.png"]:
-    B[t]["kind"] = "tilea"
+# crack stages are drawn procedurally (see build_cracks), not generated
 
 # ---- B15 corals, desert sandstone, strays ------------------------------------
 sheet("B15_extras", [
@@ -408,7 +406,35 @@ B["default_item_smoke.png"]["size"] = (8, 8)
 B["default_fern_2.png"]["size"] = (32, 32)
 B["default_fern_3.png"]["size"] = (32, 32)
 
-# Variants/spares are internal, not shipped.
+# ---- C01 dedicated chest sheet (2x2, full fidelity) ---------------------------
+C01_CELLS = [
+    ("default_chest_front.png", "[hue amber #FFB347] storage chest FRONT face: near-black wood panel, thin amber neon frame, one small bright cyan neon latch rectangle in the center top, seamless tile"),
+    ("default_chest_side.png",  "[hue amber #FFB347] storage chest SIDE face: near-black wood panel, thin amber neon frame, seamless tile"),
+    ("default_chest_top.png",   "[hue amber #FFB347] storage chest LID TOP: near-black panel, thin amber neon border, seamless tile"),
+    ("default_chest_inside.png","[hue amber #FFB347] open chest interior: near-black walls with faint amber neon edge glow, full square"),
+]
+for i, (tex, desc) in enumerate(C01_CELLS):
+    B[tex] = dict(sheet="C01_chest", cell=i, kind="tile", size=(16, 16), desc=desc)
+
+# ---- P01 semi-transparent plate pair (triangulation matte) ---------------------
+# Sheet layout: LEFT half pure black background, RIGHT half pure white background,
+# each half a 2x2 grid of the same four wireframe sprites. Alpha is triangulated
+# from the plate pair: A = 1 - (W - B) / 255, RGB = B / A (premultiplied solve),
+# the method used by the Seirin art pipeline (ai_agent_docs/ART_PIPELINE_NEXT.md).
+SEMI = {
+    "default_water.png":         0,
+    "default_river_water.png":   1,
+    "default_glass.png":         2,
+    "default_obsidian_glass.png": 3,
+}
+SEMI_DESC = [
+    "water surface: three thin horizontal cyan neon wave lines with small gaps, centered",
+    "river water surface: three thin horizontal turquoise neon wave lines with small gaps",
+    "glass pane: one square cyan neon frame with a single diagonal streak, empty center",
+    "glass pane: one square violet neon frame with a single diagonal streak, empty center",
+]
+
+# Variants/spares are internal, not shipped.# Variants/spares are internal, not shipped.
 INTERNAL = set(n for n in B if n.startswith("_"))
 
 # Dedicated full-sheet generations: file -> (sheet name, description)
@@ -429,33 +455,40 @@ DEDICATED = {
 
 # Animated strips assembled from processed stills (file -> builder spec)
 ANIMATED = {
-    "default_water_source_animated.png":        dict(base="default_water.png",  frames=16, style="water",  alpha_scale=0.62, variants=["water2", "water3"]),
-    "default_water_flowing_animated.png":       dict(base="default_water.png",  frames=16, style="flow",   alpha_scale=0.62, variants=["water2", "water3"]),
-    "default_river_water_source_animated.png":  dict(base="default_river_water.png", frames=16, style="water", alpha_scale=0.62, variants=["river2", "river3"]),
-    "default_river_water_flowing_animated.png": dict(base="default_river_water.png", frames=16, style="flow",  alpha_scale=0.62, variants=["river2", "river3"]),
+    # water/glass come from the triangulated P01 plates; water anim = roll of ONE
+    # base texture (no variant sprites -> stable color); torch anim = ONE torch,
+    # flame-only brightness flicker (same torch, same colors every frame).
+    "default_water_source_animated.png":        dict(base="default_water.png",  frames=16, style="water", alpha_scale=0.85),
+    "default_water_flowing_animated.png":       dict(base="default_water.png",  frames=16, style="flow",  alpha_scale=0.85),
+    "default_river_water_source_animated.png":  dict(base="default_river_water.png", frames=16, style="water", alpha_scale=0.85),
+    "default_river_water_flowing_animated.png": dict(base="default_river_water.png", frames=16, style="flow",  alpha_scale=0.85),
     "default_lava_source_animated.png":         dict(base="default_lava.png",   frames=8,  style="water", alpha_scale=1.0, speed=0.5, variants=["lava2", "lava3"]),
-    "default_lava_flowing_animated.png":        dict(base="default_lava.png",   frames=16, style="flow",  alpha_scale=1.0, speed=0.5, variants=["lava2", "lava3"]),
-    "default_torch_animated.png":               dict(base="default_torch_on_floor.png", frames=16, style="torch", alpha_scale=1.0, variants=["torch2", "torch3"]),
-    "default_torch_on_floor_animated.png":      dict(base="default_torch_on_floor.png", frames=16, style="torch", alpha_scale=1.0, variants=["torch2", "torch3"]),
-    "default_torch_on_ceiling_animated.png":    dict(base="default_torch_on_floor.png", frames=16, style="torch", alpha_scale=1.0, flip=True, variants=["torch2", "torch3"]),
-    "default_furnace_front_active.png":         dict(base="default_furnace_front.png", frames=8, style="furnace", alpha_scale=1.0),
+    "default_lava_flowing_animated.png":        dict(base="default_lava.png",   frames=16, style="flow",  alpha_scale=1.0, speed=0.5),
+        "default_torch_animated.png":               dict(base="default_torch_on_floor.png", frames=16, style="torch", alpha_scale=1.0),
+    "default_torch_on_floor_animated.png":      dict(base="default_torch_on_floor.png", frames=16, style="torch", alpha_scale=1.0),
+    "default_torch_on_ceiling_animated.png":    dict(base="default_torch_on_floor.png", frames=16, style="torch", alpha_scale=1.0, flip=True),    "default_river_water_flowing_animated.png": dict(base="default_river_water.png", frames=16, style="flow",  alpha_scale=0.62, variants=["river2", "river3"]),
+    "default_lava_source_animated.png":         dict(base="default_lava.png",   frames=8,  style="water", alpha_scale=1.0, speed=0.5, variants=["lava2", "lava3"]),
+    "default_lava_flowing_animated.png":        dict(base="default_lava.png",   frames=16, style="flow",  alpha_scale=1.0, speed=0.5),
+        "default_furnace_front_active.png":         dict(base="default_furnace_front.png", frames=8, style="furnace", alpha_scale=1.0),
     "crack_anylength.png":                      dict(style="crackstack"),  # built from crack_anylength_s*.png
 }
 
 # ---------------------------------------------------------------- prompts --
 
 STYLE = (
-    "Retro-futuristic NEON-GRID pixel art for a cyberpunk voxel game: glowing thin wireframe "
-    "and grid-line art on deep black (#06080E), Tron / synthwave vector style, like light-cycle "
-    "schematics. Flat, high contrast, saturated neon accents, no realistic shading, no photo texture."
+    "Strict two-tone NEON pixel art: a deep black field (#050810) plus EXACTLY ONE saturated "
+    "neon hue per texture (the hue named in brackets). Everything is drawn as thin glowing neon "
+    "wireframe lines, circuit traces or laser holograms, Tron light-cycle style. Fills are FLAT "
+    "near-black tinted with the same hue (brightness under 22%), never mid-grey. No gradients "
+    "except a 1px dim halo hugging a neon line, no white fills, no secondary hues, no realistic "
+    "shading, no photo texture."
 )
 
 LATTICE = (
-    "Strict pixel-art lattice: every tile is 16x16 logical pixels; each logical pixel is one solid "
-    "square block of uniform color with crisp hard edges (chunky 16-bit look). Dark fills are very "
-    "dark desaturated navy/graphite, never mid-grey and never noisy. Glow lines are 1 logical pixel "
-    "thick and fully saturated; a dim halo pixel may sit next to a bright line. No anti-aliasing "
-    "blur between logical pixels."
+    "Strict pixel-art lattice: every texture is 16x16 logical pixels; each logical pixel is one "
+    "solid square block of uniform color with crisp hard edges (chunky 16-bit look). Neon lines "
+    "are 1 logical pixel thick, fully saturated and bright. No anti-aliasing blur between "
+    "logical pixels, no dithering, no noise."
 )
 
 def build_prompt(sheet_name):
@@ -497,9 +530,14 @@ def load_sheet(name):
     return im
 
 def cell_rect(sheet_name, idx):
-    cols = 3 if sheet_name.startswith("M01") else 4
-    rows = 4 if cols == 4 else 3
+    if sheet_name.startswith("C01"):
+        cols, rows = 2, 2
+    elif sheet_name.startswith("M01"):
+        cols, rows = 3, 3
+    else:
+        cols, rows = 4, 4
     cw, ch = 1024 / cols, 1024 / rows
+
     x0, y0 = int(round(idx % cols * cw)), int(round(idx // cols * ch))
     return x0, y0, int(round(cw)), int(round(ch))
 
@@ -524,17 +562,173 @@ def alpha_scale(im, s):
     im.putalpha(a)
     return im
 
+def semi_from_pair(sheet_im, idx, name):
+    """Triangulation matte from a black plate and a white plate (Seirin method):
+    W = F*a + (1-a)*255, B = F*a  ->  a = 1 - (W - B)/255, F = B/a."""
+    cw = 256
+    x0, y0 = (idx % 2) * cw, (idx // 2) * cw
+    ins = 20
+    b_plate = sheet_im.crop((x0 + ins, y0 + ins, x0 + cw - ins, y0 + cw - ins)).convert("RGB")
+    w_plate = sheet_im.crop((512 + x0 + ins, y0 + ins, 512 + x0 + cw - ins, y0 + cw - ins)).convert("RGB")
+    W, H = b_plate.size
+    bp, wp = b_plate.load(), w_plate.load()
+    out = Image.new("RGBA", (W, H))
+    op = out.load()
+    # structural check: bright regions of both plates must roughly agree
+    # black plate: neon lines are the bright pixels; white plate: neon lines are
+    # pixels that deviate from pure white in at least one channel
+    mb = set((x, y) for y in range(H) for x in range(W) if max(bp[x, y]) > 90)
+    mw = set((x, y) for y in range(H) for x in range(W) if 255 - min(wp[x, y]) > 60)
+    inter = len(mb & mw)
+    iou = inter / max(1, len(mb | mw))
+    if iou < 0.45:
+        print("WARNING: %s plate pair misaligned (IoU %.2f), falling back to keying" % (name, iou))
+        small = b_plate.resize((16, 16), Image.BOX)
+        return key_alpha(small, 14, 88)
+    for y in range(H):
+        for x in range(W):
+            rB, gB, bB = bp[x, y]
+            rW, gW, bW = wp[x, y]
+            a = 1.0 - ((rW - rB) + (gW - gB) + (bW - bB)) / (3.0 * 255.0)
+            a = max(0.0, min(1.0, a))
+            a = int(round(a * 8)) / 8.0          # quantize plate noise away
+            if a < 0.25:
+                a = 0.0
+            elif a > 0.92:
+                a = 1.0
+            if a <= 0.0:
+                op[x, y] = (0, 0, 0, 0)
+            else:
+                r = min(255, int(round(rB / a)))
+                g = min(255, int(round(gB / a)))
+                b = min(255, int(round(bB / a)))
+                op[x, y] = (r, g, b, int(round(a * 255)))
+    return out.resize((16, 16), Image.BOX)
+
+
+def _neon_hue(im):
+    """Circular mean hue of the saturated bright pixels (the neon lines)."""
+    import colorsys, math
+    sx = sy = nx = 0.0
+    n = 0
+    px = im.convert("RGBA").load()
+    for y in range(im.height):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if a < 80:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            if s > 0.35 and v > 0.35:
+                ang = h * 2 * math.pi
+                sx += math.cos(ang); sy += math.sin(ang); n += 1
+    if not n:
+        return None
+    return (math.atan2(sy, sx) / (2 * math.pi)) % 1.0
+
+
+def _set_hue(im, hue, rows=None):
+    """Recolor saturated bright pixels (optionally only in the top N rows) to hue."""
+    import colorsys
+    px = im.load()
+    ymax = im.height if rows is None else rows
+    for y in range(ymax):
+        for x in range(im.width):
+            r, g, b, a = px[x, y]
+            if a < 60:
+                continue
+            h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+            if s > 0.25 and v > 0.30:
+                r, g, b = colorsys.hsv_to_rgb(hue, s, v)
+                px[x, y] = (int(r * 255), int(g * 255), int(b * 255), a)
+    return im
+
+
+def unify_hues():
+    """Make side strips use exactly the same neon hue as their top textures."""
+    pairs = [
+        ("default_grass_side.png", "default_grass.png"),
+        ("default_dry_grass_side.png", "default_dry_grass.png"),
+        ("default_snow_side.png", "default_snow.png"),
+        ("default_moss_side.png", "default_moss.png"),
+        ("default_coniferous_litter_side.png", "default_coniferous_litter.png"),
+        ("default_rainforest_litter_side.png", "default_rainforest_litter.png"),
+        ("default_stones_side.png", "default_stones.png"),
+    ]
+    for side, top in pairs:
+        sp, tp = os.path.join(TEXDIR, side), os.path.join(TEXDIR, top)
+        if not (os.path.exists(sp) and os.path.exists(tp)):
+            continue
+        hue = _neon_hue(Image.open(tp))
+        if hue is None:
+            print("skip %s (no neon found in top)" % side)
+            continue
+        im = Image.open(sp).convert("RGBA")
+        _set_hue(im, hue, rows=5)
+        im.save(sp, optimize=True)
+        print("unified %-38s hue=%.2f" % (side, hue))
+
+
+def build_cracks():
+    """5 crack stages, procedural: bright neon cracks with real alpha, so they
+    show over translucent glass (not just its opaque frame)."""
+    import random
+    rng = random.Random(4242)
+    stages = []
+    lines_by_stage = [2, 4, 6, 9, 13]
+    walks = []
+    for i in range(13):                     # pre-generate all crack walks
+        x, y = 8 + rng.randint(-2, 2), 8 + rng.randint(-2, 2)
+        pts = [(x, y)]
+        dx, dy = rng.choice([(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)])
+        for _ in range(rng.randint(6, 12)):
+            x = max(0, min(15, x + dx)); y = max(0, min(15, y + dy))
+            pts.append((x, y))
+            if rng.random() < 0.35:
+                dx, dy = rng.choice([(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)])
+        walks.append(pts)
+    for si, nlines in enumerate(lines_by_stage):
+        im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+        op = im.load()
+        for pts in walks[:nlines]:
+            for (x, y) in pts:
+                op[x, y] = (190, 250, 255, 235)
+                for nx, ny in ((x + 1, y), (x, y + 1), (x + 1, y + 1)):
+                    if 0 <= nx < 16 and 0 <= ny < 16 and op[nx, ny][3] == 0:
+                        op[nx, ny] = (90, 190, 210, 110)
+        stages.append(im)
+    return stages
+
+
 def process():
     os.makedirs(SHEETS_DIR, exist_ok=True)
     os.makedirs(os.path.join(SHEETS_DIR, "derived"), exist_ok=True)
     stats = []
-    sheets = set(c["sheet"] for c in B.values()) | set(s for s, _d in DEDICATED.values())
+    sheets = set(c["sheet"] for c in B.values()) | set(SEMI and ["P01_semis"] or []) | set(s for s, _d in DEDICATED.values())
     missing = [s for s in sorted(sheets)
                if not os.path.exists(os.path.join(SHEETS_DIR, s + ".png"))]
     if missing:
         print("skipping (sheets not generated yet): %s" % ", ".join(missing))
     done_sheets = sheets - set(missing)
     sheet_cache = {}
+    for name, c in sorted(B.items()):
+        if name in SEMI:
+            # semi-transparent textures come from the P01 plate pair (triangulated)
+            if "P01_semis" in done_sheets:
+                if "P01_semis" not in sheet_cache:
+                    sheet_cache["P01_semis"] = load_sheet("P01_semis")
+                semi = semi_from_pair(sheet_cache["P01_semis"], SEMI[name], name)
+                semi.save(os.path.join(TEXDIR, name), optimize=True)
+                a = semi.getchannel("A")
+                stats.append((name, "P01_semis", SEMI[name],
+                              round(100 * sum(1 for v in a.tobytes() if v > 8) / 256)))
+            else:
+                print("skipping %s (P01_semis.png not generated)" % name)
+            continue
+        if c["sheet"] not in done_sheets:
+            continue
+        if name in INTERNAL and not name.startswith(("_var_", "crack_anylength_s")):
+            continue  # spares not shipped as files; variants stored below
+        p = os.path.join(TEXDIR, name)
     for name, c in sorted(B.items()):
         if c["sheet"] not in done_sheets:
             continue
@@ -678,13 +872,7 @@ def assemble():
     for name, spec in ANIMATED.items():
         p = os.path.join(TEXDIR, name)
         if spec["style"] == "crackstack":
-            parts = []
-            for i in range(1, 6):
-                q = os.path.join(TEXDIR, "crack_anylength_s%d.png" % i)
-                parts.append(Image.open(q).convert("RGBA"))
-            out = vstack(parts)
-            for i in range(1, 6):           # temp stage files, strip is assembled
-                os.remove(os.path.join(TEXDIR, "crack_anylength_s%d.png" % i))
+            out = vstack(build_cracks())
         else:
             base = Image.open(os.path.join(TEXDIR, spec["base"])).convert("RGBA")
             variants = []
@@ -713,6 +901,39 @@ TINT = {
     "default_flint.png": (198, 214, 255),       # cool blue-grey flint
     "default_tin_lump.png": (205, 220, 255),    # silvery pale-blue tin
 }
+
+def fix_glass():
+    """Redraw the glass panes as a clean thin neon frame + diagonal streak,
+    keeping the hue triangulated from the P01 plates."""
+    for name in ("default_glass.png", "default_obsidian_glass.png"):
+        p = os.path.join(TEXDIR, name)
+        if not os.path.exists(p):
+            continue
+        im = Image.open(p).convert("RGBA")
+        px = [q for q in im.getdata() if q[3] > 120]
+        if not px:
+            continue
+        r = sum(q[0] for q in px) // len(px)
+        g = sum(q[1] for q in px) // len(px)
+        b = sum(q[2] for q in px) // len(px)
+        out = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+        op = out.load()
+        for i in range(16):
+            for j, (x, y) in enumerate(((i, 0), (i, 15), (0, i), (15, i))):
+                op[x, y] = (r, g, b, 235)
+            # dim inner halo
+            if 0 < i < 15:
+                for x, y in ((i, 1), (i, 14), (1, i), (14, i)):
+                    if op[x, y][3] == 0:
+                        op[x, y] = (r, g, b, 70)
+        for i in range(9):                       # diagonal highlight streak
+            x, y = 12 - i, 2 + i
+            op[x, y] = (r, g, b, 165)
+            if 0 <= x - 1 < 16:
+                op[x - 1, y] = (r, g, b, 80)
+        out.save(p, optimize=True)
+        print("glass redrawn %-28s rgb=(%d,%d,%d)" % (name, r, g, b))
+
 
 def polish():
     """Second-pass fixes over processed files:
@@ -760,6 +981,15 @@ def main():
             print("=" * 20, n, "=" * 20)
             print(build_prompt(n))
             print()
+        p01 = ("%s\n%s\nLayout: the canvas is split into two vertical halves. LEFT half: PURE SOLID BLACK "
+               "background. RIGHT half: PURE SOLID WHITE background. On each half the SAME 2x2 grid of "
+               "four wireframe sprites, pixel-identical in shape and color on both halves, centered in "
+               "their quadrant, thin glowing lines only: [1] %s | [2] %s | [3] %s | [4] %s. "
+               "Only the background differs between the halves. No frames around sprites, no labels, "
+               "no text, no watermark." % (STYLE, LATTICE, SEMI_DESC[0], SEMI_DESC[1], SEMI_DESC[2], SEMI_DESC[3]))
+        print("=" * 20, "P01_semis", "=" * 20)
+        print(p01)
+        print()
         for name, (s, d) in DEDICATED.items():
             print("=" * 20, s, "=" * 20)
             print(d)
@@ -776,6 +1006,12 @@ def main():
     elif cmd == "process":
         process()
     elif cmd == "polish":
+        fix_glass()
+        polish()
+    elif cmd == "unify":
+        unify_hues()
+    elif cmd == "polish":
+        fix_glass()
         polish()
     elif cmd == "assemble":
         assemble()

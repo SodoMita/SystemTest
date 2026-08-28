@@ -71,3 +71,23 @@ deep black, cf. `mods/sl_blocks/ground/textures/*_neon.png`).
   it are printed by `tools/neon_texture_pass.py prompts`.
 - Animated texture dimensions/animation settings in `mods/default/*.lua` are
   unchanged (16 frames water, 8 lava, 16 torch, 8 furnace fire).
+
+## Neon pass v2 (2026-08-28)
+
+- Strict two-tone rule: near-black field + exactly ONE saturated neon hue per
+  texture (hue named per prompt), thin 1px neon wireframes, Tron style.
+- Semi-transparent textures (`default_water`, `default_river_water`, `glass`,
+  `obsidian_glass`) are now generated as a black-plate/white-plate PAIR on one
+  sheet (`P01_semis`) and their alpha is TRIANGULATED from the pair:
+  `A = 1-(W-B)/255`, `RGB = B/A` — the Seirin final-matting method
+  (cf. `SodoMita/Seirin ai_agent_docs/ART_PIPELINE_NEXT.md`).
+- Grass/snow/moss/litter side strips are hue-unified to their top textures
+  (`unify` step, circular-mean hue).
+- Chests regenerated from a dedicated 2x2 sheet (amber neon + cyan latch).
+- `crack_anylength.png` is drawn procedurally: bright neon cracks with real
+  alpha, visible over translucent glass.
+- Torch animation uses ONE sprite with flame-only flicker (same torch, same
+  color every frame); water animation is a roll of the single triangulated
+  texture.
+- Glass panes: thin 1px neon frame + diagonal streak redrawn procedurally,
+  color from the triangulated plates.
