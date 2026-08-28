@@ -4,7 +4,7 @@
 
 *Kaelen leaves one file on the table. New paper. Neon-bright cover.*
 
-**Kaelen** *(at the door)*: "Weapons spec. Ranged. Someone has to read it before the owner does. Three of you. Stay."
+**Kaelen** *(at the door)*: "Weapons spec. Ranged. Someone has to read it before the team does. Three of you. Stay."
 
 *Carmack stays because it's engineering. Maura stays because she doesn't trust guns to be anything but loud. Jax stays because a weapon is a tool, and tools are his department.*
 
@@ -62,7 +62,7 @@
 
 **Jax**: "And it fixes the thing I actually hate. Without it, the best strategy is: camp the man who looted the man. You're not playing the arena anymore, you're farming a funeral."
 
-**Maura**: "*Farming a funeral.* Say that at the design review and watch the owner's face. Yes. All of it. The dead keep score from inside your inventory."
+**Maura**: "*Farming a funeral.* Say that at the design review and watch the council's face. Yes. All of it. The dead keep score from inside your inventory."
 
 ---
 
@@ -88,7 +88,7 @@
 
 **Carmack** *(sketching before anyone agrees)*:
 
-"The sentry is the best thing in the file and half of you haven't noticed why. Owner-only IFF. It shoots *everyone but the person who placed it*. No team awareness — because team awareness is an identity leak. Correct. Keep it.
+"The sentry is the best thing in the file and half of you haven't noticed why. Deployer-only IFF. It shoots *everyone but the person who placed it*. No team awareness — because team awareness is an identity leak. Correct. Keep it.
 
 "Now ask what a turret *is*, in evidence terms. It's a **witness**. It stands in one place, awake, for ninety seconds, watching one arc.
 
@@ -116,7 +116,7 @@
 
 ---
 
-## WHAT WE'RE TAKING TO THE OWNER
+## WHAT WE'RE TAKING TO THE TEAM
 
 *Carmack writes the margin list. Maura dictates. Jax checks each line against a tool he'd actually carry.*
 
@@ -142,3 +142,103 @@
 **Nobody picks anything up.**
 
 **The arena is waiting to find out who's listening.**
+
+---
+
+# THE SECOND SITTING (2026-08-29)
+
+*The file comes back with margins in five different pens. Nobody admits whose. Also someone scratched out every word "owner" and wrote "team" over it in steady, patient handwriting.*
+
+*Rita is in the room this time. She was not invited. She was simply there, which is how Rita attends things.*
+
+---
+
+## THE BODIES STAY
+
+**Maura** doesn't sit. She doesn't even take her coat off.
+
+"You wrote 'loot-the-corpse comes free' and then you made the corpse *disappear*. The inventory fountains onto the floor and the man himself evaporates. That's not looting a corpse. That's looting a *rumor* of a corpse.
+
+"A death has to **stay**. The body lies where it fell until the match ends or somebody deals with it deliberately. And hear the second half, because it's the whole clause: *destroying the body is also an act someone can see.* There is no tidy option. Burial leaves a mound. Fire leaves a scorch. And under all of it, a stain that outlives both — cleaned only when the match is. The floor remembers."
+
+**Carmack** *(already sketching)*: "Entity, not a node — it has to hold a 32-slot inventory, because the fountain now lands *in the body*, not around it. RMB reads the incident report: time, cause, contents. Never the killer — same rule as the feed. And the count is bounded by the roster: single life means corpse spam is *structurally impossible*. The cleanest entity budget in the whole game is the death rate."
+
+**Jax** turns the shovel page around without a word. It's been in the guide for weeks: *earthworks and graves.*
+
+"So we finally mean it. Shovel on a body: you bury him. It takes the tool, it takes the time, and it leaves a mound with no name on it. Some players will bury strangers. That's not a mechanic, that's a *funeral*, and it costs a shovel and pays nothing — which is exactly why it will mean something when someone does it for me."
+
+**Maura**: "And fire. One flare, or a mortar across the wreck. It burns, it leaves a scorch — and it drops an **Ashen Relic**. The altar component." *She lets that sit.* "Kill a man. Burn him. Take what's left of him to the altar and summon a ghost with it. Nobody who wants that ritual will ever leave a body lying around again — and now the weapon system knows it. Desecration isn't a crime we punish. It's a market we *opened*."
+
+**Jax**: "Burn a man, buy a séance." *He writes it on the margin.*
+
+---
+
+## THE LASH
+
+**Jax** *(pulling the old file apart)*:
+
+"You banned the grapple. Understandable — and wrong. The problem was never the hook. The problem is a grapple that's *safe*. So let me write the dangerous one.
+
+"It's a lasso. A lasso of light, because nothing in this arena is allowed to be cowhide. Loot crates only — four rolls in a hundred, never on a pad, so nobody hears you take it. It burns **cells**, five a throw, out of the same pool as the Lance and the Driver: every swing is a railgun round you didn't buy. It fires a hook — slow, seeable, inherit-your-stride — and if it bites a wall, you reel. If it bites a *monster*…" *he shows his teeth* "…you reel. Toward the monster.
+
+"While you're on the line, your hands are full. You cannot shoot. Anyone can cut the line with one hit. If you take so much as a scratch, it drops you — mid-arc, at altitude, above whatever the stain will be. And the launch is a *crack* the whole block hears."
+
+**Carmack**: "Every failure mode is public. The hook is public, the line is public, the crack is public, the fall is extremely public. It's not a movement item — it's a **published bet**. I want the telemetry to prove it: lash-holders should die *more*. If they don't, we tuned it soft."
+
+**Maura**: "A visible line to your destination. It's the only weapon in the file that's an *apology in advance*."
+
+---
+
+## HANDS, NOT ORDNANCE
+
+**Carmack** taps the Monster Master row three times.
+
+"He floats. He's fast. He hits like a customs official. And the moment this file ships, he is also the only combatant on the map with *no answer to a gunfight*. Good. Keep him pure. He deploys no turrets — the system does not take his orders twice. He fires no weapons — strip them at grant, strip them at pickup, refuse at input. One refusal message, and I want it in the build exactly as written: *'Your hands are the doctrine.'*
+
+"Because his hands are the doctrine. Not items — hands, evolved. The skill tree already has a combat branch; we graft a chain onto it that only grows for him. **Tyrant Grip**: four, seven, ten damage as he buys the levels. **Long Arm**: he hits from the far side of a doorway. **Tremor Palm**: one heavy blow that shoves a room. At the top tier he kills an outpositioned man in two blows — against six guns, at close range, that he had to *walk to* under fire."
+
+**Maura**: "He's not under-equipped. He's the *pressure*. Everything in this entire arsenal — the pads, the ammo, the turrets, the lash — exists to answer one floating silhouette that refuses to pick up a gun. That's not an asymmetry gap. That's the game's whole shape."
+
+---
+
+## THE COUNT THAT SURVIVES
+
+*Rita has been reading the achievement pages. She speaks without looking up.*
+
+**Rita**: "You reset everything now. Inventories, phases, bodies, stains. Good — a new match should be a clean scene. But somebody said achievements reset too, and I'm here to fix the second half of that sentence.
+
+"Reset the *earnings*. Keep the *count*. Every time a player takes an achievement, a tally clicks — one that no end-of-match sweep touches. First Blood, twelve times. It shows. It's public.
+
+"The match forgets. The **record** doesn't. That's the whole difference between a game and a *reputation* — and I've been keeping the difference since before this room flooded."
+
+*She leaves first. She always has.*
+
+---
+
+## SIX SHOTS OF LIGHT
+
+**Jax** *(last page, almost embarrassed)*:
+
+"Someone in the margins says I look like a soldier from an old war story — the kind that fought with cap-and-ball pistols. Fine. Then I want the pistols.
+
+"But they come back wrong, the way everything here comes back wrong: frontier steel with a system heart. A revolver with six charges of light — perfect accuracy, seven a hit, and after the sixth the cylinder spins itself back to full, two and a half seconds, and the spin **hums**. Everyone in the corridor hears the gun thinking. That's not a flaw. That's the duel.
+
+"And a lever rifle. Two-note clack on every cycle, mid-range, honest. Both feed the bullet pool — they compete with the Chatter, they don't bully it."
+
+**Carmack**: "Sidegrades, not upgrades. The western set is for players who want the metagame *louder*."
+
+**Maura**: "Everything old arrives here neon. Even the past."
+
+---
+
+*The minutes end with five lines, in five pens:*
+
+1. **The bodies stay, and every way of removing them leaves a mark.**
+2. **The lash exists, and it is a published bet.**
+3. **The Master's hands are the doctrine — and they are the only doctrine he gets.**
+4. **The match forgets. The count survives.**
+5. **The past comes back neon. Six shots, then everyone hears the gun think.**
+
+*Kaelen files it with the first sitting. The depth gauge reads -2856m.*
+
+*It has not moved. Nobody asks about the ballast tanks anymore.*
