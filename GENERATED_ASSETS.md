@@ -55,12 +55,18 @@ anti-aliasing.
 - **`mods/content/workshops/textures/`** — all 50 workshop node textures regenerated
   as 16×16 tiles (workbench, anvil, assembly table, drawers, lockers, desks, racks,
   server/control panels, vents, pipes, caution tape, warning signs, windows).
-- **`mods/sl_blocks/ground/textures/`** — `square_neon.png`, `rhombus_neon.png`,
-  `x_neon.png`, `x2_neon.png`, and `square_neon_opaque.png` now 16×16 hard-edge
-  neon tiles (previously 32×32 or larger).
+- **`mods/sl_blocks/ground/textures/`** — intentionally **not touched**: the neon
+  grid/rhombus/x/x2 tiles and opaque plate are existing good art (`square_neon`,
+  `rhombus_neon`, `x_neon`, `x2_neon`, `square_neon_opaque`). They are left at
+  their original 32×32 size and original saturated palette (neon accents are a
+  deliberate special case; the code multiplies/colorizes their near-white base).
 
 ## Notes
 
+- **Node textures are mostly white/grey.** Regenerated node faces use a
+  black/dark-grey/white-grey palette so per-node `color = ...` and `^[colorize`
+  works cleanly; saturated colour is reserved for special surfaces only (the
+  existing ground neon tiles and non-node tool/item icons).
 - All regenerated images are **16×16 RGBA PNGs** with no gradient smoothing;
   the 16×16 sprite sheets/door/window textures are intentionally left larger where
   the code animates or otherwise expects a multi-frame sheet.
@@ -78,9 +84,6 @@ but the light sources pick up a short neon glow.
 
 ## Applied to (node lights only)
 
-- `mods/sl_blocks/ground/textures/` — `square_neon.png`,
-  `square_neon_opaque.png`, `rhombus_neon.png`, `x_neon.png`, `x2_neon.png`
-  (neon grid tiles, `use_texture_alpha = "blend"` or opaque, `light_source = 14`).
 - `mods/content/sl_mvp_assets/textures/terminal_texture.png`
   (terminal mesh face, `light_source = 8`).
 - `mods/game/sl_modebase/textures/` — `sl_monster_spawner.png`,
@@ -94,6 +97,7 @@ but the light sources pick up a short neon glow.
   `sl_circuit_board.png`, flare, medkit, ritual/data-pad icons, etc.) — no
   additional bloom needed on inventory icons.
 - Non-light world textures (clouds, hide spots, doors, platforms, etc.).
+- Existing `mods/sl_blocks/ground` neon tiles — untouched good art, no bloom bake.
 - Stock `mods/default` textures, which stay untouched to avoid changing MTG
   scaffolding wholesale.
 
