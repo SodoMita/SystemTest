@@ -131,7 +131,7 @@ near-black handle + amber pommel/grip accent. Preview maps with
 `tools/neon_vector_pass.py`: AI "flat vector neon" sheets
 (`neon_sheets/S01_stone_vector.png`, `S02_ores_vector.png`) -> per-cell
 autotrace to SVG (vtracer, color stacked splines) -> render the SVG at exactly
-16x16 (PyMuPDF) -> hard 5-color palette flatten. Thin neon lines are dilated
+16x16 (PyMuPDF) -> deterministic 3-level neon recolor (line/halo/fill). Thin neon lines are dilated
 to ~1 output px before tracing so they survive the 16x16 render; ore specks
 are alpha-keyed black->transparent and composite over `default_stone.png` at
 runtime. `default_gravel.png` uses a procedural pebble fallback (its source

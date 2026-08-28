@@ -112,7 +112,8 @@ def neon_flatten_source(pil):
     else:
         mask = lum.point(lambda v: 255 if v > 150 else 0)
         t = int(vals[int(len(vals) * 0.995)])
-        mask = mask.point(lambda v: 255 if v > max(140, t - 20) else 0)
+        th = min(170, max(140, t - 20))                 # keep faint lines in
+        mask = mask.point(lambda v: 255 if v > th else 0)
         mask = mask.filter(ImageFilter.MaxFilter(19))
         # dominant neon hue of the bright pixels, saturated
         rs = gs = bs = n = 0.0
@@ -137,13 +138,13 @@ def neon_flatten_source(pil):
         for x in range(W):
             if mp[x, y]:
                 bp[x, y] = line_color
-    return base
+    return base, line_color
 
 
 def trace_to_svg(pil, path_precision=1):
     tmp = path_of(".tmp_cell.png")
     out = path_of(".tmp_cell.svg")
-    pil = neon_flatten_source(pil)
+    pil, _line = neon_flatten_source(pil)
     pil.save(tmp)
     vtracer.convert_image_to_svg_py(
         tmp, out, colormode="color", hierarchical="stacked", mode="spline",
@@ -264,6 +265,24 @@ def fallback_gravel():
     return im
 
 
+def neon_recolor(rendered, line_color):
+    """Deterministic 3-level recolor by brightness: full-bright neon line /
+    dim halo (line hue at ~37%) / near-black fill. No palette guessing."""
+    dim = tuple(v * 95 // 255 for v in line_color)
+    lum = rendered.convert("L")
+    px, lp = rendered.load(), lum.load()
+    for y in range(rendered.height):
+        for x in range(rendered.width):
+            v = lp[x, y]
+            if v > 100:
+                px[x, y] = line_color
+            elif v > 50:
+                px[x, y] = dim
+            else:
+                px[x, y] = (12, 10, 9)
+    return rendered
+
+
 def trace():
     s01 = load("S01_stone_vector.png")
     s02 = load("S02_ores_vector.png")
@@ -274,10 +293,11 @@ def trace():
             continue
         pil = cell(s01, 4, 4, idx)
         pil = pil.resize((1024, 1024), Image.LANCZOS)   # normalize viewBox
+        flat, line = neon_flatten_source(pil)
         svg = trace_to_svg(pil)
-        out = flatten_hybrid(render_svg(svg, 16), 5)
+        out = neon_recolor(render_svg(svg, 16), line)
         out.save(os.path.join(TEXDIR, name), optimize=True)
-        print("traced %-38s colors=%d" % (name, len(set(out.getdata()))))
+        print("traced %-38s line=%s" % (name, line))
     for name, idx in ORES:
         pil = cell(s02, 3, 3, idx, inset=24)
         pil = pil.resize((1024, 1024), Image.LANCZOS)
