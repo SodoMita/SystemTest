@@ -57,8 +57,13 @@ def main() -> int:
             new.writestr(item, src.read(item.filename))
     new.close()
     src.close()
+    import hashlib
+    with open(base_apk, "rb") as f:
+        base_md5 = hashlib.md5(f.read()).hexdigest()
+    inner_size = os.path.getsize(assets_tmp)
     os.remove(assets_tmp)
     print(f"repacked {base_apk}: {count} game files injected -> {out_apk}")
+    print(f"[audit] base md5={base_md5} inner assets.zip={inner_size} bytes")
     return 0
 
 
