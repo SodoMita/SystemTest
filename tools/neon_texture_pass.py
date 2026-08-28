@@ -935,6 +935,123 @@ def fix_glass():
         print("glass redrawn %-28s rgb=(%d,%d,%d)" % (name, r, g, b))
 
 
+def _soil_base(rng, tint=(1.0, 0.82, 0.62)):
+    """Warm near-black soil with subtle clumping; single-hue dim amber specks."""
+    im = Image.new("RGBA", (16, 16))
+    op = im.load()
+    pal = [(9, 8, 7), (13, 11, 9), (17, 14, 11), (22, 18, 13)]
+    for y in range(16):
+        for x in range(16):
+            r, g, b = pal[rng.randrange(4)]
+            op[x, y] = (r, g, b, 255)
+    for _ in range(9):                              # dim amber specks (one hue)
+        x, y = rng.randrange(16), rng.randrange(16)
+        r, g, b = 96 + rng.randrange(48), 62 + rng.randrange(30), 22 + rng.randrange(12)
+        op[x, y] = (r, g, b, 255)
+    return im
+
+
+def _blade_top(base, hue_rgb, rng, dense=True):
+    """Full-coverage neon blade grid: vertical dashes in EVERY column plus
+    horizontal runner lines, so no black margin/frame remains on any edge."""
+    im = base.copy()
+    op = im.load()
+    R, G, B = hue_rgb
+    for x in range(16):                             # vertical dashes per column
+        n = 5 if dense else 3
+        y = rng.randrange(2)
+        for k in range(n):
+            h = 1 + rng.randrange(2)
+            for yy in range(y, min(16, y + h)):
+                op[x, yy] = (R, G, B, 255)
+            y = yy + 1 + rng.randrange(3)
+            if y > 14:
+                break
+    for yy in (rng.randrange(3, 6), rng.randrange(9, 13)):   # runner lines
+        for x in range(16):
+            if rng.random() < 0.75:
+                op[x, yy] = (R, G, B, 255)
+    for i in range(16):                             # edge enforcement
+        for (x, y) in ((i, 0), (i, 15), (0, i), (15, i)):
+            if rng.random() < 0.55:
+                op[x, y] = (R, G, B, 255)
+    return im
+
+
+def _strip_overlay(hue_rgb, rng, blade_row=2, drips=3):
+    """TRANSPARENT side overlay: neon strip along the top edge + hanging blades.
+    The engine composites this over dirt/permafrost, so the soil always matches."""
+    im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    op = im.load()
+    R, G, B = hue_rgb
+    for y in (0, 1):
+        for x in range(16):
+            op[x, y] = (R, G, B, 255)
+    for x in range(0, 16, 2):                       # row-2 blades
+        if rng.random() < 0.6:
+            op[x, 2] = (R, G, B, 255)
+    for _ in range(drips):                          # a few longer drips
+        x = rng.randrange(16)
+        for y in range(2, 3 + rng.randrange(3)):
+            op[x, y] = (R, G, B, 200)
+    return im
+
+
+def cohere():
+    """Ground-family coherence pass:
+    - restore the v1 permafrost + moss_side pair (preferred look);
+    - one-hue soil base (dirt) shared by every ground node;
+    - full-coverage grass/dry-grass/snow tops (no bare margins, no frames);
+    - grass/dry/snow sides become TRANSPARENT overlays so the engine's
+      `dirt.png^side.png` composite shows the real soil (perfect match)."""
+    import random, subprocess
+    rng = random.Random(0xC0FFEE)
+
+    def restore(name):
+        out = os.path.join(TEXDIR, name)
+        blob = subprocess.run(["git", "show", "04df27c:mods/default/textures/" + name],
+                              capture_output=True, cwd=ROOT).stdout
+        if blob:
+            open(out, "wb").write(blob)
+            print("restored v1 %s" % name)
+
+    restore("default_permafrost.png")
+    restore("default_moss_side.png")
+
+    GRN, AMB, ICE = (61, 255, 110), (255, 183, 77), (150, 225, 255)
+
+    soil = _soil_base(rng)
+    soil.save(os.path.join(TEXDIR, "default_dirt.png"), optimize=True)
+
+    dark = soil.copy()
+    dark = Image.eval(dark, lambda v: v)  # keep base; tops read darker via blades
+    _blade_top(soil, GRN, rng, dense=True).save(
+        os.path.join(TEXDIR, "default_grass.png"), optimize=True)
+    _blade_top(soil, AMB, rng, dense=False).save(
+        os.path.join(TEXDIR, "default_dry_grass.png"), optimize=True)
+
+    # snow top: blue-tinted base + ice glint lattice
+    snow = _soil_base(rng, tint=(0.7, 0.85, 1.0))
+    op = snow.load()
+    for y in range(16):
+        for x in range(16):
+            r, g, b, a = op[x, y]
+            op[x, y] = (int(r * 0.6 + 6), int(g * 0.7 + 12), min(255, int(b * 0.9 + 26)), a)
+    for x in range(0, 16, 2):
+        for y in range(0, 16, 2):
+            op[x, y] = ICE + (255,)
+            if rng.random() < 0.5:
+                op[min(15, x + 1), y] = (ICE[0], ICE[1], ICE[2], 160)
+            if rng.random() < 0.5:
+                op[x, min(15, y + 1)] = (ICE[0], ICE[1], ICE[2], 160)
+    snow.save(os.path.join(TEXDIR, "default_snow.png"), optimize=True)
+
+    _strip_overlay(GRN, rng).save(os.path.join(TEXDIR, "default_grass_side.png"), optimize=True)
+    _strip_overlay(AMB, rng).save(os.path.join(TEXDIR, "default_dry_grass_side.png"), optimize=True)
+    _strip_overlay(ICE, rng).save(os.path.join(TEXDIR, "default_snow_side.png"), optimize=True)
+    print("ground family rebuilt (dirt/grass/dry/snow + side overlays)")
+
+
 def polish():
     """Second-pass fixes over processed files:
     - opaque tiles whose glow lines came out too faint get a brightness lift
@@ -1005,11 +1122,15 @@ def main():
         print("on disk but not planned:", extra)
     elif cmd == "process":
         process()
+    elif cmd == "cohere":
+        cohere()
     elif cmd == "polish":
         fix_glass()
         polish()
     elif cmd == "unify":
         unify_hues()
+    elif cmd == "cohere":
+        cohere()
     elif cmd == "polish":
         fix_glass()
         polish()

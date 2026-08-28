@@ -91,3 +91,17 @@ deep black, cf. `mods/sl_blocks/ground/textures/*_neon.png`).
   texture.
 - Glass panes: thin 1px neon frame + diagonal streak redrawn procedurally,
   color from the triangulated plates.
+
+## Ground-family coherence pass (2026-08-28, v2.1)
+
+- `default_permafrost.png` + `default_moss_side.png` restored to the v1 look
+  (the `permafrost^moss_side` composite node).
+- `default_dirt.png` rebuilt: single-hue warm near-black soil, dim amber specks.
+- `default_grass` / `default_dry_grass` tops rebuilt: full-coverage neon blade
+  grids (no bare margins, no frames), hue-identical to their side strips.
+- `default_grass_side` / `default_dry_grass_side` / `default_snow_side` are now
+  TRANSPARENT strip overlays (top 2 rows + hanging blades). The engine already
+  composites them over `default_dirt.png` (`dirt.png^side.png`), so the soil
+  part of every grass/dry/snow node now matches `default:dirt` exactly by
+  construction.
+- Reproduce with `python3 tools/neon_texture_pass.py cohere`.
