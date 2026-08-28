@@ -1109,6 +1109,74 @@ def cohere():
     print("ground family rebuilt (dirt/grass/dry/snow/savanna/litter/stones)")
 
 
+def crispen(pattern="default_tool_"):
+    """Kill BOX-downscale blur: snap every pixel to a strict 3-level palette
+    (near-black fill / dim halo / full-bright neon line) and binary alpha.
+    Chroma ratios are preserved (paleness survives), blends do not."""
+    import glob
+    for p in sorted(glob.glob(os.path.join(TEXDIR, pattern + "*.png"))):
+        im = Image.open(p).convert("RGBA")
+        px = im.load()
+        for y in range(im.height):
+            for x in range(im.width):
+                r, g, b, a = px[x, y]
+                if a < 120:
+                    px[x, y] = (r, g, b, 0)
+                    continue
+                m = float(max(r, g, b))
+                if m < 60:
+                    px[x, y] = (10, 9, 8, 255)          # near-black fill
+                elif m > 150:
+                    k = 255.0 / m                        # full-bright neon line
+                    px[x, y] = (int(r * k), int(g * k), int(b * k), 255)
+                else:
+                    k = 95.0 / m                         # dim halo
+                    px[x, y] = (int(r * k), int(g * k), int(b * k), 255)
+        # despeckle: drop dim pixels with no bright neighbor
+        ref = im.load()
+        for y in range(im.height):
+            for x in range(im.width):
+                r, g, b, a = ref[x, y]
+                if a and 50 < max(r, g, b) <= 110:
+                    nb = any(ref[nx, ny][3] and max(ref[nx, ny][:3]) > 150
+                             for nx, ny in ((x-1, y), (x+1, y), (x, y-1), (x, y+1))
+                             if 0 <= nx < im.width and 0 <= ny < im.height)
+                    if not nb:
+                        ref[x, y] = (10, 9, 8, 255)
+        # unify chroma: exactly ONE line color + one halo color + dark fill
+        cr = cg = cb = n = 0.0
+        for y in range(im.height):
+            for x in range(im.width):
+                r, g, b, a = ref[x, y]
+                if a and max(r, g, b) >= 250:
+                    m = float(max(r, g, b))
+                    cr += r / m; cg += g / m; cb += b / m; n += 1
+        if n:
+            cm = max(cr, cg, cb)
+            br = (min(255, int(255 * cr / cm)), min(255, int(255 * cg / cm)),
+                  min(255, int(255 * cb / cm)))
+            dm = tuple(max(1, v * 95 // 255) for v in br)
+            for y in range(im.height):
+                for x in range(im.width):
+                    r, g, b, a = ref[x, y]
+                    if not a:
+                        continue
+                    m = max(r, g, b)
+                    ref[x, y] = (10, 9, 8, 255) if m < 60 else (br + (255,) if m >= 250 else dm + (255,))
+        # drop dark pixels not attached to any line/halo (handle splatter)
+        for y in range(im.height):
+            for x in range(im.width):
+                r, g, b, a = ref[x, y]
+                if a and max(r, g, b) < 60:
+                    keep = any(0 <= nx < im.width and 0 <= ny < im.height
+                               and ref[nx, ny][3] and max(ref[nx, ny][:3]) >= 60
+                               for nx in range(x - 1, x + 2) for ny in range(y - 1, y + 2))
+                    if not keep:
+                        ref[x, y] = (0, 0, 0, 0)
+        im.save(p, optimize=True)
+        print("crispened %s" % os.path.basename(p))
+
+
 def polish():
     """Second-pass fixes over processed files:
     - opaque tiles whose glow lines came out too faint get a brightness lift
@@ -1181,6 +1249,8 @@ def main():
         process()
     elif cmd == "cohere":
         cohere()
+    elif cmd == "crispen":
+        crispen(*(sys.argv[2:3] or ["default_tool_"]))
     elif cmd == "polish":
         fix_glass()
         polish()
@@ -1188,6 +1258,8 @@ def main():
         unify_hues()
     elif cmd == "cohere":
         cohere()
+    elif cmd == "crispen":
+        crispen(*(sys.argv[2:3] or ["default_tool_"]))
     elif cmd == "polish":
         fix_glass()
         polish()
