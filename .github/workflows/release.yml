@@ -14,12 +14,12 @@ name: release
 # - windows/osx: official Luanti release binaries + embedded game.
 # - linux: portable bundle (engine + share data + ldd libs + launcher),
 #   same technique validated locally against the Debian engine.
-# - android: official APKs cannot carry custom games; the job rebuilds the
-#   engine from source with the game embedded (debug-signed). Best-effort:
-#   continue-on-error so the other channels always ship.
-# - web: Luanti has no official web/wasm port as of 5.17. The web channel
-#   carries a placeholder page saying exactly that, so the itch page is
-#   honest about it instead of shipping a broken build.
+# - android: official 5.17 APKs repacked (game injected into the nested
+#   assets.zip, re-aligned, debug-signed) — no engine rebuild needed.
+# - web: real WASM client built from paradust7/luanti-wasm (emscripten),
+#   game embedded in the virtual FS. Network play flows through the
+#   standard WebSocket proxies; playing against a dedicated SystemTest
+#   server requires hosting one separately.
 
 on:
   push:
@@ -153,29 +153,30 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
-    continue-on-error: true  # best-effort: engine source rebuild, iterated separately
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-      - name: Install build prerequisites (msgfmt for translation compile)
-        run: sudo apt-get update && sudo apt-get install -y gettext
-      - name: Fetch engine source + embed game
+      - name: Install signing tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apksigner zipalign default-jre-headless
+      - name: Repack official APKs with the game embedded
         run: |
           set -e
-          git clone --depth 1 --branch "$LUANTI_VERSION" https://github.com/luanti-org/luanti engine
-          mkdir -p engine/games
-          rsync -a --exclude=.git --exclude=.github ./ "engine/games/$GAME_ID/"
-      - name: Build debug APK with embedded game
-        run: |
-          set -e
-          cd engine/android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
-          find . -name "*.apk" -path "*outputs*" | tee /tmp/apk_list
-          cp "$(head -1 /tmp/apk_list)" ../../SystemLoot-Android.apk
+          WORK=$(mktemp -d)
+          mkdir -p apks
+          keytool -genkeypair -keystore "$WORK/debug.keystore" -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            curl -sL -o "$WORK/base-$ABI.apk" \
+              "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-${ABI}.apk"
+            python3 tools/repack_apk.py "$WORK/base-$ABI.apk" . "$WORK/unsigned-$ABI.apk"
+            zipalign -f 4 "$WORK/unsigned-$ABI.apk" "$WORK/aligned-$ABI.apk"
+            apksigner sign --ks "$WORK/debug.keystore" --ks-pass pass:android \
+              --key-pass pass:android --out "apks/SystemLoot-${ABI}.apk" "$WORK/aligned-$ABI.apk"
+            apksigner verify "apks/SystemLoot-${ABI}.apk"
+          done
+          ls -la apks/
       - name: Install butler
         run: |
           curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
@@ -185,30 +186,29 @@ jobs:
       - name: Push to itch (android)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./linux-amd64/butler push SystemLoot-Android.apk "$ITCH_TARGET:android" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+        run: ./linux-amd64/butler push apks "$ITCH_TARGET:android" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
 
   web:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
-      - name: Build honest placeholder page
+      - uses: actions/checkout@v4
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake tclsh
+      - name: Build the Luanti WASM client (paradust7/luanti-wasm)
         run: |
-          mkdir -p web
-          cat > web/index.html <<'EOF'
-          <!doctype html>
-          <html><head><meta charset="utf-8"><title>System Looting — Web build</title>
-          <style>body{background:#0a0a12;color:#cfe;font-family:monospace;max-width:640px;margin:4rem auto;padding:0 1rem;line-height:1.6}
-          a{color:#5ff}h1{color:#5ff}</style></head><body>
-          <h1>SYSTEM LOOTING — WEB CHANNEL</h1>
-          <p>A browser (WebAssembly) build is <strong>not available</strong>: the Luanti
-          engine has no official web port as of 5.17. This page exists so the
-          channel list is honest rather than broken.</p>
-          <p>Playable downloads are on the other channels of this itch page:
-          <strong>Windows</strong>, <strong>macOS</strong> (arm64 + Intel),
-          <strong>Linux</strong> (portable bundle), and <strong>Android</strong> (APK).</p>
-          <p>Source: <a href="https://github.com/SodoMita/SystemTest">github.com/SodoMita/SystemTest</a></p>
-          </body></html>
-          EOF
-          sed -i 's/^          //' web/index.html
+          set -e
+          git clone --depth 1 https://github.com/paradust7/luanti-wasm
+          cd luanti-wasm
+          ./build_all.sh   # emsdk auto-downloads; ~30-45 min
+      - name: Embed SystemTest into the virtual FS + repack www
+        run: |
+          set -e
+          cd luanti-wasm
+          mkdir -p build/fsroot/luanti/games/SystemTest
+          rsync -a --exclude=.git --exclude=.github "$GITHUB_WORKSPACE/" build/fsroot/luanti/games/SystemTest/
+          ./build_www.sh
+          ls -la www/
       - name: Install butler
         run: |
           curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
@@ -218,4 +218,4 @@ jobs:
       - name: Push to itch (web)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./linux-amd64/butler push web "$ITCH_TARGET:web" --userversion "${LUANTI_VERSION}-placeholder"
+        run: ./linux-amd64/butler push luanti-wasm/www "$ITCH_TARGET:web" --userversion "wasm-${GITHUB_SHA::7}"
