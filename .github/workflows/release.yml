@@ -116,7 +116,7 @@ jobs:
       - name: Build portable bundle (engine + share + libs + game + launcher)
         run: |
           set -e
-          # Resolve the real binary (Debian ships a shell wrapper).
+          # Resolve the real binary (some distros ship a shell wrapper).
           BIN=""
           for cand in /usr/libexec/luanti/luanti /usr/libexec/minetest/minetest; do
             [ -x "$cand" ] && BIN="$cand" && break
@@ -125,34 +125,76 @@ jobs:
             W=$(command -v luanti || command -v minetest || true)
             if [ -n "$W" ]; then
               if file "$W" | grep -q "ELF"; then
-                BIN="$W"   # Ubuntu ships the real binary directly
+                BIN="$W"
               else
-                BIN=$(sed -nE 's#.*exec[[:space:]]+([^[:space:]]+).*#\1#p' "$W" | tail -1)  # Debian wrapper
+                BIN=$(sed -nE 's#.*exec[[:space:]]+([^[:space:]]+).*#\1#p' "$W" | tail -1)
               fi
             fi
           fi
           [ -x "$BIN" ] || { echo "engine binary not found"; exit 1; }
-          SHARE=/usr/share/luanti
-          [ -d "$SHARE" ] || SHARE=/usr/share/minetest
+
+          # Data dir detection across distro layouts — asserted loudly.
+          # (The 5.17.0-81d26bb tarball shipped WITHOUT builtin/textures/
+          # fonts because this detection failed silently on the runner.)
+          SHARE=""
+          for c in /usr/share/luanti /usr/share/minetest /usr/share/games/luanti /usr/share/games/minetest; do
+            [ -f "$c/builtin/init.lua" ] && SHARE="$c" && break
+          done
+          if [ -z "$SHARE" ]; then
+            for pkg in luanti minetest; do
+              SHARE=$(dpkg -L "$pkg" 2>/dev/null | grep -E '/builtin$' | head -1 || true)
+              [ -n "$SHARE" ] && break
+            done
+          fi
+          [ -n "$SHARE" ] && [ -f "$SHARE/builtin/init.lua" ] || { echo "engine data dir (builtin/) not found"; exit 1; }
+          echo "engine data: $SHARE"
+
           WORK=$(mktemp -d)
           bundle="$WORK/bundle"
-          mkdir -p "$bundle/bin" "$bundle/lib" "$bundle/games/$GAME_ID"
+          mkdir -p "$bundle/bin" "$bundle/lib" "$bundle/games/SystemTest"
           cp "$BIN" "$bundle/bin/luanti"
-          for d in builtin client fonts textures; do
-            [ -d "$SHARE/$d" ] && cp -r "$SHARE/$d" "$bundle/$d" || true
+          for d in builtin client fonts textures locale; do
+            if [ -d "$SHARE/$d" ]; then cp -r "$SHARE/$d" "$bundle/$d"; else echo "WARN: $SHARE/$d missing"; fi
           done
-          rsync -a --exclude=.git --exclude=.github ./ "$bundle/games/$GAME_ID/"
-          ldd "$BIN" | awk '{print $3}' | grep -v '^$' | xargs -I{} cp -n {} "$bundle/lib/" 2>/dev/null || true
+          [ -f "$bundle/builtin/init.lua" ]  || { echo "bundle missing builtin/"; exit 1; }
+          [ -d "$bundle/textures/base" ]     || { echo "bundle missing textures/base/"; exit 1; }
+          [ -d "$bundle/fonts" ]             || { echo "bundle missing fonts/"; exit 1; }
+
+          rsync -a --exclude=.git --exclude=.github ./ "$bundle/games/SystemTest/"
+
+          # Bundle NON-glibc dependencies only. Bundling the build distro's
+          # glibc/ld crashes foreign distros (observed: undefined symbol
+          # __nptl_change_stack_perm on Debian 13 glibc 2.41 vs bundled 2.39).
+          ldd "$BIN" | awk '{print $3}' | grep -v '^$' | sort -u | while read -r so; do
+            base=$(basename "$so")
+            case "$base" in
+              linux-vdso*|ld-linux*|ld-*.so|libc.so*|libm.so*|libmvec*|libpthread*|libdl*|librt*|libresolv*|libnss_*|libnsl*|libanl*|libBrokenLocale*|libthread_db*) continue ;;
+            esac
+            cp -n "$so" "$bundle/lib/" 2>/dev/null || true
+          done
+
           cat > "$bundle/run-game.sh" <<'EOF'
           #!/bin/sh
           DIR="$(cd "$(dirname "$0")" && pwd)"
           export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          exec "$DIR/bin/luanti" "$@"
+          # SystemTest is the product: default the engine to it
+          # (default_game stays 'minetest' otherwise; extra args can override).
+          exec "$DIR/bin/luanti" --gameid SystemTest "$@"
           EOF
           sed -i 's/^          //' "$bundle/run-game.sh"
           chmod +x "$bundle/run-game.sh" "$bundle/bin/luanti"
-          # Smoke-check the relocated engine before shipping.
+
+          # REAL smoke: --version exits before loading builtin/ (that weak
+          # check let the broken tarball ship once). Boot a headless server
+          # with the game and require both engine-ready and sl_modebase.
           "$bundle/run-game.sh" --version
+          SMOKE_WORLD="$WORK/smokeworld"
+          mkdir -p "$SMOKE_WORLD"
+          printf 'gameid = SystemTest\nbackend = sqlite3\nmg_name = singlenode\n' > "$SMOKE_WORLD/world.mt"
+          timeout -s INT 30 "$bundle/run-game.sh" --server --world "$SMOKE_WORLD" > "$WORK/smoke.log" 2>&1 || true
+          grep -qE "Server for gameid|listening" "$WORK/smoke.log" || { echo "server smoke FAILED:"; tail -30 "$WORK/smoke.log"; exit 1; }
+          grep -q "Loaded core PvP game mode" "$WORK/smoke.log" || { echo "sl_modebase did not load:"; tail -30 "$WORK/smoke.log"; exit 1; }
+          echo "server smoke OK: engine + SystemTest + sl_modebase boot from the bundle"
           tar czf SystemLoot-Linux.tar.gz -C "$bundle" .
           ls -la SystemLoot-Linux.tar.gz
       - name: Install butler
