@@ -28,14 +28,19 @@ on:
 
 env:
   GAME_ID: SystemTest
-  LUANTI_VERSION: "5.17.0"
   ITCH_TARGET: delatel/systemloot
 
 jobs:
   windows:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Resolve latest Luanti release
+        run: |
+          V=$(curl -s https://api.github.com/repos/luanti-org/luanti/releases/latest | jq -r .tag_name)
+          [ -n "$V" ] && [ "$V" != "null" ] || { echo "could not resolve latest release"; exit 1; }
+          echo "LUANTI_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Engine version: $V"
       - name: Fetch engine + embed game
         run: |
           set -e
@@ -62,7 +67,13 @@ jobs:
   macos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Resolve latest Luanti release
+        run: |
+          V=$(curl -s https://api.github.com/repos/luanti-org/luanti/releases/latest | jq -r .tag_name)
+          [ -n "$V" ] && [ "$V" != "null" ] || { echo "could not resolve latest release"; exit 1; }
+          echo "LUANTI_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Engine version: $V"
       - name: Fetch engine (arm64 + x86_64) + embed game
         run: |
           set -e
@@ -93,7 +104,11 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Resolve latest Luanti release
+        run: |
+          V=$(curl -s https://api.github.com/repos/luanti-org/luanti/releases/latest | jq -r .tag_name)
+          echo "LUANTI_VERSION=$V" >> "$GITHUB_ENV"
       - name: Install engine
         run: |
           sudo apt-get update
@@ -154,12 +169,18 @@ jobs:
   android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install signing tools
+      - uses: actions/checkout@v5
+      - name: Resolve latest Luanti release
+        run: |
+          V=$(curl -s https://api.github.com/repos/luanti-org/luanti/releases/latest | jq -r .tag_name)
+          [ -n "$V" ] && [ "$V" != "null" ] || { echo "could not resolve latest release"; exit 1; }
+          echo "LUANTI_VERSION=$V" >> "$GITHUB_ENV"
+          echo "Engine version: $V"
+      - name: Install APK toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y apksigner zipalign default-jre-headless
-      - name: Repack official APKs with the game embedded
+          sudo apt-get install -y apktool aapt apksigner zipalign default-jre-headless python3-pil
+      - name: Build SystemLoot-branded APKs (one per ABI)
         run: |
           set -e
           WORK=$(mktemp -d)
@@ -170,11 +191,7 @@ jobs:
           for ABI in arm64-v8a armeabi-v7a x86_64; do
             curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o "$WORK/base-$ABI.apk" \
               "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-${ABI}.apk"
-            python3 tools/repack_apk.py "$WORK/base-$ABI.apk" . "$WORK/unsigned-$ABI.apk"
-            zipalign -f 4 "$WORK/unsigned-$ABI.apk" "$WORK/aligned-$ABI.apk"
-            apksigner sign --ks "$WORK/debug.keystore" --ks-pass pass:android \
-              --key-pass pass:android --out "apks/SystemLoot-${ABI}.apk" "$WORK/aligned-$ABI.apk"
-            apksigner verify "apks/SystemLoot-${ABI}.apk"
+            bash tools/build_apk.sh "$WORK/base-$ABI.apk" . "$WORK/debug.keystore" "apks/SystemLoot-$ABI.apk"
           done
           ls -la apks/
       - name: Install butler
@@ -183,17 +200,20 @@ jobs:
           unzip -q butler.zip
           chmod +x linux-amd64/butler
           ./linux-amd64/butler -V
-      - name: Push to itch (android)
+      - name: Push to itch (one channel per ABI = separate downloads)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./linux-amd64/butler push apks "$ITCH_TARGET:android" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+        run: |
+          ./linux-amd64/butler push apks/SystemLoot-arm64-v8a.apk    "$ITCH_TARGET:android-arm64-v8a"    --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+          ./linux-amd64/butler push apks/SystemLoot-armeabi-v7a.apk  "$ITCH_TARGET:android-armeabi-v7a"  --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+          ./linux-amd64/butler push apks/SystemLoot-x86_64.apk       "$ITCH_TARGET:android-x86_64"       --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
 
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24   # luanti-wasm's install_emsdk.sh requires Node >= 24.18
       - name: Install build prerequisites
@@ -215,6 +235,18 @@ jobs:
           rsync -a --exclude=.git --exclude=.github "$GITHUB_WORKSPACE/" build/fsroot/luanti/games/SystemTest/
           ./build_www.sh
           ls -la www/
+      - name: Add client-side cross-origin isolation (coi-serviceworker)
+        run: |
+          set -e
+          # itch.io only sends COOP/COEP when "SharedArrayBuffer support" is
+          # ticked in the game's Embed options; without isolation the
+          # threaded WASM module stalls at 0%. coi-serviceworker provides
+          # the headers client-side in every browser, checkbox or not.
+          cd "$RUNNER_TEMP/luanti-wasm/www"
+          curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o coi-serviceworker.min.js \
+            https://raw.githubusercontent.com/gzuidhof/coi-serviceworker/master/coi-serviceworker.min.js
+          sed -i '0,/<head[^>]*>/s//&<script src="coi-serviceworker.min.js"><\/script>/' index.html
+          grep -q coi-serviceworker index.html && echo "coi-serviceworker wired into index.html"
       - name: Install butler
         run: |
           curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip

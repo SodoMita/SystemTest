@@ -12,13 +12,16 @@ Or: GitHub → Actions → **release** → *Run workflow* on the `build` branch.
 
 ## Channels
 
+Engine version is resolved at build time from the latest luanti-org
+release (no pinning).
+
 | Channel   | Artifact                                                        | Notes |
 |-----------|-----------------------------------------------------------------|-------|
-| `windows` | `SystemLoot-Windows.zip` — official Luanti 5.17.0 win64 + game  | game at `games/SystemTest/` |
+| `windows` | `SystemLoot-Windows.zip` — latest official win64 + game         | game at `games/SystemTest/` |
 | `osx`     | arm64 + x86_64 `.app` bundles, game embedded in `Contents/Resources/games/` | `__MACOSX` junk excluded |
 | `linux`   | `SystemLoot-Linux.tar.gz` — portable bundle: engine + share data + ldd libs + `run-game.sh` | relocated engine is `--version` smoke-checked before upload |
-| `android` | official 5.17 APKs (arm64-v8a, armeabi-v7a, x86_64) repacked with the game injected into the nested `assets/assets.zip`, zipaligned, debug-signed (`tools/repack_apk.py`) | no engine rebuild; repack+sign verified locally with `apksigner verify` |
-| `web`     | real WASM client built from [paradust7/luanti-wasm](https://github.com/paradust7/luanti-wasm) (emscripten), game embedded in the virtual FS (`build/fsroot/luanti/games/SystemTest`) | network play runs through the standard WebSocket proxies; a dedicated 24/7 SystemTest server is a separate hosting task |
+| `android-arm64-v8a` / `android-armeabi-v7a` / `android-x86_64` | **one channel per ABI** (separate itch downloads), each a SystemLoot-branded APK | `tools/build_apk.sh`: game injected into nested `assets/assets.zip`, label **SystemLoot**, icon from `menu/icon.png`, package renamed to `io.itch.delatel.systemloot` (installs side-by-side with official Luanti/Minetest; note: renaming means no update path from any older `net.minetest.minetest`-packaged test APK — uninstall those), zipaligned + debug-signed + badging-asserted |
+| `web`     | real WASM client built from [paradust7/luanti-wasm](https://github.com/paradust7/luanti-wasm) (emscripten), game embedded in the virtual FS | ships `coi-serviceworker` for client-side COOP/COEP (itch otherwise stalls the threaded wasm at 0%); optionally also tick **SharedArrayBuffer support** in itch Edit → Embed options for the native-header path. Network play runs through the standard WebSocket proxies; a dedicated 24/7 SystemTest server is a separate hosting task |
 
 ## Auth
 
