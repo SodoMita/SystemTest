@@ -225,7 +225,7 @@ jobs:
         with:
           node-version: 24   # luanti-wasm's install_emsdk.sh requires Node >= 24.18
       - name: Install build prerequisites
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake tclsh
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake tclsh zstd
       - name: Build the Luanti WASM client (paradust7/luanti-wasm)
         run: |
           set -e
@@ -242,8 +242,21 @@ jobs:
           mkdir -p build/fsroot/luanti/games/SystemTest
           rsync -a --exclude=.git --exclude=.github "$GITHUB_WORKSPACE/" build/fsroot/luanti/games/SystemTest/
           # This game is the product: drop the bundled minetest_game so the
-          # client downloads/ships SystemTest only (owner directive).
+          # client ships SystemTest only (owner directive).
           rm -rf build/fsroot/luanti/games/minetest_game
+          # CRITICAL: base.pack IS build/fsroot.tar.zst (built by
+          # build_fsroot.sh during build_all.sh). After mutating fsroot the
+          # tarball MUST be regenerated or the packs keep the OLD fsroot
+          # (minetest_game in, SystemTest out) — that bug shipped once.
+          (cd build/fsroot && tar cf ../fsroot.tar .)
+          rm -f build/fsroot.tar.zst
+          zstd -q --ultra -22 -T0 build/fsroot.tar -o build/fsroot.tar.zst
+          rm -f build/fsroot.tar
+          # Assert the virtual FS actually contains the product.
+          zstd -dc build/fsroot.tar.zst | tar tf - > /tmp/fsroot_list.txt
+          grep -q "games/SystemTest/game.conf" /tmp/fsroot_list.txt || { echo "SystemTest missing from fsroot pack"; exit 1; }
+          grep -q "games/minetest_game/" /tmp/fsroot_list.txt && { echo "minetest_game still in fsroot pack"; exit 1; }
+          echo "fsroot pack verified: SystemTest in, minetest_game out"
           ./build_www.sh
           ls -la www/
       - name: Default the client to SystemTest + add cross-origin isolation
