@@ -44,7 +44,7 @@ jobs:
       - name: Live-engine soak test (AI players, 3 matches)
         run: |
           python3 tests/soak/run_soak.py \
-            --matches 3 --lives 4 --match-duration 150 \
+            --turbo --matches 3 --match-duration 60 \
             --seed ${{ github.run_number }} \
             --timeout 900 --report soak_report.json --keep-world
 
