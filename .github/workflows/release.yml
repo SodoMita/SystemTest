@@ -184,16 +184,21 @@ jobs:
         run: |
           set -e
           WORK=$(mktemp -d)
-          mkdir -p apks
+          # Outputs MUST live outside the checkout: game_dir is ".", so any
+          # artifact written into the checkout gets injected into the next
+          # ABI's assets.zip (that was the 25/50/102 MB matryoshka).
+          # $RUNNER_TEMP persists across steps within this job.
+          OUT="$RUNNER_TEMP/apks"
+          mkdir -p "$OUT"
           keytool -genkeypair -keystore "$WORK/debug.keystore" -storepass android \
             -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
             -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           for ABI in arm64-v8a armeabi-v7a x86_64; do
             curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o "$WORK/base-$ABI.apk" \
               "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-${ABI}.apk"
-            bash tools/build_apk.sh "$WORK/base-$ABI.apk" . "$WORK/debug.keystore" "apks/SystemLoot-$ABI.apk"
+            bash tools/build_apk.sh "$WORK/base-$ABI.apk" . "$WORK/debug.keystore" "$OUT/SystemLoot-$ABI.apk"
           done
-          ls -la apks/
+          ls -la "$OUT"
       - name: Install butler
         run: |
           curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
@@ -204,9 +209,12 @@ jobs:
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
         run: |
-          ./linux-amd64/butler push apks/SystemLoot-arm64-v8a.apk    "$ITCH_TARGET:android-arm64-v8a"    --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
-          ./linux-amd64/butler push apks/SystemLoot-armeabi-v7a.apk  "$ITCH_TARGET:android-armeabi-v7a"  --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
-          ./linux-amd64/butler push apks/SystemLoot-x86_64.apk       "$ITCH_TARGET:android-x86_64"       --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+          ls -la "$RUNNER_TEMP"/../ 2>/dev/null | head -2 || true
+          for f in "$RUNNER_TEMP"/tmp.*/apks/SystemLoot-*.apk; do echo "found: $f"; done | head -3 || true
+          ls -la "$RUNNER_TEMP/apks"
+          ./linux-amd64/butler push "$RUNNER_TEMP/apks/SystemLoot-arm64-v8a.apk"    "$ITCH_TARGET:android-arm64-v8a"    --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+          ./linux-amd64/butler push "$RUNNER_TEMP/apks/SystemLoot-armeabi-v7a.apk"  "$ITCH_TARGET:android-armeabi-v7a"  --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+          ./linux-amd64/butler push "$RUNNER_TEMP/apks/SystemLoot-x86_64.apk"       "$ITCH_TARGET:android-x86_64"       --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
 
   web:
     runs-on: ubuntu-latest
