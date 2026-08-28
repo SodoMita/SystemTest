@@ -241,16 +241,26 @@ jobs:
           cd "$RUNNER_TEMP/luanti-wasm"
           mkdir -p build/fsroot/luanti/games/SystemTest
           rsync -a --exclude=.git --exclude=.github "$GITHUB_WORKSPACE/" build/fsroot/luanti/games/SystemTest/
+          # This game is the product: drop the bundled minetest_game so the
+          # client downloads/ships SystemTest only (owner directive).
+          rm -rf build/fsroot/luanti/games/minetest_game
           ./build_www.sh
           ls -la www/
-      - name: Add client-side cross-origin isolation (coi-serviceworker)
+      - name: Default the client to SystemTest + add cross-origin isolation
         run: |
           set -e
-          # itch.io only sends COOP/COEP when "SharedArrayBuffer support" is
-          # ticked in the game's Embed options; without isolation the
-          # threaded WASM module stalls at 0%. coi-serviceworker provides
-          # the headers client-side in every browser, checkbox or not.
           cd "$RUNNER_TEMP/luanti-wasm/www"
+          # 1) Default game: launcher defaults gameid to '' (menu shows all
+          #    games; MTG used to win). Hard-default it to SystemTest; the
+          #    ?gameid= URL param still overrides.
+          find . -name launcher.js -exec sed -i "s/this.gameid = '';/this.gameid = 'SystemTest';/" {} +
+          find . -name launcher.js | xargs grep -l "this.gameid = 'SystemTest';" >/dev/null
+          echo "launcher defaulted to SystemTest"
+          # 2) coi-serviceworker: client-side COOP/COEP. NOTE: inside the
+          #    itch embed (html.itch.zone iframe) a service worker cannot
+          #    isolate the TOP-LEVEL page — on itch the "SharedArrayBuffer
+          #    support" embed-option checkbox is still required. On
+          #    GitHub Pages (top-level) this alone provides isolation.
           curl -sL --retry 5 --retry-all-errors --retry-delay 3 -o coi-serviceworker.min.js \
             https://raw.githubusercontent.com/gzuidhof/coi-serviceworker/master/coi-serviceworker.min.js
           sed -i '0,/<head[^>]*>/s//&<script src="coi-serviceworker.min.js"><\/script>/' index.html
@@ -265,9 +275,31 @@ jobs:
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
         run: ./linux-amd64/butler push "$RUNNER_TEMP/luanti-wasm/www" "$ITCH_TARGET:web" --userversion "wasm-${GITHUB_SHA::7}"
-      - name: Upload www artifact (for local reproduction/diagnosis)
+      - name: Upload www artifact (Pages source + diagnosis)
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: web-www
+          name: www-wasm
           path: ${{ runner.temp }}/luanti-wasm/www
+
+  web-pages:
+    runs-on: ubuntu-latest
+    needs: [web]
+    permissions:
+      contents: write   # push the gh-pages branch
+    steps:
+      - name: Download built www
+        uses: actions/download-artifact@v5
+        with:
+          name: www-wasm
+          path: www
+      - name: Publish to GitHub Pages (gh-pages branch)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./www
+          force_orphan: true
+          # GitHub Pages serves the page top-level, so the bundled
+          # coi-serviceworker can actually provide COOP/COEP there
+          # (unlike the itch embed iframe) — this is the web build that
+          # boots without any manual checkbox.

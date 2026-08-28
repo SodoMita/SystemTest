@@ -50,6 +50,7 @@ for icon in glob.glob(f"{work}/res/mipmap*/ic_launcher.png"):
 PYEOF
 
 apktool b "$WORK/work" -o "$WORK/rebuilt.apk" --use-aapt2
+
 audit_sizes() {
     python3 - "$1" <<'PYAUDIT'
 import sys, zipfile
@@ -67,6 +68,7 @@ python3 "$SCRIPT_DIR/slim_apk.py" "$WORK/rebuilt.apk" "$WORK/slim.apk"
 echo "[audit] slim.apk ($(stat -c%s "$WORK/slim.apk") bytes):"; audit_sizes "$WORK/slim.apk"
 zipalign -f 4 "$WORK/slim.apk" "$WORK/aligned.apk"
 echo "[audit] aligned.apk: $(stat -c%s "$WORK/aligned.apk") bytes"
+
 apksigner sign --ks "$KEYSTORE" --ks-pass pass:android --key-pass pass:android \
     --out "$OUT_APK" "$WORK/aligned.apk"
 apksigner verify "$OUT_APK"
@@ -76,4 +78,9 @@ echo "[audit] final: $(stat -c%s "$OUT_APK") bytes"
 BADGING="$(aapt dump badging "$OUT_APK" 2>/dev/null)"
 echo "$BADGING" | grep -q "package: name='io.itch.delatel.systemloot'" || { echo "package rename failed"; exit 1; }
 echo "$BADGING" | grep -q "application-label:'SystemLoot'" || { echo "label change failed"; exit 1; }
-echo "built $(basename "$OUT_APK"): SystemLoot / io.itch.delatel.systemloot"
+
+# Size guard: official base is 15-17 MB + ~8 MB game. Anything past 60 MB
+# means compression regressed again.
+SIZE_MB=$(( $(stat -c%s "$OUT_APK") / 1048576 ))
+[ "$SIZE_MB" -le 60 ] || { echo "APK unexpectedly large: ${SIZE_MB} MB (compression regression?)"; exit 1; }
+echo "built $(basename "$OUT_APK"): SystemLoot / io.itch.delatel.systemloot / ${SIZE_MB} MB"
