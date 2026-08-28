@@ -50,7 +50,8 @@ for icon in glob.glob(f"{work}/res/mipmap*/ic_launcher.png"):
 PYEOF
 
 apktool b "$WORK/work" -o "$WORK/rebuilt.apk" --use-aapt2
-zipalign -f 4 "$WORK/rebuilt.apk" "$WORK/aligned.apk"
+python3 "$SCRIPT_DIR/slim_apk.py" "$WORK/rebuilt.apk" "$WORK/slim.apk"
+zipalign -f 4 "$WORK/slim.apk" "$WORK/aligned.apk"
 apksigner sign --ks "$KEYSTORE" --ks-pass pass:android --key-pass pass:android \
     --out "$OUT_APK" "$WORK/aligned.apk"
 apksigner verify "$OUT_APK"
