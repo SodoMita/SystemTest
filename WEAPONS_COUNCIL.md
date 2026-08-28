@@ -242,3 +242,76 @@
 *Kaelen files it with the first sitting. The depth gauge reads -2856m.*
 
 *It has not moved. Nobody asks about the ballast tanks anymore.*
+
+---
+
+# THE THIRD SITTING (2026-08-29, evening)
+
+*The file comes back again. This time the margins are fewer and meaner. Whoever wrote them was not brainstorming. They were correcting.*
+
+---
+
+## THE SLOT MACHINE
+
+**Carmack** has the loot table page open and one word underlined four times.
+
+"Four percent." *He doesn't look up.* "I let it through because it was rare. That was sloppy of me. Rare is not the same as *earned*. A four-percent roll is a slot machine, and a slot machine teaches the wrong skill: it teaches **grinding**. Open enough crates, pull enough levers, and the lash falls out eventually. We already banned randomness from the bloom — 'bloom is a function, never a die roll.' Then I signed a die roll on the most expensive item in the file. Inconsistent. Fix it."
+
+**Jax**: "So make it a *destination*, not a dice roll. You want the lash? You walk to it. There are workshops — the plans are already in the repo, commented out, waiting. Stations. Put the lash on a station: a **Precision Fabricator**, bolted to the floor of the worst-placed workshop on the map. Down in the cubes, where his monsters live. And here's the trick everyone will miss until it's pointed at them: the *recipe is cheap.* Ingots, circuits, a crystal, plastic — garage parts. Anybody can afford the lash. Almost nobody can afford the *trip*."
+
+**Carmack**: "The materials are common. The **tool** is rare." *He writes it, boxes it.* "That's the whole sentence. And the Fabricator can't be moved — dig it loose and it breaks. Nobody gets to carry the monopoly home. One to three per map, placed mean."
+
+**Maura**: "A pilgrim with a shopping list, walking down into the dark, past the things he was fleeing on the surface. Ten full seconds of machine hum at the end of it — standing still, singing quietly, in the worst neighborhood in the simulation." *She almost smiles.* "You didn't design an acquisition. You designed a *sacrifice*."
+
+**Jax**: "The walk is the game. It was the game when we made them walk to the scatter. Now it's the game all the way down."
+
+---
+
+## THE BORING CONSTANT
+
+**Carmack**: "The arc question. Someone asked whether the mortar should drop harder — more lob, more Quake-2, more spice." *He closes that page.* "No. We ship the boring constant. Flat two-per-second-squared, the safe arc, the one every duelist already has in their wrist from day one. If the hands-on says it's dull, we turn one dial later, in daylight, with telemetry on. Nobody experiments at launch."
+
+---
+
+## THE DEADWALK
+
+**Maura** *(this is the one she came back for)*:
+
+"You approved my puppet. Good. Now let me constrain it properly, because an unconstrained corpse is just a second evil ghost wearing a body.
+
+"It walks — *wrong*. Ashen. Flickering, like a signal losing an argument with the distance. Dark grit falling off it. Speed's cut, no sprint, a hitch in the gait. In the dark, at range, a nervous man shoots it — that's the *point*. But any player who stops and *looks* must know in one second what they're seeing. **Deception, not impersonation.** That band is the law: fool the marksman, never fool the witness.
+
+"It has eight health and no healing. It carries nothing — no inventory, no looting, no crafting, no building, no digging. It opens doors, because doors are drama. It touches nothing else. It harms no one — the damage ban on the dead holds all the way down to its boots.
+
+"And it is *expensive to ignore*. It eats a lance round — eighteen damage spent on eight health, the worst trade on the map. It soaks a sentry's battery and tells everyone watching exactly where the sentry is. In an economy where the killing shot smashes a third of the ammunition in the body — *our* rule, we wrote it — a decoy is a weapon made of the enemy's nerves."
+
+**Carmack**: "Own corpse only. One puppet per body — punch it twice, the strings burn, no re-runs. Shot apart, and the body is *gone*, stain and all. Feed says `cause: puppet collapse`, no name, same as everything." *He ticks each line as he says it.* "And we write down the escalations we refused — other people's corpses, longer walks, a shove — so nobody 'improves' it later by accident."
+
+**Maura**: "Approved. The safe version first. If it's boring in play, we'll know exactly which sin to consider committing."
+
+---
+
+## PAR FOR THE ASH
+
+**Maura**, last page, one line:
+
+"Cremation relics trade at par. Full par. I argued myself out of the discount — 'burned evidence is secondhand evidence' — and I was wrong, because the discount punishes the *ritual*, not the burning. The altar doesn't ask where the ash has been. It asks how much there is."
+
+**Carmack**: "One relic type, one value, one less branch in the loot code."
+
+**Jax**: "Burn a man, buy a séance. The price is honest now."
+
+---
+
+*The minutes end with four lines, in three pens:*
+
+1. **The lash is not loot. It is a destination.**
+2. **The arc ships boring.**
+3. **The deadwalk fools the marksman, never the witness.**
+4. **Ash is ash. Par is par.**
+
+*Kaelen files the third sitting under the first two. Nobody has opened the ballast question in two sittings.*
+
+*The depth gauge still reads -2856m.*
+
+*The council has stopped looking at it. The corridor outside has started sounding like work.*

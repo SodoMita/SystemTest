@@ -1,8 +1,8 @@
 # System Looting — Ranged Weapons & Sentry Towers Specification
 
-**Status:** v1.1 — design only, no implementation yet. v1.0 written 2026-08-28;
+**Status:** v1.2 — design only, no implementation yet. v1.0 written 2026-08-28;
 amended 2026-08-29 after the Weapons Council session (`WEAPONS_COUNCIL.md`)
-and the team review. This document is the review gate for Phase W.
+and two team reviews. This document is the review gate for Phase W.
 **Priority:** P1 — after the Phase A remainder (hand-built arena map), before
 Phase B crafting expansion. Ranged combat is additive content, not a blocker.
 
@@ -14,7 +14,10 @@ Phase B crafting expansion. Ranged combat is additive content, not a blocker.
 | Towers | Player-deployable sentry turrets from loot — tower defense inside the arena |
 | Feel | Quake/UT: weapon pads, per-weapon ammo pools, no reloads, fast TTK, movement tech |
 | Corpses | Death spawns a persistent corpse entity; stays until match end or explicit destruction — and destruction itself leaves observable traces (§7) |
-| Grapple | One rare, expensive, dangerous movement item exists — as the deliberate exception, not a kit fixture (§10.1) |
+| Grapple | No casino: never rolled as loot — fabricated at hard-to-reach workshops from ordinary materials; the rare part is the tool, the Precision Fabricator station (§10.1) |
+| Mortar arc | Safe variant: flat 2 n/s² drop kept; revisit only with hands-on data (§17.3) |
+| Corpse possession | Approved 2026-08-29, safe variant: evil ghosts may puppet their own corpse as a *visibly dead*, capability-limited decoy (§7.4) |
+| Cremation relics | On par with ritual-sourced Ashen Relics — a Relic is a Relic (§7.3) |
 | Monster Master | Never deploys towers, never uses ranged weapons. MM melee is bare hands evolved through the skill tree — never items (§6.1) |
 | Achievements | Reset at match end; persistent lifetime counters record how many times each was earned (§12.1) |
 | Western set | Revolver/lever-action sidegrades as sci-fi neon weapons, Phase W2 (§3.1) |
@@ -62,8 +65,9 @@ beacon damage is deliberately weak).
 3. **Movement tech is free by default — earned when paid.** Mortar-jump
    knockback, pulse-juggle push, and the existing crouch-walk quirk
    (`movement_speed_crouch = 5.5`) cost nothing and belong to everyone. The
-   Grapple Lash (§10.1) is the single rare, expensive, *dangerous* exception —
-   a purchase, not a fixture.
+   Grapple Lash (§10.1) is the single expensive, *dangerous* exception — and
+   it is never a dice roll: it is fabricated at remote workshops, never
+   dropped, never rolled (§10.1).
 4. **Identity stays neutral.** No team-colored tracers, no kill attributions.
    A turret cannot be used as a team oracle (§6, §11).
 5. **Everything routes through the existing rule engine.** All weapon damage
@@ -157,13 +161,17 @@ Quake item pads, in System Looting's ownership-neutral clothing:
 - **Chimes identify the weapon by pitch** (council resolution #1): mortar low
   and long, cells high and quick. The arena is a radio station; the chime is
   the headline. A player with three matches of ears knows what was taken
-  through a wall. The Grapple Lash never spawns on a pad — acquiring it is
-  quiet, which is itself intel asymmetry worth having.
+  through a wall. The Grapple Lash spawns on no pad, in no crate (§10.1) —
+  acquiring it is a *journey*: the workshops sit far from the chimes, and
+  the silence of the trip is its own intel asymmetry.
 - **Killfeed is an incident report, not a joke** (council resolution #2):
   `0347  @1 — cause: arc discharge — range: long — witnesses: unknown`.
   Cause, time, circumstance — never an adjective, never an attacker name.
 - **Loot crates** may roll weapon + ammo bundles (crate loot tables get a
-  `weapons` section; Sentry Kit weight ≈ 10 %, §7; Grapple Lash ≈ 4 %, §10.1).
+  `weapons` section; Sentry Kit weight ≈ 10 %, §6). The Grapple Lash is
+  **excluded from every random table** — no casino. Four rolls in a hundred
+  is still a slot machine, and slot machines teach grinding, not reading.
+  The Lash is fabricated at remote workshops instead (§10.1).
 - **Recovered weapons keep state** (council resolution #3): every weapon
   stack carries its remaining-ammo count in metadata; a gun lifted from a
   body shows the dead man's last number, frozen. You pick up the mortar with
@@ -291,19 +299,70 @@ its own incident scene, exactly as `EVENT IDEAS.md` demands of its horror.
 | Action | How | What remains |
 |---|---|---|
 | **Burial** | Trench Shovel (existing item — *"earthworks and graves"*) on a corpse placed on/in diggable ground | **Grave mound** node: anonymous, permanent until reset. A decent burial. Some players will perform it for strangers; that is roleplay, and it is free |
-| **Cremation** | One flare burned on the body, or one mortar splash across it | **Scorch** node + an **Ashen Relic** drops — the existing altar-ritual component. Burning the dead feeds the ghost economy: kill → cremate → summon. A player who wants the ritual *needs* the bodies. Desecration as a designed choice, exactly the weight class of `EVENT IDEAS.md` #6 |
+| **Cremation** | One flare burned on the body, or one mortar splash across it | **Scorch** node + an **Ashen Relic** drops — the existing altar-ritual component, **on par with ritual-sourced Relics** (team decision 2026-08-29: burned evidence is not secondhand evidence; a Relic is a Relic). Kill → cremate → summon trades at full par. Burning the dead feeds the ghost economy: a player who wants the ritual *needs* the bodies. Desecration as a designed choice, exactly the weight class of `EVENT IDEAS.md` #6 |
 | **Match end** | Normal cleanup | Nothing — the next match starts with a clean scene |
 
 There is **no silent removal**. Destroying evidence is loud, visible, or
 laborious — and the residue node stays regardless. Ghost-cage ghosts cannot
 interact with corpses at all; evil ghosts follow §7.4.
 
-### 7.4 Open possession question
+### 7.4 The Deadwalk Puppet (approved 2026-08-29 — safe variant)
 
-An evil ghost possessing *its own corpse* — a puppet decoy that walks, and is
-punched apart in two hits — is the single most theatrical idea in this
-document and is deliberately **not** approved yet (§17). It needs its own
-counterplay rules before it earns a place.
+*The team approved corpse possession, deliberately choosing the safe variant
+first: ship the constrained decoy, watch what it does to real matches, and
+only then consider escalation. Every number below is provisional pending
+hands-on.*
+
+An evil ghost may possess **its own corpse** (own body only — one puppet, one
+corpse, no impersonating the other dead) through the existing Possession
+Focus, under the standard possession economy: 20 s duration, 45 s cooldown,
++30 s when exorcised.
+
+**Visible distinction is a hard rule.** The puppet may bait a shot at a
+glance, but it must never pass as one of the living:
+
+- **Deadwalk corruption**: ashen, desaturated texture variant of the boxman
+  (no new mesh), glitch-flicker opacity pulses, a slow drip of dark particles.
+- **Wrong movement**: speed ×0.8, no sprint, weak jump, occasional
+  half-second animation stutter — the gait reads *broken* at mid range.
+- Ambiguous in the dark and at distance; unmistakable on inspection. That
+  band — *could fool a nervous marksman, cannot fool anyone who looks* — is
+  the design target.
+
+**Capability limits (mandated by the team: health, crafting, building,
+inventory — all limited):**
+
+| Ability | Puppet |
+|---|---|
+| Health | 8 HP, no healing, no medkits |
+| Attacking | None — evil-ghost damage ban holds; the puppet is a decoy, not a fighter |
+| Firing weapons / using items | Refused |
+| Crafting | Refused (no inventory craft, no workshop use) |
+| Building / digging | Refused — cannot place or break nodes |
+| Inventory | Locked and empty: carries nothing, cannot loot corpses, crates, or pads |
+| Movement | Walk, weak jump |
+| Interactions | Doors and hatches only (standard possessed-door slam behavior) |
+
+**Ends and counterplay:**
+
+- **Shot apart** (8 HP: one lance overkill, two scatter pellets-plus, four
+  pistol taps) → corpse consumed, residue remains, feed logs
+  `cause: puppet collapse` — never a name.
+- **Exorcised** (two punches, or two weapon hits — §5) → ghost ejected,
+  corpse remains but the strings are burned: one puppet per body.
+- Match end sweeps everything, as always.
+
+**Why anyone would want it**: the puppet is an ammo sink in an economy where
+the killing shot smashes a third of the victim's ammo. It eats a lance round
+worth 18 damage by existing. It soaks sentry batteries and exposes turret
+positions. It triggers ambushes meant for the living. And it is harmless by
+statute — the horror is the *deception*, and the deception costs the
+deceived, never the deceived's health bar.
+
+**Escalation parking lot** (only if the safe variant proves boring in play):
+puppeting *other* corpses, longer duration, a single Tremor-grade shove.
+None of these are approved; all of them are written down so we remember the
+safe variant was a choice.
 
 ## 8. Rules integration matrix
 
@@ -312,7 +371,7 @@ counterplay rules before it earns a place.
 | Lobby / no active match | Firing refused at input; punch-guard backstop |
 | Creative mode | Damage blocked (existing guard) |
 | Ghost (contained) | Cannot fire; immortal — cannot be damaged; no corpse interaction |
-| Evil ghost | Cannot fire weapons; may possess pads/turrets; corpse possession open (§7.4) |
+| Evil ghost | Cannot fire weapons; may possess pads/turrets; may puppet its own corpse as a visibly-dead, capability-limited decoy (§7.4) |
 | Single death | Weapons never bypass `on_dieplayer` transitions; splash deaths included; every death leaves a corpse (§7) |
 | Friendly fire | Always on (all players are `fleshy`) — intentional: betrayal is a designed social mechanic |
 | Monster Master | Cannot fire ranged, cannot deploy turrets (§6.1); `fleshy = 100` armor stands vs. the chip damage that still leaks through; mortars still shove monsters |
@@ -336,6 +395,7 @@ gameplay instead of turning matches into artillery exchanges.
 - **Mortar-jump**: mortar explosion within 3 m applies up to 9 n/s velocity
   away from blast (7.5 % of self-damage at direct feet-shot ≈ 1 HP cost with
   50 % self-damage falloff). Horizontal mortar-hops cost more HP, go farther.
+  Arc drop stays at the safe flat 2 n/s² (team decision 2026-08-29, §17.3).
 - **Pulse-juggle**: consecutive bolt hits nudge 0.4 n/s — enough to harass a
   runner's rhythm, not enough to lift a player.
 - **Crouch-strafe** (existing config: crouch 5.5 vs walk 4) is already the
@@ -345,7 +405,7 @@ gameplay instead of turning matches into artillery exchanges.
   when placing sniper ledges — ledges should be jump-reachable *or* properly
   committed climbs, never accidental.
 
-### 10.1 The Grapple Lash — the one paid exception
+### 10.1 The Grapple Lash — the one fabricated exception
 
 *Team decision 2026-08-29: a grapple exists, as an expensive, advanced, rare,
 and dangerous-to-use movement item. Frontier silhouette, system-era body: a
@@ -355,7 +415,7 @@ exception, and the only one.)
 | Property | Value |
 |---|---|
 | Item | `sl_weapons:grapple` — "Grapple Lash" |
-| Acquisition | **Loot crates only**, ≈ 4 % weight. Never on pads, never craftable in W2. Quiet acquisition (§5) |
+| Acquisition | **Fabricated only** (§10.1 "The pilgrimage"): ordinary materials + a Precision Fabricator at a hard-to-reach workshop. Never on pads, never in crates, never a roll |
 | Cost per launch | 5 Cells from the shared pool + 2.0 s cooldown. Expensive by design — the Lash competes with your Lance and Driver for the same battery |
 | Mechanics | Hook is a slow projectile (30 n/s, inherits shooter velocity), attaches to **solid node faces only**, max 24 m; reel-in at 14 n/s, momentum conserved; jump detaches at full swing speed |
 | **Danger 1 — loud** | Launch crack audible 32 m; the glowing line is visible to everyone. Grappling is broadcasting your position and intent |
@@ -371,6 +431,34 @@ escapes nobody else can make. Every clause above exists so that using it is a
 *published bet*, not a free upgrade. If soak telemetry (§14) shows Lash
 holders dying more often than non-holders, the item is correctly tuned.
 
+#### The pilgrimage (acquisition, per team decision 2026-08-29)
+
+*0.04 was still a lot. Four rolls in a hundred is a slot machine, and slot
+machines teach grinding, not reading. The rarity moved from the dice to the
+map: the materials are ordinary, the **tools are rare**, and the tool is a
+place.*
+
+- **The station, not the recipe, is the treasure.** A Lash is fabricated only
+  at a workshop carrying a **Precision Fabricator** — a bolted-down machine
+  head that cannot be crafted, moved, or bought. Digging one loose destroys
+  it (level 2, `sl_weapons:fabricator`). Map authors place **1–3 per map**,
+  deliberately far: deep underground cubes where the monsters live, sealed
+  sections, the far corners nobody patrols.
+- **The recipe is deliberately mundane** — existing `CRAFTING_GUIDE`
+  materials, nothing exotic: Metal Ingot ×2 + Circuit Board ×2 + Energy
+  Crystal ×2 + Plastic Scrap ×1. Any team that *reaches* a Fabricator can
+  usually afford the Lash. The gate was never the shopping list.
+- **The job takes 10 s** with a machine hum audible 12 m — an eternity to
+  stand still in a bad neighborhood, which is exactly where the workshops
+  are.
+- **Compatibility**: this revives the workshops concept
+  (`mods/content/sl_workshops`, currently fully commented out — ROADMAP
+  already calls to "revive ONE station"). The Fabricator is self-contained in
+  `sl_weapons` (WP9 ownership) but its node contract matches the planned
+  Assembly Table so WP6 can adopt it later.
+- **Soak note**: bot telemetry must treat the trip as the cost — track
+  deaths-in-transit-to-fabricator as a first-class counter.
+
 ## 11. Identity-neutrality audit
 
 - Tracers/beams: one palette (system cyan/white) for everyone — no team tints.
@@ -379,6 +467,8 @@ holders dying more often than non-holders, the item is correctly tuned.
 - Turret IFF: deployer-only immunity — zero team information emitted.
 - Corpse reports: cause of death and inventory, never the killer's name. A
   grave mound is anonymous — the burial is decent *because* nobody signs it.
+- Deadwalk puppets are visibly corrupt by hard rule (§7.4): a decoy may bait
+  a shot at a glance, but never impersonate the living to anyone who looks.
 - Pad chimes and weapon reports are *global* positional audio: everyone with
   ears gets the same intel. Sound advantage must never be private.
 - Achievement lifetime counters (§12.1) are public reputation — a *player*
@@ -396,6 +486,7 @@ mods/game/sl_weapons/
   projectiles.lua -- mortar/pulse/hook entities, swept collision, splash+knockback
   weapons.lua     -- the six registrations + Frontier set + ammo items & pools
   grapple.lua     -- the Lash: hook entity, line entity, reel physics
+  fabricator.lua  -- Precision Fabricator station node + 10 s Lash job
   pads.lua        -- weapon/ammo pad nodes, respawn timers, possession hooks
   turret.lua      -- sentry kit item, turret node + head entity, targeting log
   corpses.lua     -- corpse entity, incident reports, residue/mound/scorch, burial & cremation
@@ -415,7 +506,10 @@ pistol + 1 blade) · `sl_weapons_pad_respawn` (int 30) ·
 
 Integration touch points outside the new mod (all additive, WP3/WP5 files):
 
-- `sl_modebase/content.lua`: crate loot table gains a `weapons` section.
+- `sl_modebase/content.lua`: crate loot table gains a `weapons` section
+  (Grapple Lash explicitly excluded — it is fabricated, never rolled).
+- `mods/content/sl_workshops` (commented-out plan): the Fabricator's node
+  contract matches its planned Assembly Table so WP6 can adopt it later.
 - `sl_modebase/match.lua`: death-fountain redirect into the corpse (§7.1).
 - `sl_modebase/nodes.lua`: pads/turret/corpse-trace nodes join the possessable
   group; turret gets sabotage refusal. No edits to the punch guard — by design.
@@ -447,18 +541,20 @@ Matching the existing pipeline (`GENERATED_ASSETS.md`, `generate_sounds.py`):
 
 - **Textures**: 16×16 neon-system icons — 6 weapons + Neon Six + Neon
   Repeater, 4 ammo items, Grapple Lash, Sentry Kit, targeting log, pad ring
-  (armed/dim), turret node, corpse residue, grave mound, scorch — extend
-  `generate_content_assets.py` with an `sl_weapons` section.
+  (armed/dim), turret node, Precision Fabricator station, corpse residue,
+  grave mound, scorch, deadwalk boxman texture variant (ashen/desaturated) —
+  extend `generate_content_assets.py` with an `sl_weapons` section.
 - **Sounds** (procedural, mono, .ogg): pistol crack, chatter burst, scatter
   boom, lance crack-hum (long tail), mortar launch + explosion + flight loop,
   pulse zap, revolver crack + cylinder spin hum, lever two-note clack, dry
   click (loud, room-audible), grapple launch crack + reel whine + line-sever
-  snap, pad chime (arm + take, pitched per weapon), turret acquire chirp /
+  snap, 10 s fabrication hum, deadwalk glitch static + puppet collapse, pad
+  chime (arm + take, pitched per weapon), turret acquire chirp /
   servo / laser hum / death pop, corpse-examine report chime, loot hum,
   shovel-burial fills, cremation roar.
 - **Models**: reuse `sl_mvp_assets` `item_pickup.obj` for pad holograms;
-  turret head is a small generated cube-cluster obj; the corpse reuses the
-  player boxman model (no new mesh).
+  turret head is a small generated cube-cluster obj; the corpse and the
+  deadwalk puppet reuse the player boxman model (no new meshes).
 
 ## 14. Test & telemetry plan
 
@@ -472,9 +568,15 @@ Matching the existing pipeline (`GENERATED_ASSETS.md`, `generate_sounds.py`):
   insertion clears ammo/turrets. **Corpse suite:** spawn on death, report
   contents (cause, no attacker), loot is audible, inventory lands in body,
   smash-a-third applied, shovel-burial → mound + residue persists, cremation
-  → scorch + Ashen Relic, no silent removal path, full sweep at reset.
-  **Lash suite:** launch costs 5 cells, detach-on-damage, line cut by one
-  hit, monster-hook reels the shooter, no pads carry it. **Achievement
+  → scorch + Ashen Relic **at ritual par**, no silent removal path, full
+  sweep at reset. **Puppet suite:** own-corpse-only, visible corruption flags
+  set, 8 HP with no healing, fire/craft/build/dig/loot all refused, doors
+  work, shot-apart consumes corpse + logs `puppet collapse` with no name,
+  exorcism burns the strings (one puppet per body), standard cooldowns.
+  **Lash suite:** craftable only at a Fabricator (recipe consumes mats,
+  10 s job), absent from every pad/crate table, digging a Fabricator
+  destroys it, launch costs 5 cells, detach-on-damage, line cut by one
+  hit, monster-hook reels the shooter. **Achievement
   suite:** award → reset at match end → `times_earned` survives.
 - **Soak harness** (`aaa_botmatch` extension, Phase W2): bots learn
   pickup-camping, projectile leading, turret placement near own beacon route,
@@ -496,7 +598,7 @@ Matching the existing pipeline (`GENERATED_ASSETS.md`, `generate_sounds.py`):
 |---|---|---|
 | **W0** (½ day) | Stub raycast extension + `sl_weapons` skeleton loads clean | smoke tests still green |
 | **W1** (2–3 days) | Six weapons, ammo, hitscan/projectile pipeline (with velocity inheritance), HUD readout, incident-report killfeed, generated assets, stub tests | playable duel vs bots; stub suite green |
-| **W2** (3 days) | Pads, Sentry Kit + turret + targeting logs, **corpse system**, **Grapple Lash**, **Neon Frontier set**, MM hands + gates, achievement lifecycle, possession/sabotage hooks, bot behaviors, telemetry | soak turbo 40 matches, exit-gate metrics |
+| **W2** (3 days) | Pads, Sentry Kit + turret + targeting logs, **corpse system + deadwalk puppet**, **Grapple Lash + Precision Fabricator**, **Neon Frontier set**, MM hands + gates, achievement lifecycle, possession/sabotage hooks, bot behaviors, telemetry | soak turbo 40 matches, exit-gate metrics |
 | **W3** (1 day) | Balance pass from telemetry, arena pad placement guide for WP1, docs integration (ROADMAP, NEEDED ASSETS) | team sign-off |
 
 ## 16. Out of scope (explicitly)
@@ -510,15 +612,15 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 1. ~~Spawn loadout~~ — **resolved 2026-08-29: pistol-only.** The walk is the game.
 2. ~~Turret battery~~ — **resolved: 90 s kept.** A timer is a decision.
-3. **Mortar arc drop**: 2 n/s² gives Quake-2-ish arcs at arena scale — confirm
-   after first hands-on; it's one constant.
+3. ~~Mortar arc drop~~ — **resolved 2026-08-29: safe variant.** Flat
+   2 n/s² kept; revisit only with hands-on data.
 4. ~~Pad chime identification~~ — **resolved: yes, pitch identifies.** The
    chime is the headline.
-5. **Corpse possession (§7.4)**: may an evil ghost puppet its own body as a
-   two-hit decoy? Strong yes-energy, needs counterplay rules first.
-6. **Ashen Relic economy**: does cremation-dropped Relic feed the altar at
-   par with ritual-sourced Relics, or at a discount (burned evidence is
-   secondhand evidence)?
+5. ~~Corpse possession~~ — **resolved 2026-08-29: approved, safe variant.**
+   The Deadwalk Puppet (§7.4): visibly dead, 8 HP, harmless, capability-
+   limited; escalation options parked in writing.
+6. ~~Ashen Relic economy~~ — **resolved 2026-08-29: full par.** Burned
+   evidence is not secondhand evidence; a Relic is a Relic.
 7. **Neon Six cylinder pause**: 2.5 s proposed — needs a hands-on duel test;
    it must feel like drama, never like lag.
 8. **MM hand tiers (§6.1)**: 4/7/10 proposed — validate against soak before
@@ -526,6 +628,14 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.2 (2026-08-29, second review)** — casino removed: Grapple Lash pulled
+  from all random tables, now fabricated at hard-to-reach Precision
+  Fabricator workshops from ordinary materials (the tool is rare, not the
+  mats — §10.1 "The pilgrimage", revives the `sl_workshops` station plan);
+  mortar arc resolved to the safe flat 2 n/s²; corpse possession approved as
+  the safe-variant Deadwalk Puppet — visibly corrupt, 8 HP, harmless,
+  health/crafting/building/inventory all limited (§7.4); cremation Relics on
+  full par with ritual Relics (§7.3).
 - **v1.1 (2026-08-29)** — team review + Weapons Council deltas: corpse &
   trace system (§7); Grapple Lash (§10.1, reverses v1.0 blanket ban); MM
   clause — no towers, no ranged, bare-hand skill-tree evolutions (§6.1);
