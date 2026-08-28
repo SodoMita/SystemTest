@@ -125,3 +125,14 @@ one palette per material (wood / stone / steel / bronze / mese / diamond).
 Strict 4-color palette per icon: material bright line + dim halo (~40%) +
 near-black handle + amber pommel/grip accent. Preview maps with
 `python3 tools/neon_tools.py --preview`.
+
+## Stone & ores via vector tracing (2026-08-28, v4)
+
+`tools/neon_vector_pass.py`: AI "flat vector neon" sheets
+(`neon_sheets/S01_stone_vector.png`, `S02_ores_vector.png`) -> per-cell
+autotrace to SVG (vtracer, color stacked splines) -> render the SVG at exactly
+16x16 (PyMuPDF) -> hard 5-color palette flatten. Thin neon lines are dilated
+to ~1 output px before tracing so they survive the 16x16 render; ore specks
+are alpha-keyed black->transparent and composite over `default_stone.png` at
+runtime. `default_gravel.png` uses a procedural pebble fallback (its source
+cell was too low-contrast to trace).
