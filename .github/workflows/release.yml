@@ -257,3 +257,9 @@ jobs:
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
         run: ./linux-amd64/butler push "$RUNNER_TEMP/luanti-wasm/www" "$ITCH_TARGET:web" --userversion "wasm-${GITHUB_SHA::7}"
+      - name: Upload www artifact (for local reproduction/diagnosis)
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: web-www
+          path: ${{ runner.temp }}/luanti-wasm/www
