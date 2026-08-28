@@ -51,11 +51,13 @@ jobs:
       - name: Install butler
         run: |
           curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
-          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+          unzip -q butler.zip
+          chmod +x linux-amd64/butler
+          ./linux-amd64/butler -V
       - name: Push to itch (windows)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./butler push SystemLoot-Windows.zip "$ITCH_TARGET:windows" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+        run: ./linux-amd64/butler push SystemLoot-Windows.zip "$ITCH_TARGET:windows" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
 
   macos:
     runs-on: ubuntu-latest
@@ -68,8 +70,9 @@ jobs:
           mkdir -p "$WORK/mac"
           for ARCH in arm64 x86_64; do
             curl -sL -o "$WORK/mac-$ARCH.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti_${LUANTI_VERSION}_macos12.3_${ARCH}.zip"
-            unzip -q "$WORK/mac-$ARCH.zip" -d "$WORK/mac/SystemLoot-macOS-$ARCH"
-            APP=$(find "$WORK/mac/SystemLoot-macOS-$ARCH" -maxdepth 3 -name "*.app" | head -1)
+            unzip -q "$WORK/mac-$ARCH.zip" -d "$WORK/mac/SystemLoot-macOS-$ARCH" -x "__MACOSX/*"
+            APP=$(find "$WORK/mac/SystemLoot-macOS-$ARCH" -maxdepth 3 -name "*.app" -not -path "*__MACOSX*" | head -1)
+            [ -n "$APP" ] || { echo "no .app found in mac-$ARCH.zip"; exit 1; }
             RES="$APP/Contents/Resources"
             mkdir -p "$RES/games/$GAME_ID"
             rsync -a --exclude=.git --exclude=.github ./ "$RES/games/$GAME_ID/"
@@ -79,11 +82,13 @@ jobs:
       - name: Install butler
         run: |
           curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
-          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+          unzip -q butler.zip
+          chmod +x linux-amd64/butler
+          ./linux-amd64/butler -V
       - name: Push to itch (osx)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./butler push mac "$ITCH_TARGET:osx" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+        run: ./linux-amd64/butler push mac "$ITCH_TARGET:osx" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
 
   linux:
     runs-on: ubuntu-latest
@@ -102,8 +107,14 @@ jobs:
             [ -x "$cand" ] && BIN="$cand" && break
           done
           if [ -z "$BIN" ]; then
-            W=$(command -v luanti || command -v minetest)
-            BIN=$(sed -nE 's#.*exec[[:space:]]+([^[:space:]]+).*#\1#p' "$W" | tail -1)
+            W=$(command -v luanti || command -v minetest || true)
+            if [ -n "$W" ]; then
+              if file "$W" | grep -q "ELF"; then
+                BIN="$W"   # Ubuntu ships the real binary directly
+              else
+                BIN=$(sed -nE 's#.*exec[[:space:]]+([^[:space:]]+).*#\1#p' "$W" | tail -1)  # Debian wrapper
+              fi
+            fi
           fi
           [ -x "$BIN" ] || { echo "engine binary not found"; exit 1; }
           SHARE=/usr/share/luanti
@@ -132,11 +143,13 @@ jobs:
       - name: Install butler
         run: |
           curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
-          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+          unzip -q butler.zip
+          chmod +x linux-amd64/butler
+          ./linux-amd64/butler -V
       - name: Push to itch (linux)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./butler push SystemLoot-Linux.tar.gz "$ITCH_TARGET:linux" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+        run: ./linux-amd64/butler push SystemLoot-Linux.tar.gz "$ITCH_TARGET:linux" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
 
   android:
     runs-on: ubuntu-latest
@@ -166,11 +179,13 @@ jobs:
       - name: Install butler
         run: |
           curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
-          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+          unzip -q butler.zip
+          chmod +x linux-amd64/butler
+          ./linux-amd64/butler -V
       - name: Push to itch (android)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./butler push SystemLoot-Android.apk "$ITCH_TARGET:android" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+        run: ./linux-amd64/butler push SystemLoot-Android.apk "$ITCH_TARGET:android" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
 
   web:
     runs-on: ubuntu-latest
@@ -197,8 +212,10 @@ jobs:
       - name: Install butler
         run: |
           curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
-          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+          unzip -q butler.zip
+          chmod +x linux-amd64/butler
+          ./linux-amd64/butler -V
       - name: Push to itch (web)
         env:
           BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
-        run: ./butler push web "$ITCH_TARGET:web" --userversion "${LUANTI_VERSION}-placeholder"
+        run: ./linux-amd64/butler push web "$ITCH_TARGET:web" --userversion "${LUANTI_VERSION}-placeholder"
