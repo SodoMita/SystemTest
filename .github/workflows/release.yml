@@ -39,16 +39,18 @@ jobs:
       - name: Fetch engine + embed game
         run: |
           set -e
-          curl -sL -o win.zip "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-win64.zip"
-          unzip -q win.zip -d win
-          ROOT=$(find win -maxdepth 1 -mindepth 1 -type d | head -1)
+          WORK=$(mktemp -d)
+          curl -sL -o "$WORK/win.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-win64.zip"
+          unzip -q "$WORK/win.zip" -d "$WORK/win"
+          ROOT=$(find "$WORK/win" -maxdepth 1 -mindepth 1 -type d | head -1)
           mkdir -p "$ROOT/games/$GAME_ID"
           rsync -a --exclude=.git --exclude=.github ./ "$ROOT/games/$GAME_ID/"
-          (cd win && zip -qr ../SystemLoot-Windows.zip .)
+          (cd "$WORK/win" && zip -qr "$WORK/SystemLoot-Windows.zip" .)
+          cp "$WORK/SystemLoot-Windows.zip" SystemLoot-Windows.zip
           ls -la SystemLoot-Windows.zip
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip butler && chmod +x butler && ./butler -V
       - name: Push to itch (windows)
         env:
@@ -62,19 +64,21 @@ jobs:
       - name: Fetch engine (arm64 + x86_64) + embed game
         run: |
           set -e
-          mkdir -p mac
+          WORK=$(mktemp -d)
+          mkdir -p "$WORK/mac"
           for ARCH in arm64 x86_64; do
-            curl -sL -o "mac-$ARCH.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti_${LUANTI_VERSION}_macos12.3_${ARCH}.zip"
-            unzip -q "mac-$ARCH.zip" -d "mac/SystemLoot-macOS-$ARCH"
-            APP=$(find "mac/SystemLoot-macOS-$ARCH" -maxdepth 3 -name "*.app" | head -1)
+            curl -sL -o "$WORK/mac-$ARCH.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti_${LUANTI_VERSION}_macos12.3_${ARCH}.zip"
+            unzip -q "$WORK/mac-$ARCH.zip" -d "$WORK/mac/SystemLoot-macOS-$ARCH"
+            APP=$(find "$WORK/mac/SystemLoot-macOS-$ARCH" -maxdepth 3 -name "*.app" | head -1)
             RES="$APP/Contents/Resources"
             mkdir -p "$RES/games/$GAME_ID"
             rsync -a --exclude=.git --exclude=.github ./ "$RES/games/$GAME_ID/"
           done
+          cp -r "$WORK/mac" mac
           ls -la mac/
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip butler && chmod +x butler && ./butler -V
       - name: Push to itch (osx)
         env:
@@ -104,28 +108,30 @@ jobs:
           [ -x "$BIN" ] || { echo "engine binary not found"; exit 1; }
           SHARE=/usr/share/luanti
           [ -d "$SHARE" ] || SHARE=/usr/share/minetest
-          mkdir -p bundle/bin bundle/lib "bundle/games/$GAME_ID"
-          cp "$BIN" bundle/bin/luanti
+          WORK=$(mktemp -d)
+          bundle="$WORK/bundle"
+          mkdir -p "$bundle/bin" "$bundle/lib" "$bundle/games/$GAME_ID"
+          cp "$BIN" "$bundle/bin/luanti"
           for d in builtin client fonts textures; do
-            [ -d "$SHARE/$d" ] && cp -r "$SHARE/$d" "bundle/$d" || true
+            [ -d "$SHARE/$d" ] && cp -r "$SHARE/$d" "$bundle/$d" || true
           done
-          rsync -a --exclude=.git --exclude=.github ./ "bundle/games/$GAME_ID/"
-          ldd "$BIN" | awk '{print $3}' | grep -v '^$' | xargs -I{} cp -n {} bundle/lib/ 2>/dev/null || true
-          cat > bundle/run-game.sh <<'EOF'
+          rsync -a --exclude=.git --exclude=.github ./ "$bundle/games/$GAME_ID/"
+          ldd "$BIN" | awk '{print $3}' | grep -v '^$' | xargs -I{} cp -n {} "$bundle/lib/" 2>/dev/null || true
+          cat > "$bundle/run-game.sh" <<'EOF'
           #!/bin/sh
           DIR="$(cd "$(dirname "$0")" && pwd)"
           export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           exec "$DIR/bin/luanti" "$@"
           EOF
-          sed -i 's/^          //' bundle/run-game.sh
-          chmod +x bundle/run-game.sh bundle/bin/luanti
+          sed -i 's/^          //' "$bundle/run-game.sh"
+          chmod +x "$bundle/run-game.sh" "$bundle/bin/luanti"
           # Smoke-check the relocated engine before shipping.
-          ./bundle/run-game.sh --version
-          tar czf SystemLoot-Linux.tar.gz -C bundle .
+          "$bundle/run-game.sh" --version
+          tar czf SystemLoot-Linux.tar.gz -C "$bundle" .
           ls -la SystemLoot-Linux.tar.gz
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip butler && chmod +x butler && ./butler -V
       - name: Push to itch (linux)
         env:
@@ -141,6 +147,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Install build prerequisites (msgfmt for translation compile)
+        run: sudo apt-get update && sudo apt-get install -y gettext
       - name: Fetch engine source + embed game
         run: |
           set -e
@@ -157,7 +165,7 @@ jobs:
           cp "$(head -1 /tmp/apk_list)" ../../SystemLoot-Android.apk
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip butler && chmod +x butler && ./butler -V
       - name: Push to itch (android)
         env:
@@ -188,7 +196,7 @@ jobs:
           sed -i 's/^          //' web/index.html
       - name: Install butler
         run: |
-          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          curl -sL -o butler.zip https://github.com/itchio/butler/releases/latest/download/butler-linux-amd64.zip
           unzip -q butler.zip butler && chmod +x butler && ./butler -V
       - name: Push to itch (web)
         env:
