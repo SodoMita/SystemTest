@@ -1,0 +1,196 @@
+name: release
+
+# Release pipeline: pushes player-ready bundles to itch.io
+# (https://delatel.itch.io/systemloot) via butler.
+#
+# Trigger: any push to the `build` branch (release train: merge master ->
+# build when a build is wanted), or manual workflow_dispatch.
+#
+# Channels: windows / osx / linux / android / web
+# Auth: repository secret ITCH_API_KEY (itch.io API key), passed to butler
+# as BUTLER_API_KEY.
+#
+# Platform notes (honest ledger):
+# - windows/osx: official Luanti release binaries + embedded game.
+# - linux: portable bundle (engine + share data + ldd libs + launcher),
+#   same technique validated locally against the Debian engine.
+# - android: official APKs cannot carry custom games; the job rebuilds the
+#   engine from source with the game embedded (debug-signed). Best-effort:
+#   continue-on-error so the other channels always ship.
+# - web: Luanti has no official web/wasm port as of 5.17. The web channel
+#   carries a placeholder page saying exactly that, so the itch page is
+#   honest about it instead of shipping a broken build.
+
+on:
+  push:
+    branches: [build]
+  workflow_dispatch:
+
+env:
+  GAME_ID: SystemTest
+  LUANTI_VERSION: "5.17.0"
+  ITCH_TARGET: delatel/systemloot
+
+jobs:
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch engine + embed game
+        run: |
+          set -e
+          curl -sL -o win.zip "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti-${LUANTI_VERSION}-win64.zip"
+          unzip -q win.zip -d win
+          ROOT=$(find win -maxdepth 1 -mindepth 1 -type d | head -1)
+          mkdir -p "$ROOT/games/$GAME_ID"
+          rsync -a --exclude=.git --exclude=.github ./ "$ROOT/games/$GAME_ID/"
+          (cd win && zip -qr ../SystemLoot-Windows.zip .)
+          ls -la SystemLoot-Windows.zip
+      - name: Install butler
+        run: |
+          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+      - name: Push to itch (windows)
+        env:
+          BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
+        run: ./butler push SystemLoot-Windows.zip "$ITCH_TARGET:windows" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+
+  macos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch engine (arm64 + x86_64) + embed game
+        run: |
+          set -e
+          mkdir -p mac
+          for ARCH in arm64 x86_64; do
+            curl -sL -o "mac-$ARCH.zip" "https://github.com/luanti-org/luanti/releases/download/${LUANTI_VERSION}/luanti_${LUANTI_VERSION}_macos12.3_${ARCH}.zip"
+            unzip -q "mac-$ARCH.zip" -d "mac/SystemLoot-macOS-$ARCH"
+            APP=$(find "mac/SystemLoot-macOS-$ARCH" -maxdepth 3 -name "*.app" | head -1)
+            RES="$APP/Contents/Resources"
+            mkdir -p "$RES/games/$GAME_ID"
+            rsync -a --exclude=.git --exclude=.github ./ "$RES/games/$GAME_ID/"
+          done
+          ls -la mac/
+      - name: Install butler
+        run: |
+          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+      - name: Push to itch (osx)
+        env:
+          BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
+        run: ./butler push mac "$ITCH_TARGET:osx" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luanti || sudo apt-get install -y minetest
+      - name: Build portable bundle (engine + share + libs + game + launcher)
+        run: |
+          set -e
+          # Resolve the real binary (Debian ships a shell wrapper).
+          BIN=""
+          for cand in /usr/libexec/luanti/luanti /usr/libexec/minetest/minetest; do
+            [ -x "$cand" ] && BIN="$cand" && break
+          done
+          if [ -z "$BIN" ]; then
+            W=$(command -v luanti || command -v minetest)
+            BIN=$(sed -nE 's#.*exec[[:space:]]+([^[:space:]]+).*#\1#p' "$W" | tail -1)
+          fi
+          [ -x "$BIN" ] || { echo "engine binary not found"; exit 1; }
+          SHARE=/usr/share/luanti
+          [ -d "$SHARE" ] || SHARE=/usr/share/minetest
+          mkdir -p bundle/bin bundle/lib "bundle/games/$GAME_ID"
+          cp "$BIN" bundle/bin/luanti
+          for d in builtin client fonts textures; do
+            [ -d "$SHARE/$d" ] && cp -r "$SHARE/$d" "bundle/$d" || true
+          done
+          rsync -a --exclude=.git --exclude=.github ./ "bundle/games/$GAME_ID/"
+          ldd "$BIN" | awk '{print $3}' | grep -v '^$' | xargs -I{} cp -n {} bundle/lib/ 2>/dev/null || true
+          cat > bundle/run-game.sh <<'EOF'
+          #!/bin/sh
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          exec "$DIR/bin/luanti" "$@"
+          EOF
+          sed -i 's/^          //' bundle/run-game.sh
+          chmod +x bundle/run-game.sh bundle/bin/luanti
+          # Smoke-check the relocated engine before shipping.
+          ./bundle/run-game.sh --version
+          tar czf SystemLoot-Linux.tar.gz -C bundle .
+          ls -la SystemLoot-Linux.tar.gz
+      - name: Install butler
+        run: |
+          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+      - name: Push to itch (linux)
+        env:
+          BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
+        run: ./butler push SystemLoot-Linux.tar.gz "$ITCH_TARGET:linux" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+
+  android:
+    runs-on: ubuntu-latest
+    continue-on-error: true  # best-effort: engine source rebuild, iterated separately
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Fetch engine source + embed game
+        run: |
+          set -e
+          git clone --depth 1 --branch "$LUANTI_VERSION" https://github.com/luanti-org/luanti engine
+          mkdir -p engine/games
+          rsync -a --exclude=.git --exclude=.github ./ "engine/games/$GAME_ID/"
+      - name: Build debug APK with embedded game
+        run: |
+          set -e
+          cd engine/android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          find . -name "*.apk" -path "*outputs*" | tee /tmp/apk_list
+          cp "$(head -1 /tmp/apk_list)" ../../SystemLoot-Android.apk
+      - name: Install butler
+        run: |
+          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+      - name: Push to itch (android)
+        env:
+          BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
+        run: ./butler push SystemLoot-Android.apk "$ITCH_TARGET:android" --userversion "${LUANTI_VERSION}-${GITHUB_SHA::7}"
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build honest placeholder page
+        run: |
+          mkdir -p web
+          cat > web/index.html <<'EOF'
+          <!doctype html>
+          <html><head><meta charset="utf-8"><title>System Looting — Web build</title>
+          <style>body{background:#0a0a12;color:#cfe;font-family:monospace;max-width:640px;margin:4rem auto;padding:0 1rem;line-height:1.6}
+          a{color:#5ff}h1{color:#5ff}</style></head><body>
+          <h1>SYSTEM LOOTING — WEB CHANNEL</h1>
+          <p>A browser (WebAssembly) build is <strong>not available</strong>: the Luanti
+          engine has no official web port as of 5.17. This page exists so the
+          channel list is honest rather than broken.</p>
+          <p>Playable downloads are on the other channels of this itch page:
+          <strong>Windows</strong>, <strong>macOS</strong> (arm64 + Intel),
+          <strong>Linux</strong> (portable bundle), and <strong>Android</strong> (APK).</p>
+          <p>Source: <a href="https://github.com/SodoMita/SystemTest">github.com/SodoMita/SystemTest</a></p>
+          </body></html>
+          EOF
+          sed -i 's/^          //' web/index.html
+      - name: Install butler
+        run: |
+          curl -sL -o butler.zip https://broth.itch.ovh/butler/linux-amd64/LATEST/archive/default
+          unzip -q butler.zip butler && chmod +x butler && ./butler -V
+      - name: Push to itch (web)
+        env:
+          BUTLER_API_KEY: ${{ secrets.ITCH_API_KEY }}
+        run: ./butler push web "$ITCH_TARGET:web" --userversion "${LUANTI_VERSION}-placeholder"
