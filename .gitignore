@@ -32,3 +32,6 @@ debug.txt
 # Compiled pipeline binaries (sources stay, binaries rebuild per-session)
 mods/content/sl_scary/pipeline/downscale_filter
 mods/content/sl_scary/pipeline/matte_floodfill
+
+# AI neon-texture working sheets (regenerable, see tools/neon_texture_pass.py)
+/neon_sheets/

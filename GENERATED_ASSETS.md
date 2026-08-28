@@ -50,3 +50,24 @@ highly packed set. Run `python3 generate_sounds.py` to reproduce it byte-for-byt
   are crossfade-loopable with zero seam click.
 - Deterministic: running the script twice produces byte-identical files (seeded per
   file/variant, fixed Ogg serial numbers and CRCs).
+
+---
+
+# Neon Texture Pass (default mod)
+
+Every texture in `mods/default/textures/` (241 files) was replaced with
+neon-grid style artwork matching the game's visual direction (neon outlines on
+deep black, cf. `mods/sl_blocks/ground/textures/*_neon.png`).
+
+- Run `python3 tools/neon_texture_pass.py` — steps: `prompts` (AI sheet
+  prompts) -> generate 1024x1024 sheets into `neon_sheets/` (19 sheets, 4x4 or
+  3x3 grids of textures upscaled on a strict 16x16 pixel-art lattice) ->
+  `process` (split sheets, BOX-downscale each cell by the same power back to
+  16x16, key pure black to alpha for transparent sprites) -> `polish`
+  (brightness lift for too-dark tiles, hue tint for a few white sprites) ->
+  `assemble` (animated strips: water/lava/torch/furnace vertical frames,
+  crack_anylength stage stack).
+- The `neon_sheets/` working directory is gitignored; the prompts to regenerate
+  it are printed by `tools/neon_texture_pass.py prompts`.
+- Animated texture dimensions/animation settings in `mods/default/*.lua` are
+  unchanged (16 frames water, 8 lava, 16 torch, 8 furnace fire).
