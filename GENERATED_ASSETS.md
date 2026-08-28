@@ -105,3 +105,14 @@ deep black, cf. `mods/sl_blocks/ground/textures/*_neon.png`).
   part of every grass/dry/snow node now matches `default:dirt` exactly by
   construction.
 - Reproduce with `python3 tools/neon_texture_pass.py cohere`.
+
+## Special-dirt coherence (2026-08-28, v2.2)
+
+All remaining `dirt ^ overlay` ground nodes rebuilt procedurally
+(`tools/neon_texture_pass.py cohere`):
+- `default:dry_dirt` (savanna): warm near-black base + orange neon crack walks.
+- `dirt_with_rainforest_litter` / `dirt_with_coniferous_litter`: litter tops on
+  the shared soil base; sides are transparent neon fringes so the engine
+  composite (`dirt.png^..._side.png`) shows the real dirt.
+- `permafrost_with_stones`: `default_stones.png` / `default_stones_side.png`
+  are transparent pale-blue pebble outlines composited over permafrost.

@@ -1049,7 +1049,64 @@ def cohere():
     _strip_overlay(GRN, rng).save(os.path.join(TEXDIR, "default_grass_side.png"), optimize=True)
     _strip_overlay(AMB, rng).save(os.path.join(TEXDIR, "default_dry_grass_side.png"), optimize=True)
     _strip_overlay(ICE, rng).save(os.path.join(TEXDIR, "default_snow_side.png"), optimize=True)
-    print("ground family rebuilt (dirt/grass/dry/snow + side overlays)")
+
+    # --- savanna dirt (own tile, used for top/bottom/sides of default:dry_dirt)
+    ORG = (255, 122, 47)
+    dry = _soil_base(rng)
+    op = dry.load()
+    for y in range(16):
+        for x in range(16):
+            r, g, b, a = op[x, y]
+            op[x, y] = (min(255, int(r * 1.5 + 10)), int(g * 1.15 + 4), int(b * 0.8), a)
+    for _ in range(5):                                # orange neon crack walks
+        x, y = rng.randrange(16), rng.randrange(16)
+        for _ in range(rng.randint(4, 8)):
+            op[x, y] = ORG + (255,)
+            x = max(0, min(15, x + rng.choice((-1, 0, 1, 1))))
+            y = max(0, min(15, y + rng.choice((-1, 0, 1))))
+    dry.save(os.path.join(TEXDIR, "default_dry_dirt.png"), optimize=True)
+
+    # --- litter tops (over the shared soil base) + transparent side fringes
+    RAIN, CONF = (110, 255, 94), (47, 232, 200)
+
+    def litter_top(hue):
+        im = _soil_base(rng)
+        p = im.load()
+        for _ in range(30):                           # scattered needle/leaf dashes
+            x, y = rng.randrange(16), rng.randrange(16)
+            for dx in range(rng.randint(1, 3)):
+                if x + dx < 16:
+                    p[x + dx, y] = hue + (255,)
+        return im
+
+    litter_top(RAIN).save(os.path.join(TEXDIR, "default_rainforest_litter.png"), optimize=True)
+    litter_top(CONF).save(os.path.join(TEXDIR, "default_coniferous_litter.png"), optimize=True)
+    _strip_overlay(RAIN, rng, drips=2).save(
+        os.path.join(TEXDIR, "default_rainforest_litter_side.png"), optimize=True)
+    _strip_overlay(CONF, rng, drips=2).save(
+        os.path.join(TEXDIR, "default_coniferous_litter_side.png"), optimize=True)
+
+    # --- permafrost_with_stones: transparent pebble overlays (over permafrost)
+    PBL = (159, 216, 255)
+
+    def pebbles(n, rows):
+        im = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+        p = im.load()
+        for _ in range(n):
+            x, y = rng.randrange(1, 13), rng.randrange(1, rows)
+            w, h = rng.choice(((3, 2), (2, 2), (4, 2)))
+            for dx in range(w):
+                p[x + dx, y] = PBL + (235,)
+                p[x + dx, y + h - 1] = PBL + (235,)
+            for dy in range(h):
+                p[x, y + dy] = PBL + (235,)
+                p[x + w - 1, y + dy] = PBL + (235,)
+        return im
+
+    pebbles(7, 15).save(os.path.join(TEXDIR, "default_stones.png"), optimize=True)
+    pebbles(5, 5).save(os.path.join(TEXDIR, "default_stones_side.png"), optimize=True)
+
+    print("ground family rebuilt (dirt/grass/dry/snow/savanna/litter/stones)")
 
 
 def polish():
