@@ -56,13 +56,13 @@ function W.register_weapon(def)
 				if loaded < 1 then
 					-- Dry. The click is loud: emptiness is information
 					-- (council resolution #6) and ghosts gossip about it.
+					-- The weapon stays in the hand: the player reloads it,
+					-- they do not get swapped out of it (v1.3.9 — the
+					-- old autoswitch stole the gun and announced it).
 					minetest.sound_play("sl_weapons_dry_click", {
 						pos = user:get_pos(), gain = 0.9, max_hear_distance = 16,
 					})
 					minetest.chat_send_player(name, S("Dry. Load it."))
-					if def.id ~= "pistol" then
-						W.autoswitch_pistol(user, def)
-					end
 					return itemstack
 				end
 				W.mag_set(itemstack, loaded - 1)
@@ -126,38 +126,6 @@ function W.register_weapon(def)
 end
 
 W.rounds_fired = {} -- Neon Six cylinder count
-
-function W.autoswitch_pistol(user, fired_def)
-	local name = user:get_player_name()
-	local inv = user:get_inventory()
-	if not inv then return end
-	-- v1.3: the dry weapon steps aside for the pistol the player
-	-- actually owns -- the most loaded one, moved into its slot. No
-	-- free rounds are ever conjured by a dry click; with no pistol at
-	-- all, an empty one parks there and the blade is the truth.
-	local dry_slot
-	local best_slot, best_mag
-	for i = 1, inv:get_size("main") do
-		local stack = inv:get_stack("main", i)
-		local iname = stack:get_name()
-		if iname == "sl_weapons:" .. fired_def.item and not dry_slot then
-			dry_slot = i
-		elseif iname == "sl_weapons:pistol" then
-			local m = W.mag_get(stack)
-			if not best_slot or m > best_mag then
-				best_slot, best_mag = i, m
-			end
-		end
-	end
-	if not dry_slot then return end
-	if best_slot then
-		inv:set_stack("main", dry_slot, inv:get_stack("main", best_slot))
-		inv:set_stack("main", best_slot, ItemStack(""))
-	else
-		inv:set_stack("main", dry_slot, ItemStack("sl_weapons:pistol"))
-	end
-	minetest.chat_send_player(name, S("Switched to Pulsar Pistol."))
-end
 
 -- Scoped weapons: RMB toggles zoom (engine set_fov where available).
 W.zoom = {} -- [name] = true

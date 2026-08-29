@@ -89,13 +89,20 @@ minetest.register_on_leaveplayer(function(player)
 end)
 
 -- ---------------------------------------------------------------
--- Salvage pickup weapons section (spec §5): loot crates / loose
--- items may roll weapon + ammo bundles — Sentry Kit weight ≈ 10 %.
--- The Grapple Lash appears on NO random table, ever (§10.1).
+-- Salvage pickup section (spec §5): loot crates / loose items roll
+-- weapon + ammo bundles — Sentry Kit weight ≈ 10 %. Spec §3 publishes
+-- pickup yields for ALL FOUR ammo kinds (bullets 40, shells 8, cells
+-- 15, rockets 4): "Ammo is the loot" (spec §1) — a crate table missing
+-- the rocket/cell/bullet caches left the mortar, the lance and the
+-- driver unresupplyable after the first magazine. The Grapple Lash
+-- appears on NO random table, ever (§10.1).
 -- ---------------------------------------------------------------
 if game_mode and game_mode.register_pickup_roll then
 	game_mode.register_pickup_roll(W.modname .. ":sentry_kit", 1, 0.45)
+	game_mode.register_pickup_roll(W.modname .. ":ammo_bullets", 1, 0.45)
 	game_mode.register_pickup_roll(W.modname .. ":ammo_shells", 4, 0.45)
+	game_mode.register_pickup_roll(W.modname .. ":ammo_cells", 1, 0.45)
+	game_mode.register_pickup_roll(W.modname .. ":ammo_rockets", 1, 0.45)
 end
 
 -- The Precision Fabricator is a workshop, and mapgen places no

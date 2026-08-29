@@ -572,8 +572,9 @@ check(vic4:get_hp() == 15, "pulse bolt deals 5")
 local jv = vic4:get_velocity()
 check(jv.z ~= 0 or jv.x ~= 0 or jv.y ~= 0, "pulse-juggle knockback nudges the target")
 
--- Dry fire: loud click + autoswitch to pistol (empty MAGAZINE —
--- the reserve is irrelevant until someone loads it)
+-- Dry fire: loud click, weapon STAYS in the hand (v1.3.9 removed the
+-- autoswitch: it stole the gun and announced "Switched to Pulsar
+-- Pistol" — the player reloads the weapon, they are not swapped out).
 W.get_pool("alpha").cells = 6
 alpha:get_inventory():add_item("main", ItemStack("sl_weapons:lance"))
 local dry_stack = ItemStack("sl_weapons:lance")
@@ -583,8 +584,8 @@ H.advance(0.35, 0.1)
 local sndd = #H.sounds
 minetest.registered_tools["sl_weapons:lance"].on_use(dry_stack, alpha, nil)
 check(sound_played("sl_weapons_dry_click", sndd), "dry click is loud")
-check(not alpha:get_inventory():contains_item("main", ItemStack("sl_weapons:lance")),
-	"empty lance autoswitches to pistol")
+check(alpha:get_inventory():contains_item("main", ItemStack("sl_weapons:lance")),
+	"dry fire keeps the weapon in hand (no autoswitch)")
 
 -- ================================================================
 section("PHASE W1e — magazines: every weapon eats ammo, blades wear")
@@ -634,6 +635,34 @@ check(W.get_pool("alpha").bullets == 40 - pdef.mag, "and pulls exactly the diffe
 local r_before = W.get_pool("alpha").bullets
 W.mag_load(alpha, pdef, pst)
 check(W.get_pool("alpha").bullets == r_before, "a full magazine loads nothing more")
+
+-- "No rockets for the Fusion Mortar" while there actually ARE rockets
+-- (the live complaint): reserve empty but a Rocket Cache in the
+-- inventory is unpacked into the reserve and the magazine loads from
+-- it. "No @1" may only be said when there are none anywhere the
+-- player can touch.
+local mdef2 = W.defs_by_item["sl_weapons:mortar"]
+W.get_pool("alpha").rockets = 0
+alpha:get_inventory():add_item("main", ItemStack("sl_weapons:ammo_rockets"))
+local mst2 = ItemStack("sl_weapons:mortar")
+W.mag_set(mst2, 0)
+W.mag_load(alpha, mdef2, mst2)
+check(W.mag_get(mst2) == 3,
+	"empty reserve + held Rocket Cache: the reload unpacks the cache and loads")
+check(W.get_pool("alpha").rockets == W.AMMO_YIELD.rockets - 3,
+	"cache yield minus the loaded magazine stays in reserve")
+check(not alpha:get_inventory():contains_item("main", ItemStack("sl_weapons:ammo_rockets")),
+	"the unpacked cache item is consumed")
+-- The refusal is honest now: no reserve, no cache -> "No rockets".
+W.get_pool("alpha").rockets = 0
+local chat0 = #(H.chat_player.alpha or {})
+local mst3 = ItemStack("sl_weapons:mortar")
+W.mag_set(mst3, 0)
+W.mag_load(alpha, mdef2, mst3)
+local last_chat = (H.chat_player.alpha or {})[#H.chat_player.alpha] or ""
+check(last_chat:find("No rockets") ~= nil,
+	"'No rockets for the Fusion Mortar' only when there are no rockets anywhere ('"
+	.. last_chat .. "')")
 
 -- RMB loads a non-zoom weapon straight from the reserve
 local sdef = W.defs_by_item["sl_weapons:scatter"]

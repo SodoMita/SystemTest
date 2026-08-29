@@ -194,7 +194,8 @@ local function ai_tick(bot, now)
 
 	-- Fire whatever is carried (raise/refire/cooldown gates decide).
 	-- Bots prefer any weapon whose ammo pool can still feed it; the
-	-- loadout pistol is the infinite fallback (dry guns autoswitch).
+	-- loadout pistol is the fallback when every primary is dry
+	-- (v1.3.9: no more autoswitch — dry guns stay in the hand).
 	local inv = bot.p:get_inventory()
 	local pool = W.peek_pool(bot.p:get_player_name())
 

@@ -90,7 +90,37 @@ function W.loaded_stack(itemname)
 	return st
 end
 
--- Pull rounds from the reserve pool into the weapon's magazine.
+-- Human labels for the cache items (spec §3 "trade bait").
+W.AMMO_LABEL = {
+	bullets = "Bullet Cache", shells = "Shell Cache",
+	cells = "Cell Cache", rockets = "Rocket Cache",
+}
+
+-- Consume ONE ammo cache item of `kind` from the player's main
+-- inventory into the reserve pool. Spec §5: "ammunition without guns
+-- is trade bait" — the bait is spendable, so a cache in the inventory
+-- IS reserve ammo, not decoration. Returns the rounds banked
+-- (0 = nothing to unpack).
+function W.consume_cache(user, kind)
+	if not user or not user.get_inventory then return 0 end
+	local name = user.get_player_name and user:get_player_name()
+	local inv = user:get_inventory()
+	if not name or not inv then return 0 end
+	local itemname = W.modname .. ":ammo_" .. kind
+	for i = 1, inv:get_size("main") do
+		local st = inv:get_stack("main", i)
+		if st:get_name() == itemname then
+			inv:set_stack("main", i, st:take_item())
+			return W.add_ammo(name, kind, W.AMMO_YIELD[kind] or 0)
+		end
+	end
+	return 0
+end
+
+-- Pull rounds from the reserve pool into the weapon's magazine. When
+-- the pool is empty, a cache item of that kind in the inventory is
+-- unpacked first (see W.consume_cache) — so "No @1 for the @2" can
+-- only be said when there are none anywhere the player can touch.
 function W.mag_load(user, def, stack)
 	local name = user and user.get_player_name and user:get_player_name() or nil
 	if not name or not def or not stack then return stack end
@@ -100,9 +130,14 @@ function W.mag_load(user, def, stack)
 	if room <= 0 then return stack end
 	local pool = W.get_pool(name)
 	local have = pool[def.pool] or 0
+	local from_cache = 0
 	if have < 1 then
-		minetest.chat_send_player(name, S("No @1 for the @2.", def.pool, def.desc))
-		return stack
+		from_cache = W.consume_cache(user, def.pool)
+		have = pool[def.pool] or 0
+		if have < 1 then
+			minetest.chat_send_player(name, S("No @1 for the @2.", def.pool, def.desc))
+			return stack
+		end
 	end
 	local take = math.min(room, have)
 	pool[def.pool] = have - take
@@ -110,7 +145,13 @@ function W.mag_load(user, def, stack)
 	minetest.sound_play("sl_weapons_ammo_load", {
 		to_player = name, gain = 0.5,
 	}, true)
-	minetest.chat_send_player(name, string.format("%s %d/%d", def.desc, cur + take, cap))
+	if from_cache > 0 then
+		minetest.chat_send_player(name,
+			S("Unpacked a @1.", W.AMMO_LABEL[def.pool] or def.pool) .. " "
+			.. string.format("%s %d/%d", def.desc, cur + take, cap))
+	else
+		minetest.chat_send_player(name, string.format("%s %d/%d", def.desc, cur + take, cap))
+	end
 	return stack
 end
 
@@ -174,7 +215,7 @@ end
 -- ----------------------------------------------------------------
 W.next_fire = {}   -- [name] = earliest next shot
 W.raise_at = {}    -- [name] = raise delay gate
-W.busy_until = {}  -- [name] = cylinder spin / autoswitch pause
+W.busy_until = {}  -- [name] = cylinder spin pause (Neon Six)
 W.last_weapon = {} -- [name] = last wielded weapon id (switch detection)
 
 -- Returns ok, reason ("raising" | "refire" | "busy").

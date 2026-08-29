@@ -697,6 +697,33 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.3.9 (2026-08-29, dry fire keeps the gun, "No rockets" becomes
+  true)** — two live complaints, one pass. (1) **The dry-fire
+  autoswitch is gone**: a dry click used to rip the weapon out of the
+  player's hand, park the most-loaded pistol (or a brand-new EMPTY
+  pistol) in its slot, and announce "Switched to Pulsar Pistol." —
+  while the player was trying to *reload*, not be disarmed. The dry
+  click now just does its job: loud click, "Dry. Load it.", weapon
+  stays in the hand. `W.autoswitch_pistol` is removed from the tree.
+  (2) **"No rockets for the Fusion Mortar" while there actually are
+  rockets**: `W.mag_load` only looked at the reserve pool — the
+  player's rockets could be sitting in the inventory as a Rocket
+  Cache (corpse loot, trade, crate) and the reload still refused. New
+  `W.consume_cache`: an empty-reserve reload unpacks one matching
+  cache item from the inventory into the pool first, so the refusal
+  can only be spoken when there are none anywhere the player can
+  touch. Root cause of the empty pool itself: the crate pickup table
+  registered only the shell cache, although spec §3 publishes pickup
+  yields for all four kinds (bullets 40, shells 8, cells 15, rockets
+  4) and spec §1 says "Ammo is the loot" — the mortar, the lance and
+  the driver were unresupplyable after the first magazine. All four
+  cache kinds now ride the random table (Sentry Kit weight ≈ 10 %
+  unchanged). W1c/W1e updated: the dry-fire check asserts the weapon
+  stays in hand, and new cache-fallback checks prove the reload
+  works from a held Rocket Cache and that the refusal is spoken only
+  when there are genuinely no rockets anywhere. Suites: weapons
+  304/304, smoke 127/127.
+
 - **v1.3.8 (2026-08-29, the nil-puncher segfault — audit of the
   13:05:43 crash)** — third crash on the same log line
   ("zzt uses sl_weapons:mortar, pointing at [node under=6,0,0
