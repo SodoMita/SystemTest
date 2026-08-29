@@ -18,39 +18,74 @@ end
 -- Tab button strip (reusable by the outfit menu too)
 -- Now 5 tabs: crafting, abilities, achievements, system, comms
 -- System tab exposes majority of sl_ commands, Comms tab for DM
-function gui_get_tab_buttons(current_tab, show_label)
+local TAB_W, TAB_PITCH = 0.75, 0.8
+
+function gui_get_tab_buttons(current_tab, show_label, x0, y0)
+    -- The defaults reproduce the original top-right placement used by the
+    -- outfit menu. The unified inventory passes its own origin because it
+    -- reserves a header band for the tabs and the character preview.
+    x0 = x0 or 7.1
+    y0 = y0 or 0.3
+
     local tabs = {
-        {id = "crafting",     icon_img = "gui_tab_crafting.png",     label = "Crafting",     x = 7.1},
-        {id = "abilities",    icon_img = "gui_tab_abilities.png",    label = "Abilities",    x = 7.9},
-        {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements", x = 8.7},
-        {id = "system",       icon_img = "gui_tab_player_info.png",  label = "System",       x = 9.5},
-        {id = "comms",        icon_img = "gui_tab_crafting.png",     label = "Comms",        x = 10.3},
+        {id = "crafting",     icon_img = "gui_tab_crafting.png",     label = "Crafting"},
+        {id = "abilities",    icon_img = "gui_tab_abilities.png",    label = "Abilities"},
+        {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements"},
+        {id = "system",       icon_img = "gui_tab_player_info.png",  label = "System"},
+        {id = "comms",        icon_img = "gui_tab_crafting.png",     label = "Comms"},
     }
 
     local formspec = {}
 
-    if show_label ~= false and current_tab ~= "crafting" then
+    if show_label ~= false then
         for _, tab in ipairs(tabs) do
             if tab.id == current_tab then
-                table.insert(formspec, string.format("label[0.3,1.5;> %s]", tab.label))
+                table.insert(formspec, string.format("label[%g,%g;> %s]",
+                    x0, y0 + TAB_W + 0.2, tab.label))
                 break
             end
         end
     end
 
-    for _, tab in ipairs(tabs) do
+    for i, tab in ipairs(tabs) do
+        local x = x0 + (i - 1) * TAB_PITCH
         if tab.id == current_tab then
-            table.insert(formspec, string.format("box[%f,0.3;0.75,0.75;#5a9a5aff]", tab.x))
-            table.insert(formspec, string.format("box[%f,0.3;0.75,0.75;#7aca7a55]", tab.x))
+            table.insert(formspec, string.format("box[%g,%g;%g,%g;#5a9a5aff]", x, y0, TAB_W, TAB_W))
+            table.insert(formspec, string.format("box[%g,%g;%g,%g;#7aca7a55]", x, y0, TAB_W, TAB_W))
         else
-            table.insert(formspec, string.format("box[%f,0.3;0.75,0.75;#3a3a3aff]", tab.x))
+            table.insert(formspec, string.format("box[%g,%g;%g,%g;#3a3a3aff]", x, y0, TAB_W, TAB_W))
         end
         table.insert(formspec, string.format(
-            "image_button[%f,0.3;0.75,0.75;%s;tab_%s;]",
-            tab.x, tab.icon_img, tab.id))
+            "image_button[%g,%g;%g,%g;%s;tab_%s;]",
+            x, y0, TAB_W, TAB_W, tab.icon_img, tab.id))
     end
 
     return table.concat(formspec, "")
+end
+
+-- Build the `model[]` element that shows the player character.
+--
+-- The documented layout of this element ends with the animation frame loop
+-- range and then the animation speed, and has done so since at least 5.4 --
+-- every release this game can run on. The formspecs here were written for the
+-- older `initial rotation X,Y,Z` form, so they passed `0,0` where the engine
+-- reads a frame loop range: that pins the mesh to a single animation frame
+-- instead of the documented default of "the full range of all available
+-- frames". Leave the frame loop empty and give the element a real speed.
+function gui_character_model_element(name, x, y, w, h)
+    local model_name = "character.b3d"
+    local texture = "character.png"
+    if sl_characters and sl_characters.default_model then
+        model_name = sl_characters.default_model
+        texture = sl_characters.default_texture or "sl_boxman_neon.png"
+    end
+
+    -- One texture per mesh buffer, the same way player_api dresses the model.
+    local textures = {}
+    for _ = 1, 8 do textures[#textures + 1] = texture end
+
+    return string.format("model[%g,%g;%g,%g;%s;%s;%s;0,20;true;false;;30]",
+        x, y, w, h, name, model_name, table.concat(textures, ","))
 end
 
 -- Strip the header (formspec_version, size, bgcolor) from a full
@@ -64,31 +99,46 @@ local function strip_formspec_header(fs)
     return stripped
 end
 
+-- The per-tab formspecs are laid out for this height.
+local CONTENT_H = 11.8
+-- Header band reserved above them. The tab strip and the character preview
+-- used to share a single 0.9-unit strip at the top, so the tabs were painted
+-- straight over the preview and hid the character. Giving the band real
+-- height means both fit side by side without moving any tab's own layout.
+local HEADER_H = 1.8
+local PREVIEW_X, PREVIEW_Y, PREVIEW_SIZE = 0.2, 0.1, 1.6
+local PREVIEW_PAD = 0.1
+
 -- Build the full unified inventory formspec
 function get_unified_inventory(player)
     local current_tab = get_current_tab(player)
-    local model_name = "character.b3d"
-    local tex_str = "character.png,character.png,character.png,character.png,character.png,character.png,character.png,character.png"
-    
-    if sl_characters and sl_characters.default_model then
-        model_name = sl_characters.default_model
-        local tex = sl_characters.default_texture or "sl_boxman_neon.png"
-        tex_str = string.format("%s,%s,%s,%s,%s,%s,%s,%s", tex, tex, tex, tex, tex, tex, tex, tex)
-    end
+
+    local inner_x = PREVIEW_X + PREVIEW_PAD
+    local inner_y = PREVIEW_Y + PREVIEW_PAD
+    local inner_size = PREVIEW_SIZE - 2 * PREVIEW_PAD
 
     local formspec = {
         "formspec_version[4]",
-        "size[12,11.8]",
+        string.format("size[12,%g]", CONTENT_H + HEADER_H),
         "bgcolor[#1a1a1aff;true]",
-        
+
         -- 3D Player preview (always visible to reach Information/Outfit menu)
-        "box[7.8,0.2;1.5,1.5;#2a2a2aff]",
-        string.format("model[7.9,0.3;1.3,1.3;player_preview;%s;%s;0,170;false;true;0,0]",
-            model_name, tex_str),
-        "image_button[7.9,0.3;1.3,1.3;;open_outfit;]",
+        string.format("box[%g,%g;%g,%g;#2a2a2aff]",
+            PREVIEW_X, PREVIEW_Y, PREVIEW_SIZE, PREVIEW_SIZE),
+        gui_character_model_element("player_preview", inner_x, inner_y, inner_size, inner_size),
+        -- Click target over the preview. border=false means the engine draws
+        -- no button pane, so the mesh behind it stays visible; the element
+        -- still receives the click that opens the outfit / player info menu.
+        "style[open_outfit;border=false;bgcolor=#00000000]",
+        string.format("image_button[%g,%g;%g,%g;;open_outfit;]",
+            inner_x, inner_y, inner_size, inner_size),
     }
 
-    table.insert(formspec, gui_get_tab_buttons(current_tab))
+    table.insert(formspec, gui_get_tab_buttons(current_tab, true, 2.1, 0.5))
+    table.insert(formspec, "label[6.4,0.75;SYSTEM LOOTING]")
+
+    -- Shift the tab's own layout below the header band instead of overlapping it.
+    table.insert(formspec, string.format("container[0,%g]", HEADER_H))
 
     if current_tab == "crafting" then
         if get_crafting_formspec then
@@ -137,6 +187,8 @@ function get_unified_inventory(player)
             table.insert(formspec, "label[0.4,1.3;Comms tab loading... install system_tab.lua]")
         end
     end
+
+    table.insert(formspec, "container_end[]")
 
     return table.concat(formspec, "")
 end
