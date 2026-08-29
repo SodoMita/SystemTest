@@ -124,3 +124,71 @@ highly packed set. Run `python3 generate_sounds.py` to reproduce it byte-for-byt
   are crossfade-loopable with zero seam click.
 - Deterministic: running the script twice produces byte-identical files (seeded per
   file/variant, fixed Ogg serial numbers and CRCs).
+
+---
+
+# Neon Node Texture Pass (2026-08-29)
+
+The previous 16×16 pass flattened nearly every surface to white/grey noise with
+glow blobs. This pass replaces the **node** textures with bold, saturated pixel
+art (deep charcoal base + one vivid accent per object) and reverts the **entity**
+textures to their previous versions. Ground neon tiles and `mods/default` stock
+textures remain untouched.
+
+## Clouds — three types (`mods/sl_blocks/sky/`)
+
+- **`sky:cloud`** — *foliage cloud*: plant-like green leaf-clump texture
+  (`cloud.png`, clip alpha, breakable `choppy=3`, leaf sounds). Aliases
+  `cloud` / `default:cloud` preserved.
+- **`sky:cloud_solid`** — *solid cloud*: opaque, **seamless** (tileable) cloud
+  texture, **walkable**, **unbreakable** arena structure.
+- **`sky:cloud_water`** — *cloud water*: transparent white liquid
+  (`liquidtype = "source"`, blend alpha). **Swimmable** (liquid physics +
+  `liquid_damping`) but **static** — no `liquid_alternative_flowing`, so it
+  never flows or spreads. White-tinted haze, obviously not water.
+- **Ambient particles**: a nearby-player-gated ABM emits drifting leaf specks
+  (`cloud_leaf_particle.png`) around foliage clouds and slow-rising dust motes
+  (`cloud_particle.png`) around solid clouds.
+
+## Node textures (all 16×16 RGBA, hard-edge pixel art)
+
+Design language: deep black/charcoal surfaces, one bold saturated accent per
+object, real-world functional colors for symbols — "neon against deep black".
+
+- **`mods/content/workshops/textures/`** (50 files, regenerated):
+  wood-top workbench, cyan-grid assembly table, blue blueprint drawer,
+  yellow/black **caution tape**, green flask chemical station, cyan-screen
+  control panel, blue-steel cabinets/lockers/desks, galvanized pipes with cyan
+  flanges, steel anvil, LED-lit server rack, orange/cyan tool rack, vent grate,
+  windows (cyan glass, cracked variant).
+- **Warning signs now show real-world symbols** (yellow field, black symbol):
+  - `warning_sign_hazard.png` — warning triangle with exclamation mark
+  - `warning_sign_radiation.png` — radiation trefoil + outer ring
+  - `warning_sign_biohazard.png` — interlocking biohazard circles + center ring
+  - `warning_sign_back.png` — charcoal plate, steel frame, corner bolts
+- **`mods/game/sl_modebase/textures/`** (regenerated where they are node faces):
+  orange loot crate, red-eye monster spawner, cyan objective core (+icon),
+  yellow power cell with white **lightning bolt**, blue-band blast shield,
+  orange-striped barricade, green-antenna signal relay, magenta-lens sensor
+  array, `sl_warning_sign.png` (the 384×512 AI image replaced by a 16×16
+  hazard triangle), and **new beacon textures** `sl_beacon_a.png` (team-red
+  core), `sl_beacon_b.png` (team-blue core), `sl_beacon_destroyed.png` (charred
+  with dim embers) — now referenced by `beacon_a` / `beacon_b` /
+  `destroyed_beacon` in `nodes.lua` (previously upstream mese/steel/obsidian).
+- **`mods/content/sl_mvp_assets/textures/`** node faces: green-screen
+  terminal, red-striped door, yellow-safety-edge platform, amber pickup cube.
+- **`mods/content/sl_scary/textures/`** `hide_spot_*`: dark panels with a
+  faint red glow slit.
+
+## Entity textures — reverted
+
+Per owner decision, entity textures were **restored to their previous
+(pre-neon-pass) versions** rather than regenerated:
+
+- `sl_boxman_neon.png` restored to the 2×2 placeholder that all branches
+  before the 16×16 pass used (the 16×16 replacement sampled a 3-pixel UV
+  strip on the boxman GLB and stretched it over every body part).
+- `monster_texture.png`, `player_texture.png`, the scary mob sprite strips,
+  `sl_scary_signal_wraith.png`, `scary_mob_texture.png` — verified
+  byte-identical to the previous state (they were never changed by the neon
+  pass).
