@@ -252,9 +252,18 @@ services:
    dustlabs WebSocket proxies (`wss://luanti.dustlabs.io/proxy` and regional
    ones, selectable in the launcher). Players enter your server address in the
    *Join Server* dialog; the proxy bridges to your TCP port. For full control
-   you can host your own proxy:
-   [paradust7/webshims](https://github.com/paradust7/webshims) (its
-   `proxy.js`), then point the client at it.
+   you can host your own proxy — this repo ships one at
+   `tools/server/websocket_proxy.js` (a ~60-line Node server implementing the
+   webshims emsocket protocol: `PROXY IPV4 TCP|UDP <ip> <port>` →
+   `PROXY OK`, then raw binary relay):
+
+   ```bash
+   npm install ws            # in tools/server/
+   node tools/server/websocket_proxy.js   # listens on 0.0.0.0:8081
+   ```
+
+   Then point the client at it: patch `this.proxyUrl` in the web build's
+   `launcher.js` (or add an entry to the proxy dropdown in `index.html`).
 
 ## 8. Admin operations
 
