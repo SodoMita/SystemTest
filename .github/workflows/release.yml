@@ -304,12 +304,17 @@ jobs:
           # build_fsroot.sh during build_all.sh). After mutating fsroot the
           # tarball MUST be regenerated or the packs keep the OLD fsroot
           # (minetest_game in, SystemTest out) — that bug shipped once.
+          # Pack format: UNCOMPRESSED tar. The CI-built wasm's libarchive
+          # rejects zstd at runtime ("emloop_install_pack failed: zstd not
+          # supported") despite --with-zstd builds — an upstream wasm
+          # toolchain integration issue. libarchive's raw-tar reader is
+          # unconditional, so base.pack ships as plain tar (filename keeps
+          # the .zst suffix build_www.sh expects; detection is by content).
           (cd build/fsroot && tar cf ../fsroot.tar .)
           rm -f build/fsroot.tar.zst
-          zstd -q --ultra -22 -T0 build/fsroot.tar -o build/fsroot.tar.zst
-          rm -f build/fsroot.tar
+          mv build/fsroot.tar build/fsroot.tar.zst
           # Assert the virtual FS actually contains the product.
-          zstd -dc build/fsroot.tar.zst | tar tf - > /tmp/fsroot_list.txt
+          tar tf build/fsroot.tar.zst > /tmp/fsroot_list.txt
           grep -q "games/SystemTest/game.conf" /tmp/fsroot_list.txt || { echo "SystemTest missing from fsroot pack"; exit 1; }
           grep -q "games/minetest_game/" /tmp/fsroot_list.txt && { echo "minetest_game still in fsroot pack"; exit 1; }
           echo "fsroot pack verified: SystemTest in, minetest_game out"
