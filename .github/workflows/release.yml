@@ -305,7 +305,7 @@ jobs:
           # Bump deliberately, never float.
           git init -q "$RUNNER_TEMP/luanti-wasm"
           cd "$RUNNER_TEMP/luanti-wasm"
-          git fetch -q --depth 1 https://github.com/paradust7/luanti-wasm 51c2d4ee
+          git fetch -q --depth 1 https://github.com/paradust7/luanti-wasm 51c2d4ee2a3af7b35bbde1fd82794f26c8a4cd45
           git checkout -q FETCH_HEAD
           # Pre-seed sources, then patch the pack installer: upstream
           # src/mainloop.cpp hard-aborts pack installation when libarchive
