@@ -1,0 +1,11 @@
+# docker compose up -d   →  full public server (native + web play)
+services:
+  systemloot:
+    build: .
+    ports:
+      - "30000:30000/udp"     # native Luanti clients (the game protocol)
+      - "30000:30000/tcp"     # server-list ping
+      - "8080:8080"           # web client + WebSocket proxy
+    restart: unless-stopped
+    environment:
+      - PORT=8080
