@@ -67,6 +67,25 @@ Verify the whole chain from any machine (no browser needed):
   * `FULL CHAIN OK`  -> browser multiplayer will work
   * `SERVER SILENT`  -> server/firewall problem (see runbook below)
 
+### playit.gg finding (2026-08-29)
+
+The project endpoint (147.185.221.230:6323) is a playit.gg tunnel. Desktop
+clients connect fine, but the web relay path fails. Measured from the
+e2e harness:
+
+* proxy handshake succeeds (`PROXY OK`) on both dustlabs relays
+* every relayed probe after handshake is dropped — **including against a
+  known-healthy control server** (51.195.90.45:40001, 36 clients) when
+  probed from datacenter IPs — the relays appear to filter datacenter
+  sources, so sandbox-side verdicts about the final leg are inconclusive
+
+**Recommendation: skip playit entirely.** The server host is a VPS with a
+public IP — playit exists for NATed machines and only adds a second relay
+(which may itself filter relay-to-relay traffic). Run the server directly
+on the public IP and open the UDP port in the provider firewall. Then the
+browser path is: browser -> dustlabs relay -> your server (one relay,
+the standard path public servers use).
+
 ### Server runbook (VPS)
 
     # 1. Get the bundle (itch linux channel) and extract

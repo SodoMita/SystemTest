@@ -51,9 +51,25 @@ def main() -> int:
 
     t0 = time.time()
     try:
-        with wsclient.connect(proxy_url, open_timeout=10) as conn:
+        headers = {
+            "Origin": "https://sodomita.github.io",
+            "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                           "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
+        }
+        with wsclient.connect(proxy_url, open_timeout=10, additional_headers=headers) as conn:
             print(f"PROXY reachable ({(time.time()-t0)*1000:.0f} ms)")
-            conn.send(encapsulate(server_ip, server_port, peer_init))
+            # Handshake REQUIRED before the proxy relays anything:
+            # text request 'PROXY IPV4 UDP <ip> <port>', expect 'PROXY OK'.
+            conn.send(f"PROXY IPV4 UDP {server_ip} {server_port}")
+            hs = conn.recv(timeout=10)
+            hs_text = hs.decode(errors="replace") if isinstance(hs, (bytes, bytearray)) else str(hs)
+            print(f"handshake: {hs_text.strip()!r}")
+            if "PROXY OK" not in hs_text:
+                print(f"VERDICT: PROXY REFUSED RELAY ({hs_text.strip()!r})")
+                return 2
+            # PROXY mode relays RAW payloads (the 12-byte EP_MAGIC header is
+            # VPN-mode only) — send the bare Luanti peer-init.
+            conn.send(peer_init)
             # Luanti clients retry peer-init a few times; mimic that.
             deadline = time.time() + 12
             attempts = 0
@@ -63,21 +79,17 @@ def main() -> int:
                 except TimeoutError:
                     attempts += 1
                     if attempts < 4:
-                        conn.send(encapsulate(server_ip, server_port, peer_init))
+                        conn.send(peer_init)
                     continue
-                if isinstance(msg, (bytes, bytearray)) and len(msg) >= 12:
-                    magic, src_ip_raw, src_port, pktlen = struct.unpack(">I4sHH", msg[:12])
-                    if magic == EP_MAGIC:
-                        src_ip = socket.inet_ntoa(src_ip_raw)
-                        payload = msg[12:]
-                        print(f"SERVER REPLIED via proxy: {src_ip}:{src_port} "
-                              f"({len(payload)} bytes, first bytes {payload[:12].hex()})")
-                        if payload[:4] == struct.pack(">I", LUANTI_PROTOCOL_ID):
-                            print("VERDICT: FULL CHAIN OK — browser web multiplayer WILL work "
-                                  f"against {server_ip}:{server_port}")
-                            return 0
-                        print("VERDICT: reply received but not Luanti protocol — check server type")
-                        return 1
+                if isinstance(msg, (bytes, bytearray)) and len(msg) >= 8:
+                    print(f"SERVER REPLIED via proxy: {len(msg)} bytes, "
+                          f"first bytes {msg[:12].hex()}")
+                    if msg[:4] == struct.pack(">I", LUANTI_PROTOCOL_ID):
+                        print("VERDICT: FULL CHAIN OK — browser web multiplayer WILL work "
+                              f"against {server_ip}:{server_port}")
+                        return 0
+                    print("VERDICT: reply received but not Luanti protocol — check server type")
+                    return 1
     except Exception as e:
         print(f"VERDICT: PROXY UNREACHABLE/CHANNEL ERROR ({e})")
         return 2
