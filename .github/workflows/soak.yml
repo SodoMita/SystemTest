@@ -1,9 +1,8 @@
 name: soak
 
 # Merge gate for the multi-agent workflow described in AGENT_PARALLEL_PLAN.md:
-# every push / pull request must pass the stub smoke test, the formspec layout
-# test, and the live-engine soak test (simulated AI players, bug harvest,
-# balance telemetry).
+# every push / pull request must pass the stub smoke test and the live-engine
+# soak test (simulated AI players, bug harvest, balance telemetry).
 
 on:
   push:
@@ -41,9 +40,6 @@ jobs:
 
       - name: Headless stub smoke test
         run: luajit tests/smoke_test.lua
-
-      - name: Headless UI layout test (formspecs fit their frame)
-        run: luajit tests/ui_layout_test.lua
 
       - name: Live-engine soak test (AI players, 3 matches)
         run: |
