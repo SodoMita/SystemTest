@@ -317,6 +317,9 @@ jobs:
           # This game is the product: drop the bundled minetest_game so the
           # client ships SystemTest only (owner directive).
           rm -rf build/fsroot/luanti/games/minetest_game
+          # Menu default: without this the engine menu pre-selects the
+          # stock 'minetest_game' label even though only SystemTest ships.
+          echo "default_game = SystemTest" >> build/fsroot/luanti/cache/common.conf
           # CRITICAL: base.pack IS build/fsroot.tar.zst (built by
           # build_fsroot.sh during build_all.sh). After mutating fsroot the
           # tarball MUST be regenerated or the packs keep the OLD fsroot
@@ -336,7 +339,17 @@ jobs:
           grep -q "games/minetest_game/" /tmp/fsroot_list.txt && { echo "minetest_game still in fsroot pack"; exit 1; }
           echo "fsroot pack verified: SystemTest in, minetest_game out"
           ./build_www.sh
-          ls -la www/
+          # The launcher pushes gameid into its pack list and fetches
+          # packs/<gameid>.pack (404 -> the worker's alert()-based error
+          # path threw 'alert is not defined'). Ship the game as its own
+          # pack too (same tar-root as base.pack; extraction is idempotent).
+          PACKDIR=$(find www -maxdepth 2 -type d -name packs | head -1)
+          [ -n "$PACKDIR" ] || { echo "packs dir not found in www"; exit 1; }
+          PACKROOT=$(mktemp -d)
+          mkdir -p "$PACKROOT/luanti/games"
+          cp -a build/fsroot/luanti/games/SystemTest "$PACKROOT/luanti/games/"
+          (cd "$PACKROOT" && tar cf "$OLDPWD/$PACKDIR/SystemTest.pack" .)
+          ls -la "$PACKDIR"
       - name: Default the client to SystemTest + add cross-origin isolation
         run: |
           set -e
