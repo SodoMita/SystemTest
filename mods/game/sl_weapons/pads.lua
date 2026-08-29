@@ -161,7 +161,9 @@ local function try_dispense(player, pos, entry)
 	if entry.kind == "weapon" then
 		local itemname = W.modname .. ":" .. W.weapons[entry.item].item
 		if inv:contains_item("main", itemname) then return end -- no dupe hoarding
-		inv:add_item("main", ItemStack(itemname))
+		-- Weapons come off the pad loaded (v1.3).
+		inv:add_item("main", W.defs_by_item[itemname]
+			and W.loaded_stack(itemname) or ItemStack(itemname))
 	elseif entry.kind == "ammo" then
 		local added = W.add_ammo(name, entry.item, W.AMMO_YIELD[entry.item])
 		if added <= 0 then return end -- full pools leave the pad armed

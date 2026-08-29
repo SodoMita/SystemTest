@@ -248,11 +248,11 @@ minetest.register_globalstep(function(dtime)
 			local recipe = W.FAB_RECIPES[job.recipe]
 			local player = minetest.get_player_by_name(job.user)
 			if player then
-				player:get_inventory():add_item("main", ItemStack(recipe.item .. " 1"))
+				player:get_inventory():add_item("main", W.loaded_stack(recipe.item))
 				minetest.chat_send_player(job.user,
 					S("Fabrication complete: @1", recipe.label))
 			else
-				minetest.add_item(job.pos, ItemStack(recipe.item .. " 1"))
+				minetest.add_item(job.pos, W.loaded_stack(recipe.item))
 			end
 			minetest.sound_play("sl_weapons_fab_done", {
 				pos = job.pos, gain = 0.8, max_hear_distance = 16,

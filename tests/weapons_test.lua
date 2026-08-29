@@ -80,7 +80,15 @@ end
 local function fire(itemname, player)
 	local def = minetest.registered_tools[itemname]
 	if not def then return nil, "no such tool" end
-	return def.on_use(ItemStack(itemname), player, nil)
+	-- Emulates a player wielding a LOADED weapon (v1.3): fresh stacks
+	-- carry no magazine. Dedicated magazine tests use raw stacks.
+	local st = ItemStack(itemname)
+	local ww = sl_weapons -- global: the helper runs before `local W` exists
+	local wdef = ww and ww.defs_by_item[itemname]
+	if wdef and wdef.pool and wdef.mag then
+		ww.mag_set(st, wdef.mag)
+	end
+	return def.on_use(st, player, nil)
 end
 
 -- A quiet open-space arena far above everything.
@@ -275,11 +283,15 @@ local bullets = W.get_pool("alpha").bullets
 fire("sl_weapons:chatter", alpha)
 check(W.get_pool("alpha").bullets == bullets, "switch-raise blocked the shot")
 H.advance(0.35, 0.1)
+local chat_stack = ItemStack("sl_weapons:chatter")
+W.mag_set(chat_stack, W.defs_by_item["sl_weapons:chatter"].mag)
 for _ = 1, 4 do
-	fire("sl_weapons:chatter", alpha)
+	minetest.registered_tools["sl_weapons:chatter"].on_use(chat_stack, alpha, nil)
 	H.advance(0.1, 0.05)
 end
-check(W.get_pool("alpha").bullets == bullets - 4, "chatter drains 1 bullet/shot")
+check(W.mag_get(chat_stack) == W.defs_by_item["sl_weapons:chatter"].mag - 4,
+	"chatter burns 4 rounds out of its magazine")
+check(W.get_pool("alpha").bullets == bullets, "firing alone never touches the reserve")
 check(W.bloom_current("alpha") > W.BLOOM_MIN, "bloom grows along a held burst")
 H.advance(0.7, 0.1)
 check(W.bloom_current("alpha") == W.BLOOM_MIN, "bloom resets after 0.6 s idle")
@@ -292,8 +304,12 @@ fire("sl_weapons:scatter", alpha) -- draw attempt
 H.advance(0.95, 0.1)
 vic:set_hp(20)
 local sh_before = W.get_pool("alpha").shells
-fire("sl_weapons:scatter", alpha)
-check(W.get_pool("alpha").shells == sh_before - 1, "scatter consumes a shell")
+local sc_stack = ItemStack("sl_weapons:scatter")
+W.mag_set(sc_stack, W.defs_by_item["sl_weapons:scatter"].mag)
+minetest.registered_tools["sl_weapons:scatter"].on_use(sc_stack, alpha, nil)
+check(W.mag_get(sc_stack) == W.defs_by_item["sl_weapons:scatter"].mag - 1,
+	"scatter consumes one shell from its magazine")
+check(W.get_pool("alpha").shells == sh_before, "the reserve waits for a load")
 local scatter_dmg = 20 - vic:get_hp()
 check(scatter_dmg >= 4 and scatter_dmg <= 12,
 	"scatter pellets deal partial-to-full 12 (got " .. tostring(scatter_dmg) .. ")")
@@ -307,7 +323,7 @@ H.advance(0.95, 0.1)
 vic:set_hp(20)
 fire("sl_weapons:lance", alpha)
 check(vic:get_hp() == 2, "lance leaves the victim at 2 HP (18 dmg)")
-check(W.get_pool("alpha").cells == 8, "lance costs 2 cells")
+check(W.get_pool("alpha").cells == 10, "lance burns its magazine, not the reserve (1 cell-round/shot)")
 
 -- Zoom toggle exists (no engine fov in stub; flag only)
 minetest.registered_tools["sl_weapons:lance"].on_place(ItemStack("sl_weapons:lance"), alpha, nil)
@@ -372,7 +388,12 @@ fire("sl_weapons:mortar", alpha) -- draw attempt
 H.advance(0.95, 0.1)
 fire("sl_weapons:mortar", alpha) -- the real shot, sprint carried
 check(#H.entity_spawns == es0 + 1, "mortar projectile spawned")
-check(W.get_pool("alpha").rockets == rockets_before - 1, "mortar costs a rocket")
+local mst = ItemStack("sl_weapons:mortar")
+W.mag_set(mst, 0)
+W.get_pool("alpha").rockets = 5
+W.mag_load(alpha, W.defs_by_item["sl_weapons:mortar"], mst)
+check(W.mag_get(mst) == 3 and W.get_pool("alpha").rockets == 2,
+	"loading fills the 3-rocket magazine from the reserve")
 local mortar_obj = nil
 for _, lua in pairs(H.luaentities) do
 	if lua.name == "sl_weapons:mortar" then mortar_obj = lua.object break end
@@ -440,16 +461,120 @@ check(vic4:get_hp() == 15, "pulse bolt deals 5")
 local jv = vic4:get_player_velocity()
 check(jv.z ~= 0 or jv.x ~= 0 or jv.y ~= 0, "pulse-juggle knockback nudges the target")
 
--- Dry fire: loud click + autoswitch to pistol
-W.get_pool("alpha").cells = 0
+-- Dry fire: loud click + autoswitch to pistol (empty MAGAZINE —
+-- the reserve is irrelevant until someone loads it)
+W.get_pool("alpha").cells = 6
 alpha:get_inventory():add_item("main", ItemStack("sl_weapons:lance"))
-fire("sl_weapons:lance", alpha) -- draw attempt (raises)
+local dry_stack = ItemStack("sl_weapons:lance") -- magazine: 0
+minetest.registered_tools["sl_weapons:lance"].on_use(dry_stack, alpha, nil) -- raise
 H.advance(0.35, 0.1)
 local sndd = #H.sounds
-fire("sl_weapons:lance", alpha)
+minetest.registered_tools["sl_weapons:lance"].on_use(dry_stack, alpha, nil)
 check(sound_played("sl_weapons_dry_click", sndd), "dry click is loud")
 check(not alpha:get_inventory():contains_item("main", ItemStack("sl_weapons:lance")),
 	"empty lance autoswitches to pistol")
+
+-- ================================================================
+section("PHASE W1e — magazines: every weapon eats ammo, blades wear")
+-- ================================================================
+
+-- No free rides: every weapon declares a pool AND a magazine
+local offenders = {}
+for iname, def in pairs(W.defs_by_item) do
+	if not def.pool or not def.mag then
+		table.insert(offenders, iname)
+	end
+end
+check(#offenders == 0, "every weapon declares ammo + magazine (offenders: "
+	.. table.concat(offenders, ",") .. ")")
+
+-- The pistol's magazine cycle: fire, empty, dry, load, fire again
+H.advance(2.0, 0.5) -- lance refire window (player-keyed) + switch raise
+aim_at(alpha, { x = 0, y = 61, z = 40 }) -- empty air: nobody on the line
+local pdef = W.defs_by_item["sl_weapons:pistol"]
+local pst = ItemStack("sl_weapons:pistol")
+W.mag_set(pst, pdef.mag)
+W.get_pool("alpha").bullets = 0 -- no reserve: the magazine is all there is
+local pfire1 = #H.sounds
+minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil) -- raise
+H.advance(0.4, 0.1)
+minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil) -- fires
+check(sound_played("sl_weapons_pistol_fire", pfire1), "loaded pistol fires")
+H.advance(0.4, 0.1)
+minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil) -- fires
+check(W.mag_get(pst) == pdef.mag - 2, "each shot burns one magazine round")
+for _ = 1, pdef.mag do
+	minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil)
+	H.advance(0.4, 0.1)
+end
+check(W.mag_get(pst) == 0, "the magazine empties")
+local pdry = #H.sounds
+minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil)
+check(sound_played("sl_weapons_dry_click", pdry), "empty magazine dry-clicks (no free pistol)")
+W.get_pool("alpha").bullets = 40
+pst = W.mag_load(alpha, pdef, pst)
+check(W.mag_get(pst) == pdef.mag, "loading fills the pistol to capacity")
+check(W.get_pool("alpha").bullets == 40 - pdef.mag, "and pulls exactly the difference from the reserve")
+local r_before = W.get_pool("alpha").bullets
+W.mag_load(alpha, pdef, pst)
+check(W.get_pool("alpha").bullets == r_before, "a full magazine loads nothing more")
+
+-- RMB loads a non-zoom weapon straight from the reserve
+local sdef = W.defs_by_item["sl_weapons:scatter"]
+local sst = ItemStack("sl_weapons:scatter")
+W.mag_set(sst, 0)
+W.get_pool("alpha").shells = 8
+sst = minetest.registered_tools["sl_weapons:scatter"].on_place(sst, alpha, nil)
+check(W.mag_get(sst) == sdef.mag, "right-click loads the scatter")
+check(W.get_pool("alpha").shells == 8 - sdef.mag, "shells pulled from the reserve")
+
+-- A cache use while holding a matching weapon tops up both
+local ldef = W.defs_by_item["sl_weapons:lance"]
+local lw = ItemStack("sl_weapons:lance")
+W.mag_set(lw, 0)
+alpha:set_wielded_item(lw)
+W.get_pool("alpha").cells = 10
+local cache = minetest.registered_items["sl_weapons:ammo_cells"]
+cache.on_use(ItemStack("sl_weapons:ammo_cells"), alpha, nil)
+check(W.get_pool("alpha").cells == 10 + W.AMMO_YIELD.cells - ldef.mag,
+	"cache use fills the reserve and loads the wielded lance")
+check(W.mag_get(alpha:get_wielded_item()) == ldef.mag, "the wielded lance is loaded")
+
+-- HUD: loaded/capacity, full shows full, empty shows 0
+local hud_full = W.hud_line("alpha", pdef, pdef.mag)
+local hud_zero = W.hud_line("alpha", pdef, 0)
+check(hud_full:find(pdef.mag .. "/" .. pdef.mag, 1, true) ~= nil,
+	"HUD reads full at capacity (" .. hud_full .. ")")
+check(hud_zero:find("0/" .. pdef.mag, 1, true) ~= nil,
+	"HUD reads 0 at empty (" .. hud_zero .. ")")
+
+-- Loadout: the pistol arrives loaded with starting reserve
+local lp_stack
+for _, st in ipairs(alpha:get_inventory():get_list("main")) do
+	if st:get_name() == "sl_weapons:pistol" then lp_stack = st end
+end
+check(lp_stack ~= nil and W.mag_get(lp_stack) == 12, "loadout pistol arrives loaded (12)")
+check(W.peek_pool("alpha").bullets >= 24, "loadout carries two magazines of bullets")
+
+-- Melee is consumable: the blade wears on landed hits and breaks
+local blv = new_victim("blv", "beacon_b")
+alpha:set_wielded_item(ItemStack("sl_modebase:combat_blade"))
+local w0 = alpha:get_wielded_item():get_wear()
+blv:punch(alpha, 1.0, { full_punch_interval = 0.8, damage_groups = { fleshy = 6 } }, nil)
+local w1 = alpha:get_wielded_item():get_wear()
+check(w1 > w0, "a landed hit wears the blade")
+local spent = ItemStack("sl_modebase:combat_blade")
+spent:add_wear(65535 - math.ceil(65535 / 40))
+alpha:set_wielded_item(spent)
+blv:punch(alpha, 1.0, { full_punch_interval = 0.8, damage_groups = { fleshy = 6 } }, nil)
+check(alpha:get_wielded_item():get_name() == "", "a spent blade breaks in the hand")
+alpha:set_wielded_item(ItemStack(""))
+
+local blade_recipe
+for _, r in ipairs(captured_recipes) do
+	if r.output == "sl_modebase:combat_blade" then blade_recipe = r end
+end
+check(blade_recipe ~= nil, "a broken blade is replaceable: the recipe exists (ingot x2)")
 
 -- Neon Six: six shots then the cylinder pause (busy gate)
 local vic5 = new_victim("tgt", "beacon_b")
@@ -457,12 +582,17 @@ vic5:set_pos({ x = 0, y = 60, z = 7 })
 aim_at(alpha, vic5)
 W.get_pool("alpha").bullets = 40
 alpha:get_inventory():add_item("main", ItemStack("sl_weapons:neon_six"))
-H.advance(0.4, 0.1)
+H.advance(2.0, 0.5) -- W1e's pistol refire + switch raise clear
+local six_stack = ItemStack("sl_weapons:neon_six")
+W.mag_set(six_stack, W.defs_by_item["sl_weapons:neon_six"].mag)
 local six_fired = 0
+local six_m = W.mag_get(six_stack)
 for i = 1, 8 do
-	local before = W.get_pool("alpha").bullets
-	fire("sl_weapons:neon_six", alpha)
-	if W.get_pool("alpha").bullets == before - 1 then six_fired = six_fired + 1 end
+	minetest.registered_tools["sl_weapons:neon_six"].on_use(six_stack, alpha, nil)
+	if W.mag_get(six_stack) < six_m then
+		six_fired = six_fired + 1
+		six_m = W.mag_get(six_stack)
+	end
 	H.advance(0.6, 0.1) -- longer than the 0.55 refire
 	vic5:set_hp(20)
 end

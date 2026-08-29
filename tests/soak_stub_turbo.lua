@@ -139,7 +139,7 @@ local function start_match(with_lash)
 	for i, b in ipairs(bots) do
 		b.lash = false
 		b.p:get_inventory():add_item("main",
-			ItemStack(PRIMARIES[math.random(1, #PRIMARIES)]))
+			W.loaded_stack(PRIMARIES[math.random(1, #PRIMARIES)]))
 		if with_lash and (i == 1 or i == 5) then
 			b.lash = true
 			b.p:get_inventory():add_item("main", ItemStack("sl_weapons:grapple"))
@@ -228,13 +228,27 @@ local function ai_tick(bot, now)
 		end
 	end
 	if wield == "" then wield = pistol end
-	local def = wield ~= "" and minetest.registered_tools[wield]
-	if def and def.on_use and math.random() < 0.65 then
+	-- v1.3 magazines: bots keep one persistent stack per weapon and
+	-- load it from their reserve when it runs dry, exactly like a
+	-- player pressing the load key.
+	bot.stacks = bot.stacks or {}
+	local st = bot.stacks[wield]
+	if not st or st:get_name() ~= wield then
+		st = ItemStack(wield)
+		bot.stacks[wield] = st
+	end
+	local wdef = W.defs_by_item[wield]
+	if wdef and wdef.pool and wdef.mag and W.mag_get(st) <= 0 then
+		W.mag_load(bot.p, wdef, st)
+	end
+	local def = minetest.registered_tools[wield]
+	if def and def.on_use and math.random() < 0.65
+		and (not wdef or not wdef.pool or W.mag_get(st) > 0) then
 		-- Fast weapons may cycle several times inside one tick;
 		-- the mod's own refire gates decide what actually leaves
 		-- the barrel.
 		for _ = 1, 3 do
-			pcall(def.on_use, ItemStack(wield), bot.p, nil)
+			pcall(def.on_use, st, bot.p, nil)
 		end
 	end
 end
@@ -312,6 +326,7 @@ local function run_match(mi)
 	-- Reset per-bot flags for the next match.
 	for _, bot in ipairs(bots) do
 		bot.counted = false
+		bot.stacks = {} -- magazines do not survive the sweep
 		local inv = bot.p:get_inventory()
 		for i = 1, inv:get_size("main") do
 			inv:set_stack("main", i, ItemStack(""))

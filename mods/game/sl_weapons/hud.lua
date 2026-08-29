@@ -9,13 +9,23 @@ local S = W.S
 
 W.hud_ids = {} -- [name] = hud element id
 
-local function hud_line(name)
-	local pool = W.peek_pool(name)
-	local line = string.format("B %d/%d  S %d/%d  C %d/%d  R %d/%d",
-		pool.bullets, W.POOL_MAX.bullets,
-		pool.shells, W.POOL_MAX.shells,
-		pool.cells, W.POOL_MAX.cells,
-		pool.rockets, W.POOL_MAX.rockets)
+local function hud_line(name, wdef, loaded)
+	local line
+	if wdef and wdef.mag then
+		-- The wielded weapon owns the readout: LOADED n/cap +reserve.
+		-- Full shows full; empty shows zero (v1.3).
+		local pool = W.peek_pool(name)
+		line = string.format("%s %d/%d +%d",
+			(wdef.desc or wdef.id):upper(), loaded or 0, wdef.mag,
+			pool[wdef.pool] or 0)
+	else
+		local pool = W.peek_pool(name)
+		line = string.format("B %d/%d  S %d/%d  C %d/%d  R %d/%d",
+			pool.bullets, W.POOL_MAX.bullets,
+			pool.shells, W.POOL_MAX.shells,
+			pool.cells, W.POOL_MAX.cells,
+			pool.rockets, W.POOL_MAX.rockets)
+	end
 	if W.lash and W.lash[name] then
 		line = line .. "  [LASH]"
 	end
@@ -35,6 +45,18 @@ function W.hud_hide(name)
 		player:hud_remove(id)
 	end
 	W.hud_ids[name] = nil
+end
+
+W.hud_line = hud_line -- exported for the test bench
+
+local function wield_def(_, player)
+	local wielded = player and player.get_wielded_item and player:get_wielded_item() or nil
+	return wielded and W.defs_by_item[wielded:get_name()] or nil
+end
+
+local function wield_loaded(_, player)
+	local wielded = player and player.get_wielded_item and player:get_wielded_item() or nil
+	return wielded and W.mag_get(wielded) or 0
 end
 
 local hud_accum = 0
@@ -68,11 +90,11 @@ minetest.register_globalstep(function(dtime)
 				alignment = { x = -1, y = 0 },
 				scale = { x = 100, y = 100 },
 				number = 0x66ddff,
-				text = hud_line(name),
+				text = hud_line(name, wield_def(name, player), wield_loaded(name, player)),
 				z_index = 100,
 			})
 		elseif show and id then
-			player:hud_change(id, "text", hud_line(name))
+			player:hud_change(id, "text", hud_line(name, wield_def(name, player), wield_loaded(name, player)))
 		elseif not show and id then
 			player:hud_remove(id)
 			W.hud_ids[name] = nil

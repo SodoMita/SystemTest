@@ -116,6 +116,14 @@ minetest.register_on_mods_loaded(function()
 		description = S("Precision Fabricator (workshop — fabricates the Grapple Lash and Sentry Kits)"),
 		category = "tactical",
 	})
+	-- Blades are consumable now (v1.3): a spare edge costs salvage.
+	register_craft_recipe({
+		output = "sl_modebase:combat_blade",
+		output_count = 1,
+		ingredients = { ["sl_modebase:metal_ingot"] = 2 },
+		description = S("Combat Blade (melee — consumable, 40 hits)"),
+		category = "equipment",
+	})
 end)
 
 minetest.log("action", "[sl_weapons] loaded: " .. tostring(W.modpath))

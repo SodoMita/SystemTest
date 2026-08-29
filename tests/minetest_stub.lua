@@ -90,18 +90,35 @@ function StackMeta:get_meta()
 	end
 	return self._stackmeta
 end
-function StackMeta:to_string()
-	if self:is_empty() then return "" end
-	if self._count == 1 then return self._name end
-	return self._name .. " " .. self._count
+function StackMeta:get_wear() return self._wear or 0 end
+function StackMeta:add_wear(n)
+	self._wear = math.min(65535, (self._wear or 0) + math.max(0, math.floor(n)))
 end
 
+function StackMeta:to_string()
+	if self:is_empty() then return "" end
+	-- Stub-internal round-trip: "name count [wear [mag]]" so a stack
+	-- survived as a string (set_wielded_item) keeps its wear and its
+	-- loaded magazine. Not the engine's wire format; tests only.
+	local s = self._name .. " " .. self._count
+	if (self._wear or 0) > 0 then
+		s = s .. " " .. self._wear
+		local m = self._stackmeta and tonumber(self._stackmeta._d.sl_mag)
+		if m then s = s .. " " .. m end
+	elseif self._stackmeta and tonumber(self._stackmeta._d.sl_mag) then
+		s = s .. " 0 " .. tonumber(self._stackmeta._d.sl_mag)
+	end
+	return s
+end
+
+local self_has_parse = true
 function ItemStack(x)
 	local s = setmetatable({}, StackMeta)
 	if type(x) == "table" and x.__is_stack then
 		s.__is_stack = true
 		s._name = x._name
 		s._count = x._count
+		s._wear = x._wear or 0
 		if x._stackmeta then
 			local d = {}
 			for k, v in pairs(x._stackmeta._d) do d[k] = v end
@@ -110,11 +127,16 @@ function ItemStack(x)
 		return s
 	end
 	local str = tostring(x or "")
-	local name, count = str:match("^(%S+)%s+(%d+)$")
+	local name, count, wear, mag = str:match("^(%S+)%s+(%d+)%s*(%d*)%s*(%d*)$")
 	if name then
 		s._name, s._count = name, tonumber(count)
+		s._wear = tonumber(wear) or 0
+		if mag and mag ~= "" and self_has_parse then
+			s:get_meta():set_int("sl_mag", tonumber(mag))
+		end
 	else
 		s._name, s._count = str, (str == "" and 0 or 1)
+		s._wear = 0
 	end
 	s.__is_stack = true
 	return s
@@ -132,7 +154,7 @@ end
 
 local function copy_stack(s)
 	local c = ItemStack("")
-	c._name, c._count = s._name, s._count
+	c._name, c._count, c._wear = s._name, s._count, s._wear or 0
 	if s._stackmeta then
 		local d = {}
 		for k, v in pairs(s._stackmeta._d) do d[k] = v end

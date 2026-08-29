@@ -56,6 +56,52 @@ function W.add_ammo(name, kind, n)
 	return pool[kind] - before
 end
 
+-- ----------------------------------------------------------------
+-- Magazines (v1.3): rounds live in the weapon stack; the pool is
+-- the reserve a load pulls from. Loading is one right-click.
+-- ----------------------------------------------------------------
+function W.mag_get(stack)
+	return tonumber(stack:get_meta():get_int("sl_mag")) or 0
+end
+
+function W.mag_set(stack, n)
+	stack:get_meta():set_int("sl_mag", math.max(0, math.floor(n)))
+end
+
+-- A weapon granted loaded to capacity (pads, fabricator, loadouts).
+function W.loaded_stack(itemname)
+	local st = ItemStack(itemname)
+	local def = W.defs_by_item[itemname]
+	if def and def.pool and def.mag then
+		W.mag_set(st, def.mag)
+	end
+	return st
+end
+
+-- Pull rounds from the reserve pool into the weapon's magazine.
+function W.mag_load(user, def, stack)
+	local name = user and user.get_player_name and user:get_player_name() or nil
+	if not name or not def or not stack then return stack end
+	local cap = def.mag or 1
+	local cur = W.mag_get(stack)
+	local room = cap - cur
+	if room <= 0 then return stack end
+	local pool = W.get_pool(name)
+	local have = pool[def.pool] or 0
+	if have < 1 then
+		minetest.chat_send_player(name, S("No @1 for the @2.", def.pool, def.desc))
+		return stack
+	end
+	local take = math.min(room, have)
+	pool[def.pool] = have - take
+	W.mag_set(stack, cur + take)
+	minetest.sound_play("sl_weapons_ammo_load", {
+		to_player = name, gain = 0.5,
+	}, true)
+	minetest.chat_send_player(name, string.format("%s %d/%d", def.desc, cur + take, cap))
+	return stack
+end
+
 function W.take_ammo(name, kind, n)
 	local pool = W.get_pool(name)
 	if (pool[kind] or 0) >= n then
@@ -319,8 +365,12 @@ function W.give_loadout(player)
 	end
 	local inv = player:get_inventory()
 	if inv then
-		inv:add_item("main", ItemStack("sl_weapons:pistol"))
+		-- The pistol arrives loaded (v1.3 — it eats ammo like everyone
+		-- now), with two magazines of bullets as starting reserve.
+		inv:add_item("main", W.loaded_stack("sl_weapons:pistol"))
 		inv:add_item("main", ItemStack("sl_modebase:combat_blade"))
+		local pool = W.get_pool(name)
+		pool.bullets = math.max(pool.bullets or 0, 24)
 	end
 end
 

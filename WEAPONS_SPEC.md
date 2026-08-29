@@ -58,10 +58,17 @@ beacon damage is deliberately weak).
 1. **Dodgeability beats accuracy.** Projectiles carry the DPS; hitscan carries
    the punctuation. Nothing kills a healthy player from full HP in under ~1 s
    of *dodgeable* exposure.
-2. **No reloads, ever.** Ammo pools + refire delays, Quake-style. The only
-   resource decision is *what to spend and when to stop shooting*. (One
-   deliberate flavor-exception, the Neon Six's auto-spin, belongs to the gun —
-   never a button the player presses. §3.1.)
+2. **Magazines you load, reserves you carry** (v1.3 — team decision
+   2026-08-29, reversing the v1.0 "no reloads, ever" pillar). Rounds live
+   in the weapon stack; firing eats the magazine; the per-ammo pools are
+   the *reserve*, and loading is one convenient action: right-click the
+   weapon, or use a cache — a cache click even tops up the wielded
+   matching weapon. Every weapon needs ammo, the Pulsar Pistol included
+   (12-round magazine; no free guns). The HUD reads `WEAPON n/cap +reserve`
+   — full shows full, empty shows 0. (The Neon Six's auto-spin still
+   belongs to the gun, never a button the player presses. §3.1.) Melee is
+   consumable: the Combat Blade wears on landed hits (~40) and breaks;
+   a spare edge is 2 ingots through the inventory crafting menu.
 3. **Movement tech is free by default — earned when paid.** Mortar-jump
    knockback, pulse-juggle push, and the existing crouch-walk quirk
    (`movement_speed_crouch = 5.5`) cost nothing and belong to everyone. The
@@ -84,7 +91,7 @@ no armor in scope. `n/s` = nodes per second.
 
 | Weapon | Analog | Type | Dmg | Refire | DPS | TTK vs 20 HP | Ammo (max) | Quirk |
 |---|---|---|---|---|---|---|---|---|
-| **Pulsar Pistol** | Blaster/Enforcer | Hitscan | 4 | 0.35 s | 11.4 | 5 hits ≈ 1.75 s | ∞ (internal cell) | Everyone's spawn weapon; perfect accuracy |
+| **Pulsar Pistol** | Blaster/Enforcer | Hitscan | 4 | 0.35 s | 11.4 | 5 hits ≈ 1.75 s | Bullets, 12-rd magazine | Everyone's spawn weapon; arrives loaded with two magazines of reserve (v1.3: it eats ammo like everything else); perfect accuracy |
 | **Chatter SMG** | Machinegun | Hitscan | 2 | 0.09 s | 22.2 | 10 hits ≈ 0.9 s (bloom pushes real TTK ≥ 1.5 s) | Bullets (150) | First shot exact; bloom 0.5°→4° while held, resets in 0.6 s. Bloom is a published function, never a die roll |
 | **Riot Scatter** | Shotgun | Hitscan ×8 pellets | 1.5/pellet = 12 point-blank | 0.9 s | 13.3 | 2 shots ≈ 0.9 s (point-blank) | Shells (30) | 9° cone, pellets expire at 24 m, damage falls with pellet spread |
 | **Arc Lance** | Railgun | Hitscan | 18 | 1.6 s | 11.25 | 2 hits ≈ 1.6 s — **or one lance + one pistol tap** | Cells (60) | RMB zoom ×2.5; beam tracer; report audible 48 m; one shot breaks a possession (§7.3) |
@@ -673,6 +680,22 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
    W3 freezes numbers.
 
 ## 18. Changelog
+
+- **v1.3.0 (2026-08-29, magazines)** — the ammo model rebuilt per team
+  decision: rounds live in per-weapon magazines stored on the item stack
+  (`sl_mag` metadata); firing consumes the magazine, the pools become the
+  visible reserve, and loading is one action (right-click the weapon, or
+  use a cache — which also tops up a matching wielded weapon). Every
+  weapon now declares a pool and a magazine capacity: pistol 12/bullets
+  (its v1.0 infinity is revoked), chatter 30, scatter 8, lance 6, mortar 3,
+  driver 20, neon six 6, repeater 8. HUD shows `WEAPON n/cap +reserve` for
+  the wielded weapon. Weapons granted by pads, the Fabricator, and the
+  loadout arrive loaded; looted corpses' guns are found empty with the
+  frozen charge note. Dry-fire autoswitch now hands you your most-loaded
+  pistol instead of conjuring an unloaded one. Melee is consumable: the
+  Combat Blade wears (~40 landed hits) and breaks; craftable at 2 ingots.
+  Abilities/levels reset at match start (v1.2.4) confirmed: progression
+  is per-match — experience, stat points, and ability levels all zero.
 
 - **v1.2.4 (2026-08-29, every match starts from zero)** — levels and
   inventories reset at match start, unconditionally. The inventory clear

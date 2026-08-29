@@ -19,7 +19,7 @@
 1. Open your inventory with **I**.
 2. The **Crafting** tab is already selected.
 3. Pick a category: **Salvage**, **Equipment**, **Tactical**, or **Objective**.
-4. Click the green recipes you can afford. Items are consumed from your main inventory and the result is placed back in it.
+4. Click the green recipes you can afford. **Ammo:** right-click a weapon to load its magazine from your reserve, or use an ammo cache — it fills the reserve *and* tops up the matching weapon you're holding. Items are consumed from your main inventory and the result is placed back in it.
 5. Greyed-out recipes mean you are missing ingredients. Search by name if the list gets long.
 
 > **Tip:** Right-click the 3D agent preview in any tab to open the **Character** screen — team status, lives, and currently equipped uniform are all there.
@@ -45,7 +45,7 @@
 
 | Output | Ingredients | Role |
 |---|---|---|
-| **Combat Blade** | Metal Ingot × 2 | Fast melee weapon. |
+| **Combat Blade** | Metal Ingot × 2 | Fast melee weapon. **Consumable** — about 40 landed hits, then it breaks. |
 | **Breaching Pick** | Metal Ingot × 3 + Plastic Scrap × 1 | Breaks hard surfaces quickly. |
 | **Tactical Axe** | Metal Ingot × 2 + Plastic Scrap × 1 | Chops and fights. |
 | **Trench Shovel** | Metal Ingot × 1 + Plastic Scrap × 1 | Earthworks and graves. |
