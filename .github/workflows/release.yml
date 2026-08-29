@@ -380,7 +380,7 @@ jobs:
           python3 - <<'PYN'
           import glob
           hits = 0
-          for p in glob.glob("www/*/launcher.js"):
+          for p in glob.glob("**/launcher.js", recursive=True):
               s = open(p).read()
               old = "if (params.has('name')) r.name = params.get('name');"
               new = old + " else r.name = \"Web\" + String(Math.floor(Math.random() * 900000 + 100000));"
