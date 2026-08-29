@@ -401,11 +401,14 @@ function W.on_match_start()
 	W.last_cause = {}
 	if W.pads_rearm_all then W.pads_rearm_all() end
 	for _, player in ipairs(minetest.get_connected_players()) do
-		-- Hand-evolution levels are per-match too (team directive
-		-- 2026-08-29): the grip starts at zero every match.
-		pcall(function()
-			player:get_meta():set_string("sl_mm_hands", "")
-		end)
+		-- Hand-evolution levels are per-match (team directive
+		-- 2026-08-29) -- except in a tournament (v1.3.4), where the
+		-- grip rides across matches with the rest of progression.
+		if not (game_mode and game_mode.state and game_mode.state.tournament) then
+			pcall(function()
+				player:get_meta():set_string("sl_mm_hands", "")
+			end)
+		end
 		W.give_loadout(player)
 	end
 end
@@ -429,8 +432,11 @@ function W.on_match_end()
 
 	-- Achievement lifecycle (spec §12.1): the match forgets, the
 	-- count survives. reset_match_achievements is provided
-	-- additively by mods/apis/sl_gui/achievement_system.lua.
-	if reset_match_achievements then
+	-- additively by mods/apis/sl_gui/achievement_system.lua. In a
+	-- tournament (v1.3.4) achievements persist with the rest of
+	-- progression; /sl_tournament stop performs the one clean reset.
+	if reset_match_achievements
+		and not (game_mode and game_mode.state and game_mode.state.tournament) then
 		for _, player in ipairs(minetest.get_connected_players()) do
 			local ok, err = pcall(reset_match_achievements, player)
 			if not ok then

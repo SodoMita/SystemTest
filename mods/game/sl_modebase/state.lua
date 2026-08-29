@@ -32,6 +32,10 @@ local state = {
 	match_count = 0,
 	match_started_at = 0,
 	match_ended_at = 0,
+	-- Tournament mode (/sl_tournament): while true, match start still
+	-- resets inventories but achievements, levels, and abilities
+	-- persist across matches (v1.3.4).
+	tournament = false,
 
 	-- Ready check / insertion sequencing (LOBBY -> READY CHECK -> COUNTDOWN -> INSERTION)
 	ready_check = {

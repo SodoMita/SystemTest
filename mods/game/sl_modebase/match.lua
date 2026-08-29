@@ -120,7 +120,9 @@ local function reset_players_for_new_match()
 			if inv.set_list and inv:get_list("craft") then
 				inv:set_list("craft", {})
 			end
-			if reset_player_progression then
+			if reset_player_progression and not state.tournament then
+				-- Tournament mode (v1.3.4): levels and abilities ride
+				-- across matches; only inventories reset.
 				local ok, err = pcall(reset_player_progression, player)
 				if not ok then
 					minetest.log("error", "[game_mode] progression reset for "

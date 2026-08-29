@@ -89,6 +89,48 @@ minetest.register_chatcommand("sl_state", {
 	end,
 })
 
+minetest.register_chatcommand("sl_tournament", {
+	description = S("Tournament mode <start|stop>: inventories reset each match; achievements, levels and abilities persist while it runs"),
+	privs = { server = true },
+	func = function(name, param)
+		local arg = (param or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+		if arg == "start" then
+			if state.tournament then
+				return false, S("Tournament mode is already running.")
+			end
+			if state.match_active then
+				return false, S("Start the tournament between matches.")
+			end
+			state.tournament = true
+			game_mode.broadcast(S("TOURNAMENT MODE: achievements, levels and abilities now persist across matches. Inventories still reset every match."))
+			minetest.log("action", "[game_mode] tournament mode started by " .. name)
+			return true, S("Tournament mode started.")
+		elseif arg == "stop" then
+			if not state.tournament then
+				return false, S("No tournament is running.")
+			end
+			if state.match_active then
+				return false, S("Stop the tournament between matches.")
+			end
+			state.tournament = false
+			-- Leaving the island of persistence returns everyone to the
+			-- per-match economy in one clean sweep.
+			for _, player in ipairs(minetest.get_connected_players()) do
+				if reset_player_progression then
+					pcall(reset_player_progression, player)
+				end
+				if reset_match_achievements then
+					pcall(reset_match_achievements, player)
+				end
+			end
+			game_mode.broadcast(S("Tournament ended: progression reset for the next match."))
+			minetest.log("action", "[game_mode] tournament mode stopped by " .. name)
+			return true, S("Tournament mode stopped.")
+		end
+		return false, S("Usage: /sl_tournament <start|stop>")
+	end,
+})
+
 minetest.register_chatcommand("sl_be_monster_master", {
 	description = S("Become the monster master (if none exists yet)"),
 	func = function(name)

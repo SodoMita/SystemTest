@@ -1313,6 +1313,61 @@ check(not gamma:get_inventory():contains_item("main", ItemStack("sl_weapons:seve
 
 gm.end_match(nil, "W1f cleanup")
 H.advance(1, 0.5)
+
+-- ----------------------------------------------------------------
+section("PHASE W3e — tournament mode: inventories reset, progression persists")
+-- ----------------------------------------------------------------
+
+local tcmd = minetest.registered_chatcommands.sl_tournament
+check(tcmd ~= nil, "the /sl_tournament command is registered")
+local tok, _tmsg = tcmd.func("alpha", "start")
+check(tok == true, "tournament starts between matches")
+check(tcmd.func("alpha", "start") == false, "double-start is refused")
+
+-- Seed persistent progression: levels, abilities, an achievement, MM grip
+beta:get_meta():set_string("experience", "450")
+beta:get_meta():set_string("abilities_v2",
+	minetest.serialize({ unlocked = { sniper_eyes = 1 }, stat_points = 7 }))
+beta:get_meta():set_string("achievements",
+	minetest.serialize({ unlocked = { win_match = true }, progress = {} }))
+gamma:get_meta():set_string("sl_mm_hands", minetest.serialize({ grip = 2 }))
+beta:get_inventory():add_item("main", ItemStack("sl_modebase:metal_ingot 30"))
+
+gm.set_monster_master("gamma")
+state.settings.countdown = 1
+minetest.registered_chatcommands.sl_match_start.func("alpha", "")
+for _, p in ipairs(minetest.get_connected_players()) do
+	minetest.registered_chatcommands.sl_ready.func(p:get_player_name(), "")
+end
+H.advance(4, 0.5)
+check(state.match_active == true, "tournament match started")
+check(not beta:get_inventory():contains_item("main", ItemStack("sl_modebase:metal_ingot 30")),
+	"inventories still reset each tournament match")
+check(beta:get_meta():get_string("experience") == "450",
+	"levels persist across the tournament match start")
+local tab = minetest.deserialize(beta:get_meta():get_string("abilities_v2")) or {}
+check((tab.stat_points or 0) == 7 and tab.unlocked and tab.unlocked.sniper_eyes == 1,
+	"abilities persist across the tournament match start")
+check(W.get_mm_levels(gamma).grip == 2, "MM grip levels persist in a tournament")
+
+gm.end_match(nil, "tournament check")
+H.advance(1, 0.5)
+local tac = minetest.deserialize(beta:get_meta():get_string("achievements")) or {}
+check(tac.unlocked and tac.unlocked.win_match == true,
+	"achievements persist across the tournament match end")
+
+local tok2 = tcmd.func("alpha", "stop")
+check(tok2 == true, "the tournament stops between matches")
+check(beta:get_meta():get_string("experience") == "0",
+	"leaving the tournament resets levels once")
+local tab2 = minetest.deserialize(beta:get_meta():get_string("abilities_v2")) or {}
+check((tab2.stat_points or 0) == 0 and (tab2.unlocked and next(tab2.unlocked)) == nil,
+	"abilities reset when the tournament ends")
+local tac2 = minetest.deserialize(beta:get_meta():get_string("achievements")) or {}
+check(tac2.unlocked == nil or next(tac2.unlocked) == nil,
+	"achievements reset when the tournament ends (times_earned kept)")
+check(tcmd.func("alpha", "stop") == false, "stopping twice is refused")
+check(gm.get_player_state("alpha").phase == "alive", "players normalized after tournament")
 H.advance(2, 0.5)
 check(true, "engine steps still healthy after the full suite")
 

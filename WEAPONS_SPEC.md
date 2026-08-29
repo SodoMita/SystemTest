@@ -583,6 +583,10 @@ Team decision 2026-08-29, built on `mods/apis/sl_gui/achievement_system.lua`:
   at match end, joining the existing end-of-match normalization (inventories,
   phases, sabotages, possessions). A new match is a clean record — the same
   principle as the corpse sweep: the next scene starts clean.
+- **Tournament exception (v1.3.4).** While `/sl_tournament start` runs,
+  achievements persist across match ends along with levels and abilities
+  (inventories still reset every match). `/sl_tournament stop` performs the
+  one clean reset that returns everyone to the per-match economy.
 - **Lifetime counters persist.** Each award also increments a per-player,
   per-achievement **`times_earned`** counter in mod storage, which survives
   every reset (and `/resetachievements` resets it explicitly, admin-intent
@@ -684,6 +688,18 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
    W3 freezes numbers.
 
 ## 18. Changelog
+
+- **v1.3.4 (2026-08-29, tournament mode)** — `/sl_tournament start|stop`
+  (server priv, between matches only): while a tournament runs, match
+  start still resets inventories (pools, pads, turret limits, scene
+  sweep all unchanged) but achievements, levels, and abilities persist
+  across matches — experience, stat points, ability levels, MM grip
+  meta, and achievement unlock state all ride through. Stopping the
+  tournament performs one clean progression + achievement reset for
+  every connected player, returning the server to the per-match
+  economy. Progression meta already survives restarts, so a tournament
+  persists across server restarts too (the flag itself is re-armed by
+  the admin after a restart).
 
 - **v1.3.3 (2026-08-29, the open test range)** — weapons are usable
   outside matches for testing, deliberately and narrowly: `fire_gate`
