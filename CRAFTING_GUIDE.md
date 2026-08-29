@@ -86,6 +86,43 @@
 
 ---
 
+## ⚙️ Workshops — Built, Not Found
+
+The map generator places no workshops. None. If you want a station, you
+build it — and every part is torn out of a **monster**.
+
+**What the machines pay when they die** (deterministic, published — a kill
+is worth exactly what it is worth):
+
+| Creature | Pays out |
+|---|---|
+| Stalker | Metal Ingot × 1, Plastic Scrap × 1 |
+| Scout | Circuit Board × 1, Plastic Scrap × 1 |
+| Brute | Metal Ingot × 2, Energy Crystal × 1 |
+| Dredger | Energy Crystal × 1, Circuit Board × 1 |
+| Signal Wraith | Circuit Board × 1 |
+| Containment Horror | Metal Ingot × 2, Circuit Board × 2, Energy Crystal × 1 |
+
+Spoils land beside the wreck as loose items. The kill is public. The
+scramble is the tax.
+
+**Stations (inventory crafting menu, Tactical tab):**
+
+| Station | Cost | What it opens |
+|---|---|---|
+| **Ghost Altar** | Ingot × 2 + Energy Crystal × 2 + Circuit Board × 1 | The revival ritual — summons a contained ghost for a relic. |
+| **Precision Fabricator** | Ingot × 6 + Circuit Board × 4 + Energy Crystal × 2 + Plastic Scrap × 3 | Fabricates the **Grapple Lash** and **Sentry Kits**. The Lash appears on no pad, in no crate, in no roll — only here. |
+
+**Barnaby** taps the table. *"You want the workshop? Fine. Go take it out of
+the things the Monster Master sends at your beacon, carry the pieces home
+under fire, and build it in the open. The station is rare because the parts
+are still inside something that wants you dead."*
+
+**Mo** grins. *"Two brutes, two scouts, and a wraith, minimum. That's not a
+shopping list. That's a body count."*
+
+---
+
 ## 📦 Where to Find Salvage
 
 - **Loose Items** (`sl_modebase:item_pickup`) are glowing objects scattered on the map. Right-click them to claim scrap.

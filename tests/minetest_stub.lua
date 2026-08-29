@@ -32,6 +32,7 @@ M.afters = {}
 M.luaentities = {}
 M.current_modname = "sl_modebase"
 M.entity_spawns = {}  -- list of { pos = ..., name = ... }, in spawn order
+M.item_drops = {}    -- list of { pos = ..., name = ..., count = ... } from minetest.add_item
 
 local handlers = {
 	joinplayer = {}, leaveplayer = {}, respawnplayer = {}, dieplayer = {},
@@ -562,7 +563,15 @@ function minetest.get_meta(pos)
 end
 
 -- Entities / items in world
-function minetest.add_item(_, stack)
+function minetest.add_item(pos, stack)
+	local s = type(stack) == "table" and stack.__is_stack and stack or ItemStack(stack)
+	-- Record the drop (the engine spawns a pickup-able item entity;
+	-- tests observe the fountain through this log).
+	table.insert(M.item_drops, {
+		pos = pos and { x = pos.x, y = pos.y, z = pos.z } or nil,
+		name = s:get_name(),
+		count = s:get_count(),
+	})
 	local obj = { set_velocity = function() end, remove = function() end }
 	return obj
 end
@@ -818,7 +827,10 @@ local function make_entity_object(pos, name)
 		if hp <= 0 and not self._dead then
 			self._dead = true
 			local l = self._lua
-			if l and l.on_death then pcall(l.on_death, l, "punch") end
+			if l and l.on_death then
+				local ok, err = pcall(l.on_death, l, "punch")
+				if not ok then minetest.log("error", "on_death(" .. tostring(l.name) .. "): " .. tostring(err)) end
+			end
 			self:remove()
 		end
 	end

@@ -162,8 +162,9 @@ Quake item pads, in System Looting's ownership-neutral clothing:
   and long, cells high and quick. The arena is a radio station; the chime is
   the headline. A player with three matches of ears knows what was taken
   through a wall. The Grapple Lash spawns on no pad, in no crate (§10.1) —
-  acquiring it is a *journey*: the workshops sit far from the chimes, and
-  the silence of the trip is its own intel asymmetry.
+  acquiring it is a *hunt*: mapgen places no workshops, so the Precision
+  Fabricator is assembled by hand from monster spoils (§5.1), and every
+  ingot in it was carried home from a kill.
 - **Killfeed is an incident report, not a joke** (council resolution #2):
   `0347  @1 — cause: arc discharge — range: long — witnesses: unknown`.
   Cause, time, circumstance — never an adjective, never an attacker name.
@@ -192,6 +193,35 @@ Quake item pads, in System Looting's ownership-neutral clothing:
   (refuse dispensing, `OBJECT POSSESSED` infotext), living players exorcise
   with two punches **or two weapon hits at range** (council resolution #5 —
   the lance becomes a key), standard 20 s / 45 s cooldown economy.
+
+### 5.1 Monster spoils — where station parts come from
+
+Mapgen places no workshops, so the workshops are *built*: every station
+recipe is assembled in the inventory crafting menu and every ingredient
+is obtainable from monsters (team decision 2026-08-29). The payout is
+deterministic and published — a kill is worth exactly what it is worth,
+no rolls, no casino. Spoils land beside the wreck as loose items: the
+kill is public, the scramble is the tax.
+
+| Creature | Pays out |
+|---|---|
+| Stalker | Metal Ingot × 1, Plastic Scrap × 1 |
+| Scout | Circuit Board × 1, Plastic Scrap × 1 |
+| Brute | Metal Ingot × 2, Energy Crystal × 1 |
+| Dredger | Energy Crystal × 1, Circuit Board × 1 |
+| Signal Wraith | Circuit Board × 1 |
+| Containment Horror | Metal Ingot × 2, Circuit Board × 2, Energy Crystal × 1 |
+
+Stations this funds (inventory crafting menu, **Tactical** tab):
+
+| Station | Cost | Unlocks |
+|---|---|---|
+| **Precision Fabricator** | Ingot × 6, Circuit × 4, Crystal × 2, Plastic × 3 | The Grapple Lash and Sentry Kit fabrication (§10.1, §6) |
+| **Ghost Altar** | Ingot × 2, Crystal × 2, Circuit × 1 | The revival ritual (summons a contained ghost for a relic) |
+
+Ambient monsters (anything not deployed through the Monster Master's
+catalog) carry nothing — the economy belongs to the match, not to the
+wandering dead.
 
 ## 6. Turrets: the "Sentry Kit"
 
@@ -415,7 +445,7 @@ exception, and the only one.)
 | Property | Value |
 |---|---|
 | Item | `sl_weapons:grapple` — "Grapple Lash" |
-| Acquisition | **Fabricated only** (§10.1 "The pilgrimage"): ordinary materials + a Precision Fabricator at a hard-to-reach workshop. Never on pads, never in crates, never a roll |
+| Acquisition | **Fabricated only** (§10.1 "The hunt"): ordinary materials + a Precision Fabricator — and since mapgen places no workshops, the Fabricator itself is assembled in the inventory crafting menu from **monster spoils** (Metal Ingot × 6, Circuit Board × 4, Energy Crystal × 2, Plastic Scrap × 3 — every part torn out of the Monster Master's machines, loot table in §5.1). Never on pads, never in crates, never a roll |
 | Cost per launch | 5 Cells from the shared pool + 2.0 s cooldown. Expensive by design — the Lash competes with your Lance and Driver for the same battery |
 | Mechanics | Hook is a slow projectile (30 n/s, inherits shooter velocity), attaches to **solid node faces only**, max 24 m; reel-in at 14 n/s, momentum conserved; jump detaches at full swing speed |
 | **Danger 1 — loud** | Launch crack audible 32 m; the glowing line is visible to everyone. Grappling is broadcasting your position and intent |
@@ -627,6 +657,17 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
    W3 freezes numbers.
 
 ## 18. Changelog
+
+- **v1.2.2 (2026-08-29, workshops from spoils)** — mapgen places no
+  workshops, so both crafting stations are now assembled by hand in the
+  inventory crafting menu, entirely from mob-obtainable parts: the
+  Precision Fabricator (6 ingots / 4 circuits / 2 crystals / 3 plastic)
+  and the Ghost Altar (2 ingots / 2 crystals / 1 circuit). Monsters now
+  pay deterministic, published spoils on death (§5.1) — the station is
+  rare because its parts are torn out of monsters, which keeps the
+  Lash chain expensive, advanced, and dangerous exactly as v1.2
+  intended; only the acquisition of the *station* changed (the Lash
+  itself is still fabricator-only, never a roll).
 
 - **v1.2.1 (2026-08-29, implementation notes)** — no design changes; records
   how two §5 bullets landed: (1) the "crate loot tables get a weapons

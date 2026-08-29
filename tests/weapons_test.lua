@@ -11,6 +11,11 @@
 
 local H = dofile("tests/minetest_stub.lua")
 
+-- Capture inventory-craft recipe registrations (the real global comes
+-- from sl_gui's crafting menu, which this suite does not load).
+local captured_recipes = {}
+register_craft_recipe = function(def) table.insert(captured_recipes, def) end
+
 local pass_count, fail_count = 0, 0
 local function check(cond, label)
 	if cond then
@@ -23,10 +28,17 @@ local function check(cond, label)
 end
 local function section(t) print("== " .. t) end
 
--- Capture item drops (the stock stub no-ops add_item).
+-- Capture item drops (the stub records them in H.item_drops; mirror
+-- that here so this suite's early override keeps one log).
 local drops = {}
 minetest.add_item = function(pos, stack)
 	table.insert(drops, { pos = pos, stack = stack })
+	local s = type(stack) == "table" and stack.__is_stack and stack or ItemStack(stack)
+	table.insert(H.item_drops, {
+		pos = pos and { x = pos.x, y = pos.y, z = pos.z } or nil,
+		name = s:get_name(),
+		count = s:get_count(),
+	})
 	return { set_velocity = function() end, remove = function() end }
 end
 
@@ -126,6 +138,7 @@ H.current_modname = "sl_weapons"
 local ok2, err2 = pcall(dofile, "mods/game/sl_weapons/init.lua")
 check(ok2, "sl_weapons loads" .. (ok2 and "" or (" -> " .. tostring(err2))))
 if not ok2 then print("FATAL: sl_weapons failed to load; aborting.") os.exit(1) end
+H.run_mods_loaded() -- station recipes register here (order-proof)
 
 local W = sl_weapons
 local gm = game_mode
@@ -888,6 +901,70 @@ for _, st in ipairs(scv:get_inventory():get_list("main")) do
 	if st:get_name() == "sl_weapons:sentry_kit" then kits = kits + st:get_count() end
 end
 check(kits >= 18 and kits <= 60, "400 salvage rolls yield sentry kits near expectation (got " .. kits .. ")")
+
+-- ----------------------------------------------------------------
+section("PHASE W3b — workshops from mob spoils (mapgen places none)")
+-- ----------------------------------------------------------------
+
+local MOB_SPOILS = {
+	["sl_modebase:metal_ingot"] = true,
+	["sl_modebase:circuit_board"] = true,
+	["sl_modebase:energy_crystal"] = true,
+	["sl_modebase:plastic_scrap"] = true,
+}
+local fab_recipe, altar_recipe, lash_recipe
+for _, r in ipairs(captured_recipes) do
+	if r.output == "sl_weapons:fabricator" then fab_recipe = r end
+	if r.output == "sl_modebase:ghost_altar" then altar_recipe = r end
+	if r.output == "sl_weapons:grapple" then lash_recipe = r end
+end
+check(fab_recipe ~= nil, "the Precision Fabricator is inventory-craftable")
+check(altar_recipe ~= nil, "the Ghost Altar is inventory-craftable")
+local foreign = 0
+for k in pairs((fab_recipe and fab_recipe.ingredients) or {}) do
+	if not MOB_SPOILS[k] then foreign = foreign + 1 end
+end
+for k in pairs((altar_recipe and altar_recipe.ingredients) or {}) do
+	if not MOB_SPOILS[k] then foreign = foreign + 1 end
+end
+check(foreign == 0, "station recipes use only mob-obtainable parts")
+check(lash_recipe == nil, "the Lash itself is never an inventory recipe")
+
+-- Spoils: a catalog monster pays its parts on death
+local function payout_of(fn)
+	local d0 = #H.item_drops
+	local obj = fn()
+	if not obj then return nil end
+	obj:punch(nil, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 99 } }, nil)
+	local got = {}
+	for i = d0 + 1, #H.item_drops do
+		got[H.item_drops[i].name] = (got[H.item_drops[i].name] or 0) + H.item_drops[i].count
+	end
+	return got
+end
+local got_stalker = payout_of(function()
+	return game_mode.spawn_monster({ x = 960, y = 60, z = 0 }, "stalker", "gamma")
+end)
+check(got_stalker ~= nil and got_stalker["sl_modebase:metal_ingot"] == 1
+	and got_stalker["sl_modebase:plastic_scrap"] == 1,
+	"stalker pays ingot + plastic")
+local got_brute = payout_of(function()
+	return game_mode.spawn_monster({ x = 961, y = 60, z = 0 }, "brute", "gamma")
+end)
+check(got_brute ~= nil and got_brute["sl_modebase:metal_ingot"] == 2
+	and got_brute["sl_modebase:energy_crystal"] == 1,
+	"brute pays 2 ingots + a crystal")
+local got_scout = payout_of(function()
+	return game_mode.spawn_monster({ x = 962, y = 60, z = 0 }, "scout", "gamma")
+end)
+check(got_scout ~= nil and got_scout["sl_modebase:circuit_board"] == 1,
+	"scout pays a circuit board")
+
+-- Ambient spawns (no catalog variant) carry nothing
+local d_amb = #H.item_drops
+local amb = minetest.add_entity({ x = 963, y = 60, z = 0 }, "sl_modebase:monster")
+amb:punch(nil, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 99 } }, nil)
+check(#H.item_drops == d_amb, "ambient monsters carry no workshop parts")
 
 check(gm.get_player_state("alpha").phase == "alive", "players normalized after match end")
 H.advance(2, 0.5)

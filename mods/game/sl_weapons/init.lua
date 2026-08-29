@@ -23,6 +23,7 @@ local W = sl_weapons
 W.modname = minetest.get_current_modname()
 W.modpath = minetest.get_modpath(W.modname)
 W.S = minetest.get_translator(W.modname)
+local S = W.S
 
 local function include(file)
 	dofile(W.modpath .. "/" .. file)
@@ -96,5 +97,25 @@ if game_mode and game_mode.register_pickup_roll then
 	game_mode.register_pickup_roll(W.modname .. ":sentry_kit", 1, 0.45)
 	game_mode.register_pickup_roll(W.modname .. ":ammo_shells", 4, 0.45)
 end
+
+-- The Precision Fabricator is a workshop, and mapgen places no
+-- workshops: it is assembled through the inventory crafting menu,
+-- entirely from monster spoils (team directive 2026-08-29 — the
+-- station is rare because its parts are torn out of monsters).
+minetest.register_on_mods_loaded(function()
+	if not register_craft_recipe then return end
+	register_craft_recipe({
+		output = W.modname .. ":fabricator",
+		output_count = 1,
+		ingredients = {
+			["sl_modebase:metal_ingot"] = 6,
+			["sl_modebase:circuit_board"] = 4,
+			["sl_modebase:energy_crystal"] = 2,
+			["sl_modebase:plastic_scrap"] = 3,
+		},
+		description = S("Precision Fabricator (workshop — fabricates the Grapple Lash and Sentry Kits)"),
+		category = "tactical",
+	})
+end)
 
 minetest.log("action", "[sl_weapons] loaded: " .. tostring(W.modpath))

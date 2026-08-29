@@ -1027,6 +1027,11 @@ minetest.register_entity("sl_scary:dredger", {
         if pos then
             minetest.add_item(pos, "sl_scary:dredger_badge")
             minetest.sound_play("mob_death", {pos = pos, gain = 0.8, max_hear_distance = 16})
+            -- System Looting catalog spawns also pay workshop components
+            -- (the loot table lives in sl_modebase; ambient mobs do not).
+            if self.monster_variant and game_mode and game_mode.drop_monster_loot then
+                game_mode.drop_monster_loot(pos, self.monster_variant)
+            end
         end
     end,
 })
@@ -1171,6 +1176,9 @@ minetest.register_entity("sl_scary:containment", {
         if pos then
             minetest.add_item(pos, "sl_scary:containment_shard")
             minetest.sound_play("mob_death", {pos = pos, gain = 1.0, max_hear_distance = 32})
+            if self.monster_variant and game_mode and game_mode.drop_monster_loot then
+                game_mode.drop_monster_loot(pos, self.monster_variant)
+            end
         end
     end,
 })
@@ -1367,6 +1375,9 @@ minetest.register_entity("sl_scary:signal_wraith", {
             minetest.add_item(pos, "sl_scary:corrupted_data")
             minetest.add_item(pos, "sl_scary:corrupted_data")
             minetest.sound_play("mob_death", {pos = pos, gain = 0.6, max_hear_distance = 12})
+            if self.monster_variant and game_mode and game_mode.drop_monster_loot then
+                game_mode.drop_monster_loot(pos, self.monster_variant)
+            end
         end
     end,
 })
