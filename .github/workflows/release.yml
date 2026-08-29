@@ -366,6 +366,22 @@ jobs:
           find . -name launcher.js -exec sed -i 's#this.proxyUrl = "wss://luanti.dustlabs.io/proxy";#this.proxyUrl = new URLSearchParams(location.search).get("proxy") || "wss://luanti.dustlabs.io/proxy";#' {} +
           find . -name launcher.js | xargs grep -l "URLSearchParams(location.search).get('proxy')" >/dev/null
           echo "proxy query-param override wired"
+          # Auto-unique player names: without ?name=, the client fell back
+          # to its stored/default name; a lingering session with that name
+          # made every reconnect collide ("same name connected") and stall.
+          python3 - <<'PYN'
+          import glob
+          hits = 0
+          for p in glob.glob("www/*/launcher.js"):
+              s = open(p).read()
+              old = "if (params.has('name')) r.name = params.get('name');"
+              new = old + " else r.name = \"Web\" + String(Math.floor(Math.random() * 900000 + 100000));"
+              if old in s and "Math.random() * 900000" not in s:
+                  open(p, "w").write(s.replace(old, new))
+                  hits += 1
+          assert hits >= 1, "launcher name-autogen patch: pattern not found"
+          print("launcher name-autogen patched:", hits)
+          PYN
           # 2) coi-serviceworker: client-side COOP/COEP. NOTE: inside the
           #    itch embed (html.itch.zone iframe) a service worker cannot
           #    isolate the TOP-LEVEL page — on itch the "SharedArrayBuffer

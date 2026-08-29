@@ -56,9 +56,20 @@ servers only through a WebSocket->UDP proxy (default
 Target server: `147.185.221.230:6323` (Eugene, US — the default US proxy
 is the right relay for it).
 
-Browser URL (once the server answers UDP):
+Browser URL:
 
     https://sodomita.github.io/SystemTest/?go&server&address=147.185.221.230&port=6323
+
+Player names are auto-generated ("Web123456") unless ?name= is given, so
+reconnects never collide with lingering sessions. ("Same name already
+connected" = a zombie session on the server from a crashed/disconnected
+web client; it self-clears after the server's player-timeout, or restart
+the server. Before auto-names, every reconnect reused the same default
+name and stalled at the definition screen.)
+
+The server must run **SystemTest** (the web client only carries this
+game; a different server game means mismatched item/node definitions and
+media re-download stalls, especially over the relay).
 
 Verify the whole chain from any machine (no browser needed):
 
