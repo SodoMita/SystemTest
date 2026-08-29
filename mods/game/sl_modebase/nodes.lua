@@ -336,13 +336,18 @@ minetest.register_node(game_mode.modname .. ":loot_crate", {
 
 		if refuse_if_sabotaged(pos, clicker) then return itemstack end
 
+		-- An 8-slot-wide list is 9.75 units across in real coordinates
+		-- ((8-1) * 1.25 spacing + 1.0 slot), and 4 slots are 4.75 tall, so the
+		-- window has to be at least 10.05 wide and the two grids cannot share
+		-- rows. The old size[8,9.5] clipped 2.05 units off the right edge and
+		-- stacked the second grid on top of the first.
 		minetest.show_formspec(name, "sl_modebase:loot_crate",
 			"formspec_version[4]" ..
-			"size[8,9.5]" ..
+			"size[10.5,11.0]" ..
 			"bgcolor[#1a1a1aff;true]" ..
 			"label[0.3,0.5;Loot Crate (32 slots)]" ..
 			"list[nodemeta:" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ";main;0.3,0.8;8,4;]" ..
-			"list[current_player;main;0.3,5.2;8,4;]" ..
+			"list[current_player;main;0.3,5.9;8,4;]" ..
 			"listring[nodemeta:" .. pos.x .. "," .. pos.y .. "," .. pos.z .. ";main]" ..
 			"listring[current_player;main]")
 	end,

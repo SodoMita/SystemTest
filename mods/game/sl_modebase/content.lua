@@ -533,7 +533,10 @@ local function spawner_formspec(pos, meta)
 	local min_raw = meta:get_string("spawner_min")
 	local fs = {
 		"formspec_version[4]",
-		"size[9,15.5]",
+		-- An 8-slot-wide list is 9.75 units across in real coordinates, so the
+		-- window needs more than 10.05 of width; 9 clipped 1.05 units off the
+		-- right edge.
+		"size[10.5,15.6]",
 		"bgcolor[#120a14ee;true]",
 		"label[0.3,0.2;MONSTER SPAWNER UNIT]",
 		"label[0.3,0.7;Essence in unit: " .. tostring(essence) .. "  (needs "
@@ -558,14 +561,14 @@ local function spawner_formspec(pos, meta)
 	table.insert(fs, string.format("listring[nodemeta:%d,%d,%d;feed]", pos.x, pos.y, pos.z))
 	table.insert(fs, "listring[current_player;main]")
 	-- Per-node settings (spawn rate + minimal essence), saved to this unit.
-	table.insert(fs, "label[0.3,13.9;UNIT SETTINGS]")
-	table.insert(fs, "label[0.3,14.5;Cooldown (s):]")
-	table.insert(fs, string.format("field[2.1,14.2;1.2,0.6;spawner_cd;;%s]",
+	table.insert(fs, "label[0.3,14.5;UNIT SETTINGS]")
+	table.insert(fs, "label[0.3,14.95;Cooldown (s):]")
+	table.insert(fs, string.format("field[2.1,14.7;1.2,0.6;spawner_cd;;%s]",
 		cd_raw ~= "" and cd_raw or tostring(SPAWNER_CD_DEFAULT)))
-	table.insert(fs, "label[3.6,14.5;Min Essence:]")
-	table.insert(fs, string.format("field[5.2,14.2;1.2,0.6;spawner_min;;%s]",
+	table.insert(fs, "label[3.6,14.95;Min Essence:]")
+	table.insert(fs, string.format("field[5.2,14.7;1.2,0.6;spawner_min;;%s]",
 		min_raw ~= "" and min_raw or tostring(SPAWNER_MIN_DEFAULT)))
-	table.insert(fs, "button[6.7,14.2;2.0,0.6;save_spawner_cfg;Save]")
+	table.insert(fs, "button[6.7,14.7;2.0,0.6;save_spawner_cfg;Save]")
 	table.insert(fs, "button_exit[6,0.2;2.6,0.6;close;Close]")
 	return table.concat(fs, "")
 end

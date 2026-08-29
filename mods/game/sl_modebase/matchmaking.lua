@@ -10,9 +10,11 @@ local function get_matchmaking_formspec(player_name)
 	local privs = minetest.get_player_privs(player_name)
 	local is_admin = privs.sl_admin or privs.server
 
+	-- The window is 10 units tall and the control row is the last thing drawn,
+	-- so it has to end above y=10 or its bottom edge is cut off by the frame.
 	local fs = {
 		"formspec_version[4]",
-		"size[10,9]",
+		"size[10,10]",
 		"bgcolor[#101010ff;true]",
 		"label[0.5,0.5;" .. minetest.colorize("#00ffff", "SYSTEM MATCHMAKING") .. "]",
 	}
@@ -72,8 +74,8 @@ local function get_matchmaking_formspec(player_name)
 	end
 
 	-- Player List
-	table.insert(fs, "box[0.5,6.8;9,1.8;#1a1a1aff]")
-	table.insert(fs, "label[0.7,7.1;Connected Players:]")
+	table.insert(fs, "box[0.5,6.8;9,1.9;#1a1a1aff]")
+	table.insert(fs, "label[0.7,7.05;Connected Players:]")
 	
 	local connected = minetest.get_connected_players()
 	local names = {}
@@ -88,18 +90,19 @@ local function get_matchmaking_formspec(player_name)
 		end
 		table.insert(names, n .. role_str)
 	end
-	table.insert(fs, "textlist[0.7,7.5;8.6,0.8;player_list;" .. table.concat(names, ",") .. "]")
+	table.insert(fs, "textlist[0.7,7.45;8.6,1.05;player_list;" .. table.concat(names, ",") .. "]")
 
-	-- Control Buttons
+	-- Control Buttons — last row in the window, so it has to stay inside the
+	-- 10-unit frame (y=8.9 + h=0.85 ends at 9.75).
 	if not state.match_active then
 		if is_admin then
-			table.insert(fs, "image_button[3,8.7;4,0.8;gui_button_next.png;start_match;START MATCH]")
+			table.insert(fs, "image_button[3,8.9;4,0.85;gui_button_next.png;start_match;START MATCH]")
 		else
-			table.insert(fs, "label[3,8.7;Waiting for admin to start...]")
+			table.insert(fs, "label[3,9.1;Waiting for admin to start...]")
 		end
 	else
 		if is_admin then
-			table.insert(fs, "button[3,8.7;4,0.8;stop_match;FORCE STOP MATCH]")
+			table.insert(fs, "button[3,8.9;4,0.85;stop_match;FORCE STOP MATCH]")
 		end
 	end
 

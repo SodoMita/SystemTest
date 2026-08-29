@@ -14,23 +14,6 @@ local outfit_slots = {
     { key = "R_FOOT", label = "R foot" },
 }
 
--- Use the System Looting boxman model for previews
-local function get_preview_model(player)
-    if sl_characters and sl_characters.default_model then
-        local tex = sl_characters.default_texture or "sl_boxman_neon.png"
-        return sl_characters.default_model, {tex, tex, tex, tex, tex, tex, tex, tex}
-    end
-    local tex = {"character.png", "character.png", "character.png", "character.png", "character.png", "character.png"}
-    if player_api and player_api.get_textures then
-        local ptex = player_api.get_textures(player)
-        if ptex and #ptex > 0 then
-            tex = {}
-            for i=1,8 do tex[i] = ptex[1] end
-        end
-    end
-    return "character.b3d", tex
-end
-
 -- Helper to find items in the player's inventory that fit a specific slot
 local function get_player_outfit_items(player, slot_key)
     local inv = player:get_inventory()
@@ -188,7 +171,6 @@ function get_character_outfit_formspec(player, selected_slot)
         selected_slot = "HEAD"
     end
     local name = player:get_player_name()
-    local model_name, tex = get_preview_model(player)
     local equipped = get_equipped(player)
     local total_weight = calc_total_weight(equipped)
     local meta = player:get_meta()
@@ -209,7 +191,10 @@ function get_character_outfit_formspec(player, selected_slot)
 
     -- Background boxes FIRST
     table.insert(fs, "box[0,0;12,0.6;#1a1a1aff]")
-    table.insert(fs, "box[0.2,1.0;3.5,3.5;#101010ff]")
+    -- Preview panel sits between the two columns of slot buttons. It used to
+    -- span 0.2..3.7, so TORSO/L hand (0.0..0.9) and Back/R hand (3.1..4.0)
+    -- were painted over the character's torso and hands.
+    table.insert(fs, "box[1.0,1.0;2.0,3.5;#101010ff]")
     table.insert(fs, "box[4.2,0.8;7.5,4.8;#101010ff]")
     table.insert(fs, "box[0.2,6.2;5.6,4.8;#101010ff]")
     table.insert(fs, "box[5.8,6.2;6.0,4.8;#151515ff]")
@@ -219,11 +204,10 @@ function get_character_outfit_formspec(player, selected_slot)
         table.insert(fs, gui_get_tab_buttons(current_tab, false))
     end
 
-    -- 3D preview using the System Looting boxman model
-    table.insert(fs, string.format(
-        "model[0.3,1.1;3.3,3.3;outfit_preview;%s;%s;0,170;false;true;0,0]",
-        model_name, table.concat(tex, ",")
-    ))
+    -- 3D preview using the System Looting boxman model.
+    -- gui_character_model_element lives in unified_inventory.lua, which
+    -- init.lua loads before this file (it also provides gui_get_tab_buttons).
+    table.insert(fs, gui_character_model_element("outfit_preview", 1.05, 1.05, 1.9, 3.4, player))
 
     -- Slot buttons around the preview
     table.insert(fs, "button[1.4,0.4;1.0,0.6;slot_HEAD;Head]")

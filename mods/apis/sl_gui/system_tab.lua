@@ -136,28 +136,32 @@ function get_system_formspec(player)
 	end
 
 	-- Row 3: Admin / Match control (visible to all, but actions gated)
-	table.insert(fs, "box[0.2,6.0;11.6,1.6;#1a2a1aee]")
+	-- Two 0.7-tall button rows plus the label need 2.0 of height. The box used
+	-- to be 1.6, so the second row started at 7.1 while the first still ended at
+	-- 7.2: the four buttons of each row overlapped each other by 0.1 and the
+	-- second row hung 0.2 below the box.
+	table.insert(fs, "box[0.2,6.0;11.6,2.0;#1a2a1aee]")
 	table.insert(fs, string.format("label[0.4,6.1;%s %s]", S("MATCH CONTROL"), admin and S("(ADMIN)") or S("(request admin)")))
 	table.insert(fs, "button[0.3,6.5;2.5,0.7;sys_match_start; Start (ready) ]")
 	table.insert(fs, "button[3.0,6.5;2.5,0.7;sys_match_start_now; Start NOW ]")
 	table.insert(fs, "button[5.7,6.5;2.5,0.7;sys_match_stop; Stop Match ]")
 	table.insert(fs, "button[8.4,6.5;3.0,0.7;sys_autostart_toggle; Toggle Auto-Start ]")
 
-	table.insert(fs, "button[0.3,7.1;2.5,0.7;sys_set_lobby; Set Lobby Spawn ]")
-	table.insert(fs, "button[3.0,7.1;2.5,0.7;sys_build_cage; Build Cage ]")
-	table.insert(fs, "button[5.7,7.1;2.5,0.7;sys_assign_a; Assign to A ]")
-	table.insert(fs, "button[8.4,7.1;3.0,0.7;sys_assign_b; Assign to B ]")
+	table.insert(fs, "button[0.3,7.25;2.5,0.7;sys_set_lobby; Set Lobby Spawn ]")
+	table.insert(fs, "button[3.0,7.25;2.5,0.7;sys_build_cage; Build Cage ]")
+	table.insert(fs, "button[5.7,7.25;2.5,0.7;sys_assign_a; Assign to A ]")
+	table.insert(fs, "button[8.4,7.25;3.0,0.7;sys_assign_b; Assign to B ]")
 
 	-- Row 4: Ghost + Test + Info (creative/admin)
-	table.insert(fs, "box[0.2,7.8;11.6,1.6;#2a1a2aee]")
-	table.insert(fs, string.format("label[0.4,7.9;%s %s]", S("GHOST & TEST"), S("(creative)")))
-	table.insert(fs, "button[0.3,8.3;2.5,0.7;sys_summon_ghost_ui; Summon Ghost ]")
-	table.insert(fs, "button[3.0,8.3;2.5,0.7;sys_ghost_offer_sec; Offer Sec ]")
-	table.insert(fs, "button[5.7,8.3;2.5,0.7;sys_test_arena; Test Arena ]")
-	table.insert(fs, "button[8.4,8.3;3.0,0.7;sys_test_bots; Test Bots ]")
+	table.insert(fs, "box[0.2,8.2;11.6,1.6;#2a1a2aee]")
+	table.insert(fs, string.format("label[0.4,8.3;%s %s]", S("GHOST & TEST"), S("(creative)")))
+	table.insert(fs, "button[0.3,8.7;2.5,0.7;sys_summon_ghost_ui; Summon Ghost ]")
+	table.insert(fs, "button[3.0,8.7;2.5,0.7;sys_ghost_offer_sec; Offer Sec ]")
+	table.insert(fs, "button[5.7,8.7;2.5,0.7;sys_test_arena; Test Arena ]")
+	table.insert(fs, "button[8.4,8.7;3.0,0.7;sys_test_bots; Test Bots ]")
 
 	-- Footer hint
-	table.insert(fs, string.format("label[0.3,9.7;%s]", S("TIP: All actions mirror chat commands. Use COMMS tab for private links. Ghost comms are sealed.")))
+	table.insert(fs, string.format("label[0.3,10.1;%s]", S("TIP: All actions mirror chat commands. Use COMMS tab for private links. Ghost comms are sealed.")))
 
 	return table.concat(fs, "")
 end
