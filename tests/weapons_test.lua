@@ -174,6 +174,72 @@ for _, ent in ipairs({ "sl_weapons:corpse", "sl_weapons:deadwalk", "sl_weapons:m
 	check(minetest.registered_entities[ent] ~= nil, "entity registered: " .. ent)
 end
 
+-- ================================================================
+section("PHASE W0b — deprecation audit (live-server round 2)")
+-- ================================================================
+
+-- Engine entity properties belong inside initial_properties; a prop at
+-- the top of a definition logs deprecation warnings on the live server
+-- (the sl_weapons:mortar / :turret_head lesson).
+local ENGINE_PROPS = {
+	"physical", "collide_with_objects", "collisionbox", "selectionbox",
+	"pointable", "visual", "mesh", "textures", "visual_size", "spritediv",
+	"is_visible", "makes_footstep_sound", "static_save", "hp_max", "glow",
+	"nametag", "infotext", "wield_item", "backface_culling",
+	"automatic_rotate", "automatic_face_movement_dir",
+}
+local prop_offences, audited = 0, 0
+for name, def in pairs(minetest.registered_entities) do
+	audited = audited + 1
+	for _, prop in ipairs(ENGINE_PROPS) do
+		if def[prop] ~= nil then
+			prop_offences = prop_offences + 1
+			print("    offence: " .. name .. " top-level '" .. prop .. "'")
+		end
+	end
+end
+check(prop_offences == 0, "entity defs carry engine props in initial_properties ("
+	.. tostring(audited) .. " audited)")
+
+-- The deprecated velocity twins must appear nowhere in game code — not
+-- even in comments; the tree should stop teaching the pattern. MT CTF
+-- calls get_velocity / add_velocity directly, and so do we.
+local legacy = 0
+local vgrep = io.popen("grep -rn player_velocity mods/game mods/content 2>/dev/null")
+if vgrep then
+	for line in vgrep:lines() do
+		if line:find("get_player_velocity") or line:find("add_player_velocity")
+			or line:find("set_player_velocity") then
+			legacy = legacy + 1
+			print("    legacy call: " .. line)
+		end
+	end
+	vgrep:close()
+end
+check(legacy == 0, "no deprecated velocity calls in game code")
+
+-- Formspec table columns: the legal types are text, image, color,
+-- indent and tree; alignment is an option (align=right), never a type.
+-- v1.3.5 shipped a 'right' column and the client parser segfaulted.
+local VALID_COL = { text = true, image = true, color = true, indent = true, tree = true }
+local bad_cols = 0
+local cgrep = io.popen("grep -rn tablecolumns mods/game mods/content 2>/dev/null")
+if cgrep then
+	for line in cgrep:lines() do
+		for cols in line:gmatch("tablecolumns%[([^%]]*)%]") do
+			for col in cols:gmatch("[^;]+") do
+				local kind = col:match("^%s*([%w_]+)")
+				if not VALID_COL[kind] then
+					bad_cols = bad_cols + 1
+					print("    bad column type '" .. tostring(kind) .. "': " .. line)
+				end
+			end
+		end
+	end
+	cgrep:close()
+end
+check(bad_cols == 0, "formspec table columns are all legal types")
+
 check(gm.is_possessable("sl_weapons:pad_weapon"), "weapon pad is possessable")
 check(gm.is_possessable("sl_weapons:turret"), "turret is possessable")
 check(gm.is_possessable("sl_weapons:fabricator") == false
@@ -477,7 +543,7 @@ H.advance(0.6, 0.05)
 local splash_dmg = 20 - vic3:get_hp()
 check(splash_dmg >= 2 and splash_dmg <= 5, "splash falloff below direct (10 max, " ..
 	tostring(splash_dmg) .. " dmg at 2.2 m)")
-local kv = vic3:get_player_velocity()
+local kv = vic3:get_velocity()
 check(kv.x ~= 0 or kv.z ~= 0, "splash knockback applied to victim")
 
 -- Mortar-jump: shoot your own feet, ride the blast.
@@ -488,7 +554,7 @@ aim_at(alpha, { x = alpha:get_pos().x, y = alpha:get_pos().y - 1, z = alpha:get_
 H.advance(0.4, 0.1) -- refire window from the last mortar shot
 fire("sl_weapons:mortar", alpha)
 H.advance(0.4, 0.05)
-local selfvel = alpha:get_player_velocity()
+local selfvel = alpha:get_velocity()
 check(selfvel.y > 0, "mortar-jump: shooter launched upward")
 check(alpha:get_hp() < 20, "mortar-jump costs self-damage (50% falloff)")
 
@@ -503,7 +569,7 @@ H.advance(0.35, 0.1)
 fire("sl_weapons:driver", alpha)
 H.advance(0.3, 0.05)
 check(vic4:get_hp() == 15, "pulse bolt deals 5")
-local jv = vic4:get_player_velocity()
+local jv = vic4:get_velocity()
 check(jv.z ~= 0 or jv.x ~= 0 or jv.y ~= 0, "pulse-juggle knockback nudges the target")
 
 -- Dry fire: loud click + autoswitch to pistol (empty MAGAZINE —
@@ -939,7 +1005,7 @@ check(W.get_pool("alpha").cells == 10, "lash costs 5 cells")
 H.advance(0.6, 0.05)
 check(W.lash.alpha ~= nil, "hook anchored into the wall")
 H.advance(0.3, 0.05)
-local reel_v = alpha:get_player_velocity()
+local reel_v = alpha:get_velocity()
 check(reel_v.x ~= 0 or reel_v.z ~= 0, "reel applies velocity toward the anchor")
 
 -- Any damage detaches (danger 3)

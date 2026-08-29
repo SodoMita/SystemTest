@@ -697,6 +697,29 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.3.6 (2026-08-29, live-server hardening round 2)** — the second
+  field report, resolved against MT CTF as the reference implementation.
+  *Deprecations, finished:* `W.knockback` calls `add_velocity` on
+  whatever moves — CTF's own knockback (`ctf_mode_nade_fight`) does
+  exactly this, no shims; `W.player_velocity` reads `get_velocity`
+  directly; the deprecated player-only twins are gone from the tree
+  entirely, comments included, and a **W0b source scan** fails the suite
+  if they ever come back. The last old-style entity definition
+  (`sl_weapons:turret_head`, missed by the v1.3.5 sweep) moved its
+  properties into `initial_properties`, and a **W0b entity audit** now
+  fails the suite if any registered entity carries engine properties at
+  the top of its definition. *Segfault:* the v1.3.5 ranking form shipped
+  `tablecolumns[text;text;right]` — the legal column types are `text`,
+  `image`, `color`, `indent`, `tree` (alignment is an *option*,
+  `align=right`), and the unknown type fed the client formspec parser
+  garbage at exactly the moment the results screen appeared. The form
+  ships `[text;text;text]`, and a W0b scan validates every emitted
+  column list forever. Note: two of the three logged warnings referenced
+  a build older than v1.3.5 — redeploy before retesting. CTF itself
+  still carries old-style entity definitions and tolerates the warnings;
+  we hold the line at zero. Suites: weapons 272/272, smoke 127/127,
+  soak PASS (3 seeds × 40 matches).
+
 - **v1.3.5 (2026-08-29, tournament seasons + mortar rework + live-server
   fixes)** — three threads in one sitting. *Tournaments* (team decision
   2026-08-29: "limited quantity of plays or games or matches"):

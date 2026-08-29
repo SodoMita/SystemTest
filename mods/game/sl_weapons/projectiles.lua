@@ -4,7 +4,7 @@
 -- on_step raycasts from last to next position, so nothing tunnels
 -- at 26 n/s. Projectiles inherit the shooter's velocity (council
 -- resolution #10): a shell fired from a sprint carries the sprint.
--- Splash: linear falloff, knockback via add_player_velocity,
+-- Splash: linear falloff, knockback via add_velocity,
 -- mortar-jump included; cremates corpses (spec §7.3).
 -- ================================================================
 

@@ -254,12 +254,11 @@ end
 
 function W.knockback(obj, vel)
 	if not obj or not vel then return end
-	if obj:is_player() then
-		if obj.add_player_velocity then
-			obj:add_player_velocity(vel)
-		elseif obj.add_to_velocity then
-			obj:add_to_velocity(vel)
-		end
+	-- MT CTF pattern (ctf_mode_nade_fight knockback): plain add_velocity
+	-- on whatever moves; the old player-only variants are deprecated and
+	-- gone from this tree.
+	if obj.add_velocity then
+		obj:add_velocity(vel)
 	else
 		local cur = obj.get_velocity and obj:get_velocity() or { x = 0, y = 0, z = 0 }
 		obj:set_velocity({ x = cur.x + vel.x, y = cur.y + vel.y, z = cur.z + vel.z })
@@ -267,14 +266,10 @@ function W.knockback(obj, vel)
 end
 
 function W.player_velocity(user)
-	-- get_velocity replaced get_player_velocity (engine 5.3+); keep the
-	-- old name as a fallback for older engines.
+	-- MT CTF pattern: read get_velocity directly. The deprecated
+	-- player-only reader is gone from this tree, fallbacks included.
 	if user and user.get_velocity then
-		local ok, v = pcall(user.get_velocity, user)
-		if ok and type(v) == "table" then return v end
-	end
-	if user and user.get_player_velocity then
-		return user:get_player_velocity()
+		return user:get_velocity()
 	end
 	return { x = 0, y = 0, z = 0 }
 end

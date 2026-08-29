@@ -71,12 +71,14 @@ end
 minetest.register_entity(W.modname .. ":turret_head", {
 	sl_weapon_fx = true,
 	_stub_ray_radius = 0.3,
-	visual = "cube",
-	textures = { "sl_weapons_turret_head.png" },
-	visual_size = { x = 4, y = 4 },
-	physical = false,
-	pointable = false,
-	static_save = false,
+	initial_properties = {
+		visual = "cube",
+		textures = { "sl_weapons_turret_head.png" },
+		visual_size = { x = 4, y = 4 },
+		physical = false,
+		pointable = false,
+		static_save = false,
+	},
 	on_step = function(self, _dtime)
 		-- Idle sweep handled by the turret tick (rotation feedback).
 	end,

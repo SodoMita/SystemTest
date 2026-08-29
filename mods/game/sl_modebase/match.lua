@@ -277,7 +277,11 @@ function game_mode.show_rank_formspec(formname, title, subtitle, headers, rows)
 		"bgcolor[#0a0a12ee;true]",
 		"label[0.5,0.4;" .. minetest.formspec_escape(title) .. "]",
 		"label[0.5,0.9;" .. minetest.formspec_escape(subtitle) .. "]",
-		"tablecolumns[text;text;right]",
+		-- Column types are text/image/color/indent/tree and nothing else —
+		-- alignment is an option ("text,align=right"), never a type. An
+		-- unknown type feeds the client parser garbage: v1.3.5 shipped
+		-- 'right' here and the client segfaulted on the form.
+		"tablecolumns[text;text;text]",
 	}
 	local items = { table.concat(headers, ",") }
 	for _, row in ipairs(rows) do

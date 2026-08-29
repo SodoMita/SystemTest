@@ -758,11 +758,14 @@ end
 -- expose get_player_velocity.
 PlayerMeta.get_player_velocity = PlayerMeta.get_velocity
 function PlayerMeta:set_player_velocity(v) self._velocity = { x = v.x, y = v.y, z = v.z } end
-function PlayerMeta:add_player_velocity(v)
+function PlayerMeta:add_velocity(v)
 	local cur = self._velocity or { x = 0, y = 0, z = 0 }
 	self._velocity = { x = cur.x + v.x, y = cur.y + v.y, z = cur.z + v.z }
 end
-PlayerMeta.add_to_velocity = PlayerMeta.add_player_velocity
+-- Deprecated twins, kept as aliases for engine parity; game code must
+-- call add_velocity (the W0b source scan enforces it).
+PlayerMeta.add_player_velocity = PlayerMeta.add_velocity
+PlayerMeta.add_to_velocity = PlayerMeta.add_velocity
 function PlayerMeta:set_velocity(v) self._velocity = { x = v.x, y = v.y, z = v.z } end
 function PlayerMeta:get_armor_groups() return self._armor or {} end
 function PlayerMeta:get_wielded_item() return ItemStack(self._wielded or "") end
@@ -842,6 +845,10 @@ local function make_entity_object(pos, name)
 	function obj:move_to(p, continuous) self:set_pos(p) end
 	function obj:get_velocity() return { x = self._velocity.x, y = self._velocity.y, z = self._velocity.z } end
 	function obj:set_velocity(v) self._velocity = { x = v.x, y = v.y, z = v.z } end
+	function obj:add_velocity(v)
+		local cur = self._velocity or { x = 0, y = 0, z = 0 }
+		self._velocity = { x = cur.x + v.x, y = cur.y + v.y, z = cur.z + v.z }
+	end
 	function obj:set_acceleration(_) end
 	function obj:get_acceleration() return { x = 0, y = 0, z = 0 } end
 	function obj:get_properties() return self._props end
