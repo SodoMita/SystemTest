@@ -192,3 +192,57 @@ Per owner decision, entity textures were **restored to their previous
   `sl_scary_signal_wraith.png`, `scary_mob_texture.png` — verified
   byte-identical to the previous state (they were never changed by the neon
   pass).
+
+## White-bloom neon line-art pass (2026-08-29) — node textures redone
+
+Per owner correction, the bold multi-color fill textures were **replaced** with
+the established visual direction: **sharp monochrome vector line art on deep
+black** ("neon outlines against deep black", `BRIEF GDD.md`). The glow is not
+baked in — lines are snapped to full brightness and the engine's bloom does the
+glowing from line brightness.
+
+**Line color policy (owner-confirmed):**
+- Lines are **white** by default (white-bloom).
+- **Beacons keep their team hue**: `sl_beacon_a` = red, `sl_beacon_b` = blue,
+  `sl_beacon_destroyed` = grey.
+- **Warning/hazard symbols stay yellow**: hazard triangle, radiation trefoil,
+  biohazard, caution tape, and `sl_warning_sign`.
+
+**How they were made:** 10 `generate_image` sprite sheets (3×3 grids of
+flat-vector tiles) rendered as monochrome neon line art on black, then each
+16×16 texture is cut from its cell and post-processed: downscale → threshold →
+snap surviving strokes to full-brightness line color, background crushed to
+black (or made transparent for the alpha cloud tiles). Sheets are kept at
+`~/.texgen/sheets2/` (outside the repo).
+
+**Alpha cloud tiles** (foliage + cloud water) are line art on **transparent**
+background: the near-white cell background is flood-filled out to alpha 0 and
+the dark strokes inverted to white, so the cloud reads as white neon leaf/
+haze outlines. `cloud.png` = foliage clump (clip alpha), `cloud_water.png` =
+white haze (blend, ~140 alpha), `cloud_solid.png` = opaque white puff outline.
+
+Reinstalled on top of the earlier fill textures (same filenames, same 16×16
+sizes): all 50 workshop faces, all sl_modebase node faces, the 3 beacon faces,
+the sl_mvp_assets faces (terminal, door, platform, pickup), the 3 sl_scary
+hide-spot faces, and the 3 sky cloud faces.
+
+### Crash fix + ABM removal (same pass)
+- **Sky particle crash fixed.** `mods/sl_blocks/sky/init.lua` called
+  `minetest.particles:spawn`, which does not exist in this Luanti build
+  (`minetest.particles` is nil → `AsyncErr: attempt to index field 'particles'`).
+  Particles are now spawned with `core.add_particlespawner({...})` (the
+  documented Luanti API), with a `type(core.add_particlespawner)=="function"`
+  guard so the mod degrades to no particles instead of crashing on any build.
+- **No ABMs.** The ambient-particle ABM and the `sl_modebase` "Restore Beacons
+  in Lobby" ABM were both removed (owner: ABMs are too slow).
+  - Cloud particles now come from a low-frequency (2 s) `register_globalstep`
+    that samples a small fixed set of cached voxels around each player and
+    emits at most one short-lived (2 s) particlespawner per player per tick.
+  - Beacon lobby-restore now uses the classic per-node timer API:
+    `minetest.get_node_timer(pos):start(5)` in `handle_beacon_destruction`
+    plus an `on_timer` callback on the `destroyed_beacon` node definition.
+    Node timers are persistent (stored in the mapblock) and only tick while
+    the block is loaded; at most 2 destroyed beacons exist at a time, and
+    `on_timer` returns false once the node is restored or removed, so the
+    timer stops itself. A one-time check of the two known spawn positions
+    shortly after load covers pre-existing destroyed beacons without a timer.

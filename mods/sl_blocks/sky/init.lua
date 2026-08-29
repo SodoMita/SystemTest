@@ -59,41 +59,86 @@ minetest.register_alias("default:cloud", "sky:cloud")
 minetest.register_alias("cloud", "sky:cloud")
 
 -- ============================================================
--- Ambient particles: drifting leaf specks around foliage
--- clouds and slow-rising dust motes around solid clouds.
--- Only emitted when a player is nearby (ABM keeps it cheap).
+-- Ambient particles — NO ABM (rejected: too slow).
+--
+-- A low-frequency globalstep samples a small fixed set of
+-- blocks around each player (a few cached voxel lookups per
+-- 2 s) and emits at most ONE particle per player per tick
+-- when a cloud is found. No node scans, no ABMs.
+--
+-- Note: this engine has no `minetest.particles` global (that
+-- was the cause of an AsyncErr crash). Particles are spawned
+-- through core.add_particlespawner, which takes a definition
+-- table and self-terminates after `time` seconds.
 -- ============================================================
 
-local function player_near(pos, radius)
-	for _, p in ipairs(minetest.get_connected_players()) do
-		local pp = p:get_pos()
-		if pp and vector.distance(pp, pos) <= radius then
-			return true
+local CLOUD_PARTICLE = {
+	["sky:cloud"] = {
+		texture = "cloud_leaf_particle.png",
+		vy = 0.05, vy_max = 0.3, ay = 0.06, vertical = true,
+	},
+	["sky:cloud_solid"] = {
+		texture = "cloud_particle.png",
+		vy = 0.0, vy_max = 0.15, ay = -0.02, vertical = false,
+	},
+}
+
+local OFFSETS = {
+	{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+	{1, 1}, {-1, -1}, {1, -1}, {-1, 1},
+}
+
+-- Spawn a short-lived, low-volume particlespawner at a cloud
+-- node. One call per player per 2 s; the spawner lives 2 s and
+-- is then gone. No ABM, no persistent objects.
+local function emit_for_player(ppos)
+	local px = math.floor(ppos.x)
+	local py = math.floor(ppos.y)
+	local pz = math.floor(ppos.z)
+	for dy = -1, 9 do
+		for _, o in ipairs(OFFSETS) do
+			local n = minetest.get_node_or_nil({x = px + o[1], y = py + dy, z = pz + o[2]})
+			if n and CLOUD_PARTICLE[n.name] then
+				if math.random() >= 0.5 then return end
+				local spec = CLOUD_PARTICLE[n.name]
+				local nx = px + o[1] + 0.1
+				local ny = py + dy + 0.1
+				local nz = pz + o[2] + 0.1
+				core.add_particlespawner({
+					amount = 4,
+					time = 2,
+					minpos = { x = nx, y = ny, z = nz },
+					maxpos = { x = nx + 0.8, y = ny + 0.8, z = nz + 0.8 },
+					minvel = { x = -0.2, y = spec.vy, z = -0.2 },
+					maxvel = { x = 0.2, y = spec.vy_max, z = 0.2 },
+					minacc = { x = -0.02, y = spec.ay, z = -0.02 },
+					maxacc = { x = 0.02, y = spec.ay, z = 0.02 },
+					minexptime = 2,
+					maxexptime = 4,
+					minsize = 2,
+					maxsize = 4,
+					vertical = spec.vertical,
+					texture = spec.texture,
+				})
+				return
+			end
 		end
 	end
-	return false
 end
 
-minetest.register_abm({
-	label = "sky:cloud_particles",
-	nodenames = {"sky:cloud", "sky:cloud_solid"},
-	interval = 3,
-	chance = 2,
-	action = function(pos)
-		if not player_near(pos, 28) then return end
-		if math.random() >= 0.5 then return end
-		local rnd = math.random
-		local ppos = vector.new(pos.x + (rnd() - 0.5) * 1.6,
-			pos.y + rnd() * 1.4, pos.z + (rnd() - 0.5) * 1.6)
-		local solid = minetest.get_node(pos).name == "sky:cloud_solid"
-		minetest.particles:add(ppos,
-			solid and "cloud_particle.png" or "cloud_leaf_particle.png", {
-			velocity = vector.new((rnd() - 0.5) * 0.5,
-				0.1 + rnd() * 0.25, (rnd() - 0.5) * 0.5),
-			acceleration = solid and vector.new(0, -0.03, 0) or vector.new(0, 0.08, 0),
-			expirationtime = 2.5 + rnd() * 1.5,
-			size = 2 + rnd() * 2,
-			vertical = not solid,
-		})
-	end,
-})
+-- Guard: if this engine build lacks the spawner API entirely,
+-- skip ambient particles instead of crashing.
+if type(core.add_particlespawner) == "function" then
+	local step_acc = 0
+	minetest.register_globalstep(function(dtime)
+		step_acc = step_acc + dtime
+		if step_acc < 2 then return end
+		step_acc = 0
+		for _, player in ipairs(minetest.get_connected_players()) do
+			local ppos = player:get_pos()
+			if ppos then
+				emit_for_player(ppos)
+			end
+		end
+	end)
+end

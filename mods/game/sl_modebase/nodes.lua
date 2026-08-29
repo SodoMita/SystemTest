@@ -5,6 +5,10 @@ local state = game_mode.state
 -- Beacon nodes (visual + spawn anchors)
 -- ================================================================
 
+-- Forward declaration: the lobby-restore callback (defined below) is
+-- referenced by the destroyed_beacon node definition below.
+local restore_beacon_at
+
 local function handle_beacon_destruction(team_id, pos, attacker_name)
 	game_mode.broadcast(S("@1 has been destroyed by @2! Team eliminated.", 
 		game_mode.get_team_label(team_id), attacker_name or "Unknown"))
@@ -12,6 +16,11 @@ local function handle_beacon_destruction(team_id, pos, attacker_name)
 	
 	if pos then
 		minetest.set_node(pos, {name = "sl_modebase:destroyed_beacon"})
+		-- Start the per-node timer (persisted in the mapblock, only
+		-- ticks while the block is loaded) that restores this beacon
+		-- while in the lobby. No ABM. See destroyed_beacon's on_timer.
+		local timer = minetest.get_node_timer(pos)
+		if timer then timer:start(5) end
 	end
 
 	-- Use a list to avoid issues with set_hp triggering end_match recursively
@@ -40,38 +49,65 @@ minetest.register_node(game_mode.modname .. ":destroyed_beacon", {
 	groups = {cracky = 3, oddly_breakable_by_hand = 1, not_in_creative_inventory = 1},
 	selection_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
 	collision_box = {type = "fixed", fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}},
-})
 
--- Auto-restore destroyed beacons in lobby
-minetest.register_abm({
-	label = "Restore Beacons in Lobby",
-	nodenames = {"sl_modebase:destroyed_beacon"},
-	interval = 5,
-	chance = 1,
-	action = function(pos, node)
-		if not state.match_active then
-			-- Identify which beacon this was
-			if state.teams.beacon_a.spawn then
-				local bpos = {x=state.teams.beacon_a.spawn.x, y=state.teams.beacon_a.spawn.y-1, z=state.teams.beacon_a.spawn.z}
-				if vector.equals(pos, bpos) then
-					minetest.set_node(pos, {name = "sl_modebase:beacon_a"})
-					state.teams.beacon_a.hp = 100
-					return
-				end
-			end
-			if state.teams.beacon_b.spawn then
-				local bpos = {x=state.teams.beacon_b.spawn.x, y=state.teams.beacon_b.spawn.y-1, z=state.teams.beacon_b.spawn.z}
-				if vector.equals(pos, bpos) then
-					minetest.set_node(pos, {name = "sl_modebase:beacon_b"})
-					state.teams.beacon_b.hp = 100
-					return
-				end
-			end
-			-- Fallback: just delete if it doesn't match known spawns
-			minetest.remove_node(pos)
-		end
+	-- Lobby restore, driven by the per-node timer started in
+	-- handle_beacon_destruction (no ABM). restore_beacon_at is a
+	-- no-op while a match is active, so the timer keeps cycling every
+	-- 5 s until the match ends; once the node is restored or removed
+	-- it is no longer a destroyed_beacon and the timer stops.
+	on_timer = function(pos, elapsed)
+		restore_beacon_at(pos)
+		local n = minetest.get_node_or_nil(pos)
+		return n ~= nil and n.name == "sl_modebase:destroyed_beacon"
 	end,
 })
+
+-- Auto-restore destroyed beacons in lobby.
+--
+-- No ABM here (ABMs are banned: too slow). Each destroyed beacon runs
+-- a per-node timer (started in handle_beacon_destruction, fired via the
+-- on_timer callback above): one targeted 5 s timer, ticking only while
+-- its block is loaded — at most 2 destroyed beacons exist at a time,
+-- so this replaces a periodic node scan with negligible cost.
+restore_beacon_at = function(pos)
+	if state.match_active then return end
+	-- Identify which beacon this was
+	if state.teams.beacon_a.spawn then
+		local bpos = {x=state.teams.beacon_a.spawn.x, y=state.teams.beacon_a.spawn.y-1, z=state.teams.beacon_a.spawn.z}
+		if vector.equals(pos, bpos) then
+			minetest.set_node(pos, {name = "sl_modebase:beacon_a"})
+			state.teams.beacon_a.hp = 100
+			return
+		end
+	end
+	if state.teams.beacon_b.spawn then
+		local bpos = {x=state.teams.beacon_b.spawn.x, y=state.teams.beacon_b.spawn.y-1, z=state.teams.beacon_b.spawn.z}
+		if vector.equals(pos, bpos) then
+			minetest.set_node(pos, {name = "sl_modebase:beacon_b"})
+			state.teams.beacon_b.hp = 100
+			return
+		end
+	end
+	-- Fallback: just delete if it doesn't match known spawns
+	minetest.remove_node(pos)
+end
+
+-- Destroyed beacons that survived a server reload (no live timer)
+-- get restored at the two known spawn positions shortly after load.
+minetest.register_on_mods_loaded(function()
+	minetest.after(10, function()
+		for _, team_id in ipairs({"beacon_a", "beacon_b"}) do
+			local spawn = state.teams[team_id].spawn
+			if spawn then
+				local bpos = {x=spawn.x, y=spawn.y-1, z=spawn.z}
+				local n = minetest.get_node_or_nil(bpos)
+				if n and n.name == "sl_modebase:destroyed_beacon" then
+					restore_beacon_at(bpos)
+				end
+			end
+		end
+	end)
+end)
 
 function game_mode.damage_beacon(team_id, amount, attacker_name, silent)
 	local tdef = state.teams[team_id]
