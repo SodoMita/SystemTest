@@ -299,7 +299,15 @@ jobs:
           # (gotcha ledger #1 — do not repeat it).
           git clone --depth 1 https://github.com/paradust7/luanti-wasm "$RUNNER_TEMP/luanti-wasm"
           cd "$RUNNER_TEMP/luanti-wasm"
-          ./build_all.sh   # emsdk auto-downloads; ~30-45 min
+          # Pre-seed sources, then patch the pack installer: upstream
+          # src/mainloop.cpp hard-aborts pack installation when libarchive
+          # lacks zstd (the wasm libarchive is built without HAVE_ZSTD
+          # despite --with-zstd; configure silently misses it). Our
+          # base.pack is uncompressed tar, so degrade to tar-only instead
+          # of aborting. No-op once upstream wasm zstd works.
+          ./fetch_sources.sh
+          python3 tools_ci_patch_mainloop.py
+          ./build_all.sh   # emsdk auto-downloads; fetch_sources skips existing; ~30-45 min
       - name: Embed SystemTest into the virtual FS + repack www
         run: |
           set -e
