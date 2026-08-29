@@ -24,6 +24,33 @@ release (no pinning).
 | `web`     | real WASM client built from [paradust7/luanti-wasm](https://github.com/paradust7/luanti-wasm) (emscripten), SystemTest embedded in the virtual FS, **minetest_game removed**, launcher default `gameid` hardcoded to `SystemTest` (`?gameid=` URL param still overrides) | **itch caveat:** inside the itch embed (html.itch.zone iframe) no service worker can isolate the top-level page — the threaded WASM needs cross-origin isolation, so on itch you must tick **SharedArrayBuffer support** (Edit game → Embed options → Frame options) once. Pop-out mode works regardless. |
 | GitHub Pages — https://sodomita.github.io/SystemTest/ | same WASM build, published by the `web-pages` job to `gh-pages` | served **top-level**, so the bundled coi-serviceworker provides COOP/COEP automatically — this is the web build that boots with zero manual steps |
 
+## Web multiplayer — architecture reality (read before "it can't connect" reports)
+
+Browser WASM cannot open TCP/UDP sockets. The web client reaches Luanti
+servers only through a WebSocket->UDP proxy (default
+`wss://luanti.dustlabs.io/proxy`; override per-region with
+`?proxy=wss://eu1.dustlabs.io/mtproxy` on the page URL). Consequences:
+
+- A server on your LAN is UNREACHABLE from the web build — the proxy
+  lives on the internet and cannot see your home network. `0.0.0.0`
+  never works (from the proxy's view that is the proxy's own machine).
+- LAN multiplayer works only in the native builds (Linux/Windows/macOS
+  tarball+exe, Android APK) — connect by LAN IP there, as usual.
+- The in-game public server list will not show SystemTest servers until
+  one is publicly hosted (and list fetches through the proxy can be
+  flaky; direct-address join is the reliable path).
+
+### Hosting a public SystemTest server (the web-multiplayer prerequisite)
+
+1. Any VPS with a public IP and an open UDP port (e.g. 30000).
+2. `SystemLoot-Linux.tar.gz` from the itch linux channel; extract; run:
+   `./run-game.sh --server --world /var/lib/systemloot/world --port 30000`
+   (world.mt: `gameid = SystemTest`, `mg_name = singlenode`).
+3. Web players: join by address `your-vps-ip:30000` (in-game menu, or
+   page URL `?go&server&address=your-vps-ip&port=30000`).
+4. Optional: `server_announce = true` to appear in the public list for
+   native clients.
+
 ## Auth
 
 Butler authenticates with the **`ITCH_API_KEY`** repository secret
