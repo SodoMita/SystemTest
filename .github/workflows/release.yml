@@ -306,7 +306,7 @@ jobs:
           # base.pack is uncompressed tar, so degrade to tar-only instead
           # of aborting. No-op once upstream wasm zstd works.
           ./fetch_sources.sh
-          python3 tools_ci_patch_mainloop.py
+          python3 "$GITHUB_WORKSPACE/tools_ci_patch_mainloop.py"
           ./build_all.sh   # emsdk auto-downloads; fetch_sources skips existing; ~30-45 min
       - name: Embed SystemTest into the virtual FS + repack www
         run: |
