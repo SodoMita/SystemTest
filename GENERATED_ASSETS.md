@@ -223,9 +223,13 @@ haze outlines. `cloud.png` = foliage clump (clip alpha), `cloud_water.png` =
 white haze (blend, ~140 alpha), `cloud_solid.png` = opaque white puff outline.
 
 Reinstalled on top of the earlier fill textures (same filenames, same 16×16
-sizes): all 50 workshop faces, all sl_modebase node faces, the 3 beacon faces,
-the sl_mvp_assets faces (terminal, door, platform, pickup), the 3 sl_scary
-hide-spot faces, and the 3 sky cloud faces.
+sizes): all 50 workshop faces (tops, fronts, sides, backs and bottoms), all
+sl_modebase node faces, the 3 beacon faces, the sl_mvp_assets faces
+(terminal, door, platform, pickup), the 3 sl_scary hide-spot faces, the 3
+sky cloud faces, and the leaf particle sprite. Every node face in the game
+is now white-bloom line art; the only remaining colors are the functional
+accents (yellow warning symbols, red/blue beacons). Item sprites, entity
+textures, UI/HUD and ground neon tiles were out of scope and are untouched.
 
 ### Crash fix + ABM removal (same pass)
 - **Sky particle crash fixed.** `mods/sl_blocks/sky/init.lua` called
