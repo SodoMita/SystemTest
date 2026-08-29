@@ -191,11 +191,20 @@ H.advance(1, 0.5)
 
 alpha._wielded = "sl_weapons:pistol"
 alpha:get_inventory():add_item("main", ItemStack("sl_weapons:pistol"))
+-- Open test range (v1.3.3): weapons fire outside matches; lobby
+-- bodies stay immortal, so test fire is loud but never lethal.
 local s0 = #H.sounds
+fire("sl_weapons:pistol", alpha) -- draw attempt (raise delay)
+H.advance(0.4, 0.1)
+aim_at(alpha, beta)
 fire("sl_weapons:pistol", alpha)
-check(#H.chat_player.alpha > 0 and H.chat_player.alpha[#H.chat_player.alpha]:find("idle outside an active match", 1, true) ~= nil,
-	"lobby fire refused with reason")
-check(not sound_played("sl_weapons_pistol_fire", s0), "no gunshot sound in lobby")
+check(sound_played("sl_weapons_pistol_fire", s0), "weapons fire outside matches (test range)")
+local idle_refusal = false
+for _, l in ipairs(H.chat_player.alpha or {}) do
+	if l:find("idle outside an active match", 1, true) then idle_refusal = true end
+end
+check(not idle_refusal, "no 'range idle' refusal outside matches")
+check(beta:get_hp() == 20, "lobby bodies stay immortal under test fire")
 
 -- ================================================================
 section("PHASE W1b — insertion, loadout, gates inside a match")

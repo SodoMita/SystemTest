@@ -685,6 +685,14 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.3.3 (2026-08-29, the open test range)** — weapons are usable
+  outside matches for testing, deliberately and narrowly: `fire_gate`
+  lets the living fire any time (the dead and the Monster Master are
+  still refused), and the Precision Fabricator serves testers between
+  matches. Lobby immortality and the lobby PvP block are untouched by
+  design — test fire is loud, not lethal; damage rules apply only
+  inside a match.
+
 - **v1.3.2 (2026-08-29, the bar is the magazine)** — the custom ammo HUD
   text is gone. Rounds are stored as item wear, exactly like MT CTF's
   `rawf` (`set_wear` per shot, `65535` = empty): the durability bar in

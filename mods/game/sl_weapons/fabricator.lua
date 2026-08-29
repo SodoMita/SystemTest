@@ -208,9 +208,16 @@ local function start_job(pos, recipe_id, clicker)
 				S("Your hands are the doctrine.")))
 			return
 		end
-		if pl and pl.phase ~= "alive" then
-			minetest.chat_send_player(name, S("The dead order nothing built."))
-			return
+		if pl then
+			-- Inside a match only the living build; outside it the
+			-- machine runs for testers (the open range, v1.3.3).
+			local dead = (game_mode.state and game_mode.state.match_active
+				and pl.phase ~= "alive")
+				or pl.phase == "ghost" or pl.phase == "evil_ghost"
+			if dead then
+				minetest.chat_send_player(name, S("The dead order nothing built."))
+				return
+			end
 		end
 	end
 	local inv = clicker:get_inventory()

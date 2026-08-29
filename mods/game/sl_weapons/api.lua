@@ -152,10 +152,15 @@ function W.fire_gate(user)
 			if pl.role == "monster_master" then
 				return S("Your hands are the doctrine.")
 			end
-			if not (game_mode.state and game_mode.state.match_active) then
-				return S("Range systems are idle outside an active match.")
-			end
-			if pl.phase ~= "alive" then
+			if game_mode.state and game_mode.state.match_active then
+				if pl.phase ~= "alive" then
+					return S("The dead cannot wield the system's weapons.")
+				end
+			elseif pl.phase == "ghost" or pl.phase == "evil_ghost" then
+				-- Open test range (team decision 2026-08-29): weapons
+				-- are testable any time. The dead never wield; the
+				-- living test freely. Lobby bodies stay immortal by
+				-- design -- test fire is loud, not lethal.
 				return S("The dead cannot wield the system's weapons.")
 			end
 		end
