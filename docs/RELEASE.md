@@ -51,6 +51,41 @@ servers only through a WebSocket->UDP proxy (default
 4. Optional: `server_announce = true` to appear in the public list for
    native clients.
 
+## Joining the project server from the browser
+
+Target server: `147.185.221.230:6323` (Eugene, US — the default US proxy
+is the right relay for it).
+
+Browser URL (once the server answers UDP):
+
+    https://sodomita.github.io/SystemTest/?go&server&address=147.185.221.230&port=6323
+
+Verify the whole chain from any machine (no browser needed):
+
+    python3 tests/web/e2e_proxy_test.py 147.185.221.230 6323
+
+  * `FULL CHAIN OK`  -> browser multiplayer will work
+  * `SERVER SILENT`  -> server/firewall problem (see runbook below)
+
+### Server runbook (VPS)
+
+    # 1. Get the bundle (itch linux channel) and extract
+    tar xzf SystemLoot-Linux.tar.gz -C ~/systemloot
+    # 2. World (once)
+    mkdir -p ~/systemloot-world
+    printf 'gameid = SystemTest\nbackend = sqlite3\nmg_name = singlenode\n' > ~/systemloot-world/world.mt
+    # 3. Firewall: UDP 6323 (also open it in the provider's security group!)
+    sudo ufw allow 6323/udp        # if ufw is used
+    # 4. Run
+    ~/systemloot/run-game.sh --server --world ~/systemloot-world --port 6323
+    # 5. Verify it is listening
+    ss -ulnp | grep 6323
+
+Common "SERVER SILENT" causes: process not running; provider security
+group blocks UDP (ufw alone is not enough); server bound to the wrong
+port; server running a different game (web client only carries
+SystemTest — games must match to join).
+
 ## Auth
 
 Butler authenticates with the **`ITCH_API_KEY`** repository secret
