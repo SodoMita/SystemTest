@@ -372,7 +372,7 @@ jobs:
           # WebSocket->UDP proxy. Default stays dustlabs US; allow
           # ?proxy=wss://eu1.dustlabs.io/mtproxy (etc.) per-region.
           find . -name launcher.js -exec sed -i 's#this.proxyUrl = "wss://luanti.dustlabs.io/proxy";#this.proxyUrl = new URLSearchParams(location.search).get("proxy") || "wss://luanti.dustlabs.io/proxy";#' {} +
-          find . -name launcher.js | xargs grep -l "URLSearchParams(location.search).get('proxy')" >/dev/null
+          find . -name launcher.js | xargs grep -l "URLSearchParams(location.search)" >/dev/null
           echo "proxy query-param override wired"
           # Auto-unique player names: without ?name=, the client fell back
           # to its stored/default name; a lingering session with that name
