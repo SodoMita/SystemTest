@@ -207,7 +207,7 @@ function get_character_outfit_formspec(player, selected_slot)
     -- 3D preview using the System Looting boxman model.
     -- gui_character_model_element lives in unified_inventory.lua, which
     -- init.lua loads before this file (it also provides gui_get_tab_buttons).
-    table.insert(fs, gui_character_model_element("outfit_preview", 1.05, 1.05, 1.9, 3.4))
+    table.insert(fs, gui_character_model_element("outfit_preview", 1.05, 1.05, 1.9, 3.4, player))
 
     -- Slot buttons around the preview
     table.insert(fs, "button[1.4,0.4;1.0,0.6;slot_HEAD;Head]")

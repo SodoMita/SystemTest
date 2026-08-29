@@ -31,8 +31,8 @@ function gui_get_tab_buttons(current_tab, show_label, x0, y0)
         {id = "crafting",     icon_img = "gui_tab_crafting.png",     label = "Crafting"},
         {id = "abilities",    icon_img = "gui_tab_abilities.png",    label = "Abilities"},
         {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements"},
-        {id = "system",       icon_img = "gui_tab_player_info.png",  label = "System"},
-        {id = "comms",        icon_img = "gui_tab_crafting.png",     label = "Comms"},
+        {id = "system",       icon_img = "gui_tab_system.png",       label = "System"},
+        {id = "comms",        icon_img = "gui_tab_comms.png",        label = "Comms"},
     }
 
     local formspec = {}
@@ -72,7 +72,41 @@ end
 -- reads a frame loop range: that pins the mesh to a single animation frame
 -- instead of the documented default of "the full range of all available
 -- frames". Leave the frame loop empty and give the element a real speed.
-function gui_character_model_element(name, x, y, w, h)
+-- The model[] element's `frame loop range` selects which animation the preview
+-- plays. Left empty, the engine defaults to the full range of all available
+-- frames (guiFormSpecMenu::parseModel seeds frame_loop_end with infinity), and
+-- SimpleOutlinedBoxman.glb packs every animation into a single 102-keyframe
+-- track -- walk at 1-40, mine at 41-60, walk_mine at 61-99, then the
+-- crawl/sit/die poses at 100-102. So the preview ran, mined and died on a loop
+-- instead of standing still.
+--
+-- Pinning the range to the animation the player is actually using fixes that.
+-- The ranges come from player_api's registered model, so they follow the model
+-- rather than being duplicated here; `stand` is a single keyframe in this model,
+-- which the engine handles (TrackAnimSpec::advance special-cases a zero-length
+-- range), and it means the preview shows a still idle pose.
+local function gui_character_frame_loop(player, model_name)
+    local anim_name = "stand"
+    if player and player_api and player_api.get_animation then
+        -- player_api.get_animation asserts on a player it has never seen
+        -- (bots, the stub), so guard it rather than let it break the formspec.
+        local ok, data = pcall(player_api.get_animation, player)
+        if ok and type(data) == "table" then
+            anim_name = data.animation or anim_name
+            model_name = data.model or model_name
+        end
+    end
+    local models = player_api and player_api.registered_models
+    local model = models and models[model_name]
+    local range = model and model.animations
+        and (model.animations[anim_name] or model.animations.stand)
+    if not (range and range.x and range.y) then
+        return "" -- unknown model: keep the engine default rather than guess
+    end
+    return string.format("%g,%g", range.x, range.y)
+end
+
+function gui_character_model_element(name, x, y, w, h, player)
     local model_name = "character.b3d"
     local texture = "character.png"
     if sl_characters and sl_characters.default_model then
@@ -84,8 +118,9 @@ function gui_character_model_element(name, x, y, w, h)
     local textures = {}
     for _ = 1, 8 do textures[#textures + 1] = texture end
 
-    return string.format("model[%g,%g;%g,%g;%s;%s;%s;0,20;true;false;;30]",
-        x, y, w, h, name, model_name, table.concat(textures, ","))
+    return string.format("model[%g,%g;%g,%g;%s;%s;%s;0,20;true;false;%s;30]",
+        x, y, w, h, name, model_name, table.concat(textures, ","),
+        gui_character_frame_loop(player, model_name))
 end
 
 -- Strip the header (formspec_version, size, bgcolor) from a full
@@ -125,7 +160,8 @@ function get_unified_inventory(player)
         -- 3D Player preview (always visible to reach Information/Outfit menu)
         string.format("box[%g,%g;%g,%g;#2a2a2aff]",
             PREVIEW_X, PREVIEW_Y, PREVIEW_SIZE, PREVIEW_SIZE),
-        gui_character_model_element("player_preview", inner_x, inner_y, inner_size, inner_size),
+        gui_character_model_element("player_preview", inner_x, inner_y,
+            inner_size, inner_size, player),
         -- Click target over the preview. border=false means the engine draws
         -- no button pane, so the mesh behind it stays visible; the element
         -- still receives the click that opens the outfit / player info menu.
@@ -135,7 +171,6 @@ function get_unified_inventory(player)
     }
 
     table.insert(formspec, gui_get_tab_buttons(current_tab, true, 2.1, 0.5))
-    table.insert(formspec, "label[6.4,0.75;SYSTEM LOOTING]")
 
     -- Shift the tab's own layout below the header band instead of overlapping it.
     table.insert(formspec, string.format("container[0,%g]", HEADER_H))

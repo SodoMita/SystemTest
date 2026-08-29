@@ -44,6 +44,8 @@ end
 local modpaths = {
 	sl_modebase = "mods/game/sl_modebase",
 	sl_gui = "mods/apis/sl_gui",
+	player_api = "mods/player_api",
+	sl_characters = "mods/content/sl_characters",
 }
 function minetest.get_modpath(name)
 	return modpaths[name] or "mods/game/sl_modebase"
@@ -100,6 +102,23 @@ PlayerMeta.__index = function(t, k)
 		return noop
 	end
 	return nil
+end
+
+-- player_api's globalstep reads the control state to work out which animation
+-- the player is in, and that is what the preview's frame loop has to follow.
+-- The auto-noop above returns nil for get_*, which the globalstep then indexes.
+function PlayerMeta:get_player_control()
+	return self._controls or {
+		sneak = false, zoom = false, up = false, down = false,
+		left = false, right = false, LMB = false, RMB = false,
+	}
+end
+function PlayerMeta:get_player_control_state() return self:get_player_control() end
+
+-- character_outfit walks the inventory and asks each stack what it is.
+local StackMeta = getmetatable(ItemStack(""))
+function StackMeta:get_definition()
+	return minetest.registered_items[self._name] or { name = self._name }
 end
 
 -- ---------------------------------------------------------------
@@ -371,8 +390,11 @@ end
 -- A `model[]` element must match the parameter layout the engine documents:
 --   model[X,Y;W,H;name;mesh;textures;rotation;continuous;mouse;frame loop;speed]
 -- The ninth field is the animation frame loop range and the tenth the
--- animation speed; a stale `0,0` left over from the older
--- "initial rotation X,Y,Z" form pins the mesh to a single animation frame.
+-- animation speed. An empty ninth field means "the full range of all available
+-- frames" (guiFormSpecMenu::parseModel seeds frame_loop_end with infinity),
+-- which on a model that packs several animations into one track plays all of
+-- them in turn. begin == end is legal and pins a single frame:
+-- TrackAnimSpec::advance special-cases a zero-length range.
 local function check_models(label, fs)
 	local bad
 	for _, el in ipairs(parse_formspec(fs)) do
@@ -385,9 +407,9 @@ local function check_models(label, fs)
 				local loop = p[9]
 				if loop and loop ~= "" then
 					local b, e = xy(loop)
-					if not b or not e or e <= b then
+					if not b or not e or e < b then
 						bad = string.format(
-							"%s: model[%s] frame loop range is '%s' (must be begin<end, or empty for the full range)",
+							"%s: model[%s] frame loop range is '%s' (must be begin<=end, or empty for the full range)",
 							label, tostring(p[3]), tostring(loop))
 					end
 				end
@@ -452,11 +474,17 @@ if not ok then os.exit(1) end
 -- Publish the player model exactly as mods/content/sl_characters does at
 -- runtime, so the preview takes the code path it takes in the real game.
 do
-	local src = io.open("mods/content/sl_characters/model_boxman.lua"):read("*a")
-	local model = src:match('MODEL_NAME%s*=%s*"([^"]+)"')
-	local texture = src:match('MODEL_TEXTURE%s*=%s*"([^"]+)"')
-	check(model ~= nil and texture ~= nil, "read the boxman model constants from sl_characters")
-	sl_characters = { default_model = model, default_texture = texture }
+	H.current_modname = "player_api"
+	local pok, perr = pcall(dofile, "mods/player_api/api.lua")
+	check(pok, "player_api loads" .. (pok and "" or (" -> " .. tostring(perr))))
+	H.current_modname = "sl_characters"
+	local mok, merr = pcall(dofile, "mods/content/sl_characters/model_boxman.lua")
+	check(mok, "the boxman model loads" .. (mok and "" or (" -> " .. tostring(merr))))
+	local model = sl_characters and sl_characters.default_model
+	local registered = model and player_api and player_api.registered_models
+		and player_api.registered_models[model]
+	check(registered ~= nil and registered.animations ~= nil,
+		"the boxman registered its animation ranges with player_api")
 end
 
 local player = H.new_player("alpha")
@@ -708,6 +736,119 @@ check(#distinct == 1, string.format(
 	"every achievement icon draws at the same size regardless of its own "
 		.. "resolution (%d native resolutions -> %s)",
 	#natives, table.concat(distinct, ", ")))
+
+section("PHASE 9 — preview animation, header text, tab icons")
+
+-- model[] carries ten fields; the ninth is the frame loop range. An empty one
+-- means "the full range of all available frames", which on this model plays
+-- every animation back to back.
+local MODEL_FIELD_COUNT = 10
+
+local function frame_loop_of(fs, label)
+	local found
+	for _, e in ipairs(parse_formspec(fs)) do
+		if e.name == "model" then found = e end
+	end
+	if not check(found ~= nil, label .. ": renders a model[] preview") then return nil end
+	check(#found.parts == MODEL_FIELD_COUNT, string.format(
+		"%s: model[] carries %d fields, so the frame loop is field 9",
+		label, #found.parts))
+	if #found.parts ~= MODEL_FIELD_COUNT then return nil end
+	return found.parts[9]
+end
+
+local preview_model = sl_characters and sl_characters.default_model
+local preview_anims = preview_model and player_api
+	and player_api.registered_models[preview_model]
+	and player_api.registered_models[preview_model].animations
+check(preview_anims ~= nil, "the preview model's animation ranges are registered")
+
+-- Assert the preview is pinned to one named animation, and say which one.
+local function expect_animation(label, anim_name, build)
+	if not preview_anims then return end
+	local range = preview_anims[anim_name]
+	if not check(range ~= nil, string.format(
+		"%s: the model defines a '%s' animation", label, anim_name)) then return end
+	local loop = frame_loop_of(build(), label)
+	if loop == nil then return end
+	check(loop ~= "", string.format(
+		"%s: frame loop is set, not the engine's full-range default", label))
+	local b, e = loop:match("^([^,]*),([^,]*)$")
+	local nb, ne = tonumber(b), tonumber(e)
+	if not check(nb ~= nil and ne ~= nil, string.format(
+		"%s: frame loop '%s' parses as begin,end", label, tostring(loop))) then return end
+	check(math.abs(nb - range.x) < 1e-6 and math.abs(ne - range.y) < 1e-6,
+		string.format("%s: frame loop %s == the '%s' range %g..%g, so the preview "
+			.. "plays only that animation", label, loop, anim_name, range.x, range.y))
+end
+
+local IDLE = { sneak = false, zoom = false, up = false, down = false,
+	left = false, right = false, LMB = false, RMB = false }
+local WALKING = { sneak = false, zoom = false, up = true, down = false,
+	left = false, right = false, LMB = false, RMB = false }
+
+player._controls = IDLE
+H.advance(0.3, 0.3)
+expect_animation("inventory while standing", "stand", function()
+	return get_unified_inventory(player)
+end)
+
+-- The point of the change: the range follows whatever the player is doing now.
+player._controls = WALKING
+H.advance(0.3, 0.3)
+expect_animation("inventory while walking", "walk", function()
+	return get_unified_inventory(player)
+end)
+
+player._controls = IDLE
+H.advance(0.3, 0.3)
+
+-- The outfit preview goes through the same helper.
+expect_animation("outfit menu", "stand", function()
+	return get_character_outfit_formspec(player, "HEAD")
+end)
+
+-- The header no longer carries the game's name; the tabs identify the window.
+for _, tab in ipairs(TABS) do
+	player:get_meta():set_string("current_tab", tab)
+	local fs = get_unified_inventory(player)
+	check(not fs:find("SYSTEM LOOTING", 1, true),
+		"inventory/" .. tab .. ": no SYSTEM LOOTING label")
+end
+player:get_meta():set_string("current_tab", "crafting")
+
+-- Each tab has its own icon, on disk, at the size the strip renders them.
+local TAB_ICONS = {}
+do
+	local src = io.open("mods/apis/sl_gui/unified_inventory.lua"):read("*a")
+	for id, icon in src:gmatch('{id = "([%w_]+)",%s*icon_img = "([^"]+)"') do
+		TAB_ICONS[#TAB_ICONS + 1] = { id = id, icon = icon }
+	end
+end
+check(#TAB_ICONS == #TABS, string.format(
+	"found an icon for each of the %d tabs (%d)", #TABS, #TAB_ICONS))
+
+local seen = {}
+for _, t in ipairs(TAB_ICONS) do
+	check(not seen[t.icon], string.format(
+		"tab '%s' has its own icon (%s is not shared with another tab)",
+		t.id, t.icon))
+	seen[t.icon] = t.id
+	local path = "mods/apis/sl_gui/textures/" .. t.icon
+	local f = io.open(path, "rb")
+	if not check(f ~= nil, "tab '" .. t.id .. "': " .. t.icon .. " exists") then
+		goto continue
+	end
+	local head = f:read(24)
+	f:close()
+	local w = head:byte(17) * 16777216 + head:byte(18) * 65536
+		+ head:byte(19) * 256 + head:byte(20)
+	local h = head:byte(21) * 16777216 + head:byte(22) * 65536
+		+ head:byte(23) * 256 + head:byte(24)
+	check(w == 32 and h == 32, string.format(
+		"tab '%s': %s is %dx%d", t.id, t.icon, w, h))
+	::continue::
+end
 
 print("")
 print(string.format("RESULT: %d passed, %d failed", pass_count, fail_count))
