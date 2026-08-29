@@ -738,6 +738,15 @@ end
 vector.dot = function(a, b)
 	return a.x * b.x + a.y * b.y + a.z * b.z
 end
+vector.offset = function(v, x, y, z)
+	return { x = v.x + x, y = v.y + y, z = v.z + z }
+end
+-- NOTE on divergence: the engine's Lua-visible vector.normalize
+-- divides by zero and yields NaN; this stub's returns {0,0,0}. That
+-- divergence hid the point-blank mortar crash from every suite run —
+-- game code must not rely on either behaviour: use vector.direction
+-- (zero-safe in BOTH, like the engine's C++ side) for blast pushes,
+-- the MT CTF jump-grenade pattern.
 
 -- ---------------------------------------------------------------
 -- PlayerMeta additions

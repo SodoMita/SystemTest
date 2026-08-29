@@ -716,6 +716,9 @@ check((W.busy_until.alpha or 0) > W.now() or six_fired >= 7, "cylinder busy wind
 -- ================================================================
 section("PHASE W1g — NaN armour: the point-blank lesson")
 -- ================================================================
+-- do...end keeps this phase's locals block-scoped: the file runs at
+-- the Lua 5.1 limit of 200 function locals.
+do
 
 -- Live server 2026-08-29: a mortar-jump with the blast centred exactly
 -- on the shooter normalized a zero vector -> NaN -> add_velocity(NaN)
@@ -755,7 +758,8 @@ W.explode({ x = 50, y = 60, z = 0 }, "alpha", W.projectiles.mortar)
 H.advance(0.1, 0.05)
 local pvel = alpha:get_velocity()
 check(is_finite(pvel), "point-blank self-blast leaves the shooter finite (the segfault)")
-check(pvel.y > 0, "point-blank blast still mortar-jumps (straight up)")
+check(math.abs(pvel.y - 11) < 0.01 and math.abs(pvel.x) < 0.01 and math.abs(pvel.z) < 0.01,
+	"point-blank mortar-jump is the full CTF push: straight up at 11 n/s")
 check(is_finite(pvic:get_velocity()), "a victim at ground zero stays finite")
 check(alpha:get_hp() < 20 and pvic:get_hp() < 20, "ground zero still hurts")
 
@@ -773,6 +777,23 @@ H.advance(0.4, 0.05)
 H.voxels[H.vhash({ x = 55, y = 59, z = 0 })] = nil -- leave no residue
 check(is_finite(alpha:get_velocity()), "firing at your own feet stays finite (pipeline)")
 
+-- CTF jump-grenade law: engine direction (zero-safe on both sides of
+-- the stub line) and the y-clamp — a blast above the head shoves
+-- sideways, never down.
+local pp = { x = 60, y = 60, z = 0 }
+check(vector.direction(pp, pp).y == 0,
+	"engine vector.direction is zero-safe (stub parity with the C++ side)")
+local dvc = new_victim("ovh", "beacon_b")
+dvc:set_pos({ x = 60, y = 60, z = 0 })
+dvc:set_hp(20)
+dvc:set_velocity({ x = 0, y = 0, z = 0 })
+W.explode({ x = 60.6, y = 62.4, z = 0 }, "alpha", W.projectiles.mortar)
+H.advance(0.1, 0.05)
+local dvv = dvc:get_velocity()
+check(dvv.y == 0 and (dvv.x ~= 0 or dvv.z ~= 0),
+	"a blast above the head pushes aside, never down (CTF y-clamp)")
+check(is_finite(dvv), "overhead blast stays finite")
+
 -- Boundary guards: a NaN shove is refused, degenerate spread collapses
 local pre_v = alpha:get_velocity()
 W.knockback(alpha, { x = nan, y = nan, z = nan })
@@ -780,6 +801,8 @@ check(alpha:get_velocity().x == pre_v.x and alpha:get_velocity().y == pre_v.y,
 	"knockback refuses a NaN vector")
 check(is_finite(W.spread_dir({ x = 0, y = 1, z = 0 }, 4)),
 	"spread stays finite when aiming straight up")
+
+end
 
 section("PHASE W2a — corpse destruction: burial, cremation, traces")
 -- ================================================================

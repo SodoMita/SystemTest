@@ -125,6 +125,21 @@ function W.spawn_projectile(user, cfg)
 	return obj
 end
 
+-- MT CTF jump-grenade push (ctf_mode_nade_fight knockback grenade,
+-- read 2026-08-29): the engine's vector.direction is zero-safe — a
+-- blast centred exactly on the target yields a zero vector, never the
+-- NaN that Lua-side normalize produces — it points at the HEAD so a
+-- point-blank blast is a pure upward jump, and the y-clamp means a
+-- blast above you shoves you aside, never pins you into the floor.
+local function blast_push(obj, opos, pos, power)
+	local props = obj.get_properties and obj:get_properties() or {}
+	local eye = props.eye_height or 1.625
+	local headpos = vector.offset(opos, 0, eye, 0)
+	local dir = vector.direction(pos, headpos)
+	if dir.y < 0 then dir.y = 0 end
+	W.knockback(obj, vector.multiply(dir, power))
+end
+
 -- Radial splash with linear falloff (spec §3 mortar row):
 -- 6 -> 0 over 3 m, 50% self-damage, up to 9 n/s knockback with the
 -- mortar-jump as the intended use. Cremates corpses. Chip damage on
@@ -177,15 +192,14 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 			elseif not (lua and lua.sl_weapon_fx) and obj ~= shooter_obj then
 				local opos = obj:get_pos()
 				local dist = vector.distance(pos, opos)
-				if dist <= radius then
+				-- CTF gates: the dead and the unpointable are not targets.
+				if dist <= radius and obj:get_hp() > 0
+					and (not obj.get_properties
+						or obj:get_properties().pointable ~= false) then
 					local dmg = math.max(1, math.floor(splash.max * (1 - dist / radius) + 0.5))
-					local cause = cause_key
-					-- Zero-length deltas must never reach normalize(): NaN
-					-- velocity segfaults clients (2026-08-29 live incident).
-					local away = vector.safe_dir(vector.subtract(opos, pos),
-						{ x = 0, y = 1, z = 0 })
-					W.knockback(obj, vector.multiply(away, 11 * (1 - dist / radius)))
-					W.punch_object(shooter_obj, obj, dmg, cause, dist)
+					-- Flat power, headward, never down (jump grenade).
+					blast_push(obj, opos, pos, splash.knock or 11)
+					W.punch_object(shooter_obj, obj, dmg, cause_key, dist)
 				end
 			elseif obj == shooter_obj then
 				-- Self-splash: half damage, full knockback — the
@@ -195,12 +209,11 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 				if dist <= radius then
 					local dmg = math.max(1, math.floor(
 						(splash.max * (1 - dist / radius) + 0.5) * (cfg.self_dmg or 0.5)))
-					-- THE crash: a blast centred exactly on the shooter made
-					-- this normalize({0,0,0}) -> NaN -> add_velocity(NaN) ->
-					-- client segfault. Point-blank now throws straight up.
-					local away = vector.safe_dir(vector.subtract(opos, pos),
-						{ x = 0, y = 1, z = 0 })
-					W.knockback(obj, vector.multiply(away, 11 * (1 - dist / radius)))
+					-- THE crash geometry, now CTF-style: engine direction from
+					-- the blast to the shooter's HEAD is (0,1,0) at point-blank
+					-- — a pure jump, structurally immune to the NaN that
+					-- crashed clients twice.
+					blast_push(obj, opos, pos, splash.knock or 11)
 					W.punch_object(nil, obj, dmg, "mortar_self", dist)
 				end
 			end

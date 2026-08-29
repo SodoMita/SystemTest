@@ -697,6 +697,30 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.3.7 (2026-08-29, mortar knockback = the CTF jump grenade)** —
+  after the second point-blank crash, the splash push was rebuilt
+  verbatim from MT CTF's knockback grenade
+  (`ctf_mode_nade_fight:knockback_grenade`, the nade-fight jump
+  grenade): the blast push is `vector.direction(blast, head)` — the
+  **engine's** direction function, which is zero-safe on the C++ side
+  (a blast centred exactly on the target yields a zero vector, never
+  the NaN that Lua-side `normalize` produces) — aimed at the target's
+  **head** so point-blank is a pure upward jump, with a **y-clamp** so
+  a blast above you shoves you aside instead of pinning you into the
+  floor, at flat power (`splash.knock`, default 11 n/s) with damage —
+  not velocity — carrying the distance falloff. CTF's gates adopted
+  too: the dead (`hp <= 0`) and the unpointable are not blast targets.
+  The v1.3.6.1 armor stays as a backstop (`safe_dir`/`finite` refuse
+  anything non-finite at the boundaries), but the crash class is now
+  structurally absent: no Lua-side normalize touches a player delta
+  anywhere in the blast path. Stub: `vector.offset` added; the stub's
+  `normalize` divergence from the engine (zero-safe here, NaN there)
+  is now documented — it is why every earlier suite run was green
+  while the live client crashed. W1g extended: point-blank jump is
+  exactly 11 n/s straight up, engine-direction zero-safety parity, and
+  the overhead-blast y-clamp. Suites: weapons 288/288, smoke 127/127,
+  soak PASS.
+
 - **v1.3.6.1 (2026-08-29, the point-blank segfault)** — the second crash
   report ("uses sl_weapons:mortar" at own feet, client segfault) was a
   division by zero: a blast centred exactly on the shooter made the
