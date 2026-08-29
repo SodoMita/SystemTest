@@ -98,6 +98,16 @@ W.FAB_RECIPES = {
 			{ "sl_modebase:circuit_board", 1 },
 		},
 	},
+	-- The executioner's receipt: one guaranteed kill, priced so the
+	-- buyer means it (team directive 2026-08-29).
+	severance = {
+		label = S("Severance (single use)"),
+		item = W.modname .. ":severance",
+		mats = {
+			{ "sl_modebase:metal_ingot", 3 },
+			{ "sl_modebase:energy_crystal", 2 },
+		},
+	},
 }
 
 W.fab_jobs = {} -- [phash] = { pos, recipe, done_at, user }
@@ -106,7 +116,7 @@ W.fab_jobs = {} -- [phash] = { pos, recipe, done_at, user }
 -- stays the headline; the arsenal follows).
 local FAB_ORDER = {
 	"lash", "sentry_kit", "chatter", "scatter", "driver",
-	"lance", "mortar", "neon_six", "neon_repeater",
+	"lance", "mortar", "neon_six", "neon_repeater", "severance",
 }
 
 local function recipe_line(id)

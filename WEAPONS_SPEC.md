@@ -240,6 +240,7 @@ arsenal):
 | Fusion Mortar | Ingot × 4, Circuit × 2, Crystal × 2 |
 | Neon Six | Ingot × 2, Crystal × 2, Plastic × 1 |
 | Neon Repeater | Ingot × 3, Crystal × 2, Circuit × 1 |
+| **Severance** (single use) | Ingot × 3, Crystal × 2 — melee, 200 damage on a landed hit, consumed on it. The executioner's receipt: one guaranteed kill on anything that bleeds (players 20 HP, horrors up to 80), priced so the buyer means it |
 | **Ghost Altar** | Ingot × 2, Crystal × 2, Circuit × 1 | The revival ritual (summons a contained ghost for a relic) |
 
 Ambient monsters (anything not deployed through the Monster Master's
@@ -680,6 +681,15 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
    W3 freezes numbers.
 
 ## 18. Changelog
+
+- **v1.3.1 (2026-08-29, the Severance)** — a single-use melee weapon:
+  200 `fleshy` damage on a landed hit, consumed by that hit (a swing
+  that deals no damage wastes nothing). Fabricated at mob-spoil prices
+  (Ingot × 3, Crystal × 2); the incident report names the cause
+  ("severance"), never the hand. The Monster Master's doctrine sweep
+  strips it — hands only, never items. Shared melee-consequence hook
+  (`W.melee_hit`/`W.melee_entity_hit`): the Combat Blade now also wears
+  on monster hits, not only player hits.
 
 - **v1.3.0 (2026-08-29, magazines)** — the ammo model rebuilt per team
   decision: rounds live in per-weapon magazines stored on the item stack

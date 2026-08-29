@@ -291,6 +291,11 @@ minetest.register_entity(MONSTER_NAME, {
 
 	on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
 		minetest.sound_play("hit", { pos = self.object:get_pos(), gain = 0.6, max_hear_distance = 10 })
+		-- Consumable melee (Severance) and blade wear apply to monsters
+		-- too, through the shared sl_weapons hook when present.
+		if sl_weapons and sl_weapons.melee_entity_hit then
+			sl_weapons.melee_entity_hit(hitter)
+		end
 	end,
 
 	on_death = function(self, killer)

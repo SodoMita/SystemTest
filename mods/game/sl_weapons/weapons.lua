@@ -327,22 +327,62 @@ local MELEE_USES = {
 	["sl_modebase:combat_blade"] = 40,
 }
 
-minetest.register_on_punchplayer(function(victim, hitter, time_from_last_punch, tool_capabilities, dir, damage)
+local SEVERANCE = W.modname .. ":severance"
+
+-- One swing, one wound that ends arguments. The Severance carries a
+-- disposable arc edge: 200 damage on a landed hit, then the blade is
+-- slag. It is not in MELEE_USES -- wear is for blades that survive;
+-- this one does not.
+minetest.register_tool(SEVERANCE, {
+	description = S("Severance\nOne swing, 200 damage. Then it is gone."),
+	inventory_image = "sl_weapons_severance.png",
+	tool_capabilities = {
+		full_punch_interval = 1.0,
+		damage_groups = { fleshy = 200 },
+	},
+	sound = { breaks = "sl_weapons_severance_break" },
+})
+
+-- Shared melee consequences (players + entities): consumes the
+-- Severance on a landed hit, wears ordinary blades otherwise.
+function W.melee_hit(hitter, victim)
 	if not hitter or not hitter.is_player or not hitter:is_player() then return end
-	if not damage or damage <= 0 then return end
 	if not hitter.get_wielded_item then return end
 	local wield = hitter:get_wielded_item()
-	local uses = MELEE_USES[wield:get_name()]
+	local iname = wield:get_name()
+	local hname = hitter:get_player_name()
+	if iname == SEVERANCE then
+		if victim and victim.is_player and victim:is_player() and victim.get_player_name then
+			-- The incident report names the cause, never the hand.
+			W.last_cause[victim:get_player_name()] = "severance"
+		end
+		hitter:set_wielded_item(ItemStack(""))
+		minetest.sound_play("sl_weapons_severance_break", {
+			pos = hitter:get_pos(), gain = 1.0, max_hear_distance = 24,
+		})
+		minetest.chat_send_player(hname, S("The Severance is spent."))
+		return
+	end
+	local uses = MELEE_USES[iname]
 	if not uses then return end
 	wield:add_wear(math.ceil(65535 / uses))
-	local name = hitter:get_player_name()
 	if wield:get_wear() >= 65535 then
-		minetest.chat_send_player(name, S("The blade is spent."))
+		minetest.chat_send_player(hname, S("The blade is spent."))
 		minetest.sound_play("sl_weapons_blade_break", {
-			to_player = name, gain = 0.8,
+			to_player = hname, gain = 0.8,
 		}, true)
 		hitter:set_wielded_item(ItemStack(""))
 	else
 		hitter:set_wielded_item(wield)
 	end
+end
+
+-- Entity-side entry (monster on_punch handlers call this when present).
+function W.melee_entity_hit(hitter)
+	W.melee_hit(hitter, nil)
+end
+
+minetest.register_on_punchplayer(function(victim, hitter, time_from_last_punch, tool_capabilities, dir, damage)
+	if not damage or damage <= 0 then return end
+	W.melee_hit(hitter, victim)
 end)

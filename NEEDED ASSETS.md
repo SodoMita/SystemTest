@@ -132,6 +132,7 @@ silence until they ship. Priority order: the ones players learn to survive by.
 | | `sl_weapons_spark_hit.ogg` | Hitscan impact |
 | | `sl_weapons_mm_strike.ogg` | MM bare-hand doctrine hit |
 | | `sl_weapons_blade_break.ogg` | A consumable blade dies |
+| | `sl_weapons_severance_break.ogg` | The Severance spends itself (24 m — a public sound) |
 | | `sl_weapons_zoom_in.ogg` / `sl_weapons_zoom_out.ogg` | RMB optics |
 | **Sound — the funeral trade** | `sl_weapons_body_falls.ogg` | Death, the first trace |
 | | `sl_weapons_shovel_bury.ogg` | Burial |

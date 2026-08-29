@@ -76,6 +76,7 @@ minetest.register_globalstep(function(dtime)
 					local is_ranged = W.defs_by_item[iname] ~= nil
 						or iname == W.modname .. ":sentry_kit"
 						or iname == W.modname .. ":grapple"
+						or iname == W.modname .. ":severance" -- hands only, never items
 					if is_ranged and not pl._mm_strip_warned then
 						pl._mm_strip_warned = true
 						minetest.chat_send_player(name, minetest.colorize("#ff8844",

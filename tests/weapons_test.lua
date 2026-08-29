@@ -1223,6 +1223,85 @@ end
 
 gm.end_match(nil, "W3d cleanup")
 H.advance(1, 0.5)
+
+-- ----------------------------------------------------------------
+section("PHASE W1f — the Severance: one swing, 200 damage, then gone")
+-- ----------------------------------------------------------------
+
+local sev = minetest.registered_tools["sl_weapons:severance"]
+check(sev ~= nil, "the Severance is registered")
+check(sev and sev.tool_capabilities and sev.tool_capabilities.damage_groups.fleshy == 200,
+	"it hits for 200")
+
+local sev_job = W.FAB_RECIPES.severance
+local mob_only = sev_job ~= nil
+if sev_job then
+	for _, m in ipairs(sev_job.mats) do
+		if not (m[1] == "sl_modebase:metal_ingot" or m[1] == "sl_modebase:circuit_board"
+			or m[1] == "sl_modebase:energy_crystal" or m[1] == "sl_modebase:plastic_scrap") then
+			mob_only = false
+		end
+	end
+end
+check(mob_only, "fabricable at mob-spoil prices (ingot 3 + crystal 2)")
+
+-- A fresh match for the execution (corpse counts must stay honest);
+-- the MM role was normalized at the last match end, so gamma wears it
+-- again for the doctrine check below.
+gm.set_monster_master("gamma")
+state.settings.countdown = 1
+minetest.registered_chatcommands.sl_match_start.func("alpha", "")
+for _, p in ipairs(minetest.get_connected_players()) do
+	minetest.registered_chatcommands.sl_ready.func(p:get_player_name(), "")
+end
+H.advance(4, 0.5)
+check(state.match_active == true, "third match started")
+
+-- Player execution: 20 HP meets 200
+local svx = new_victim("svx", "beacon_a")
+svx:set_hp(20)
+alpha:set_wielded_item(ItemStack("sl_weapons:severance"))
+local corpses_before = #W.corpses
+local sev_caps = sev.tool_capabilities
+svx:punch(alpha, 1.0, sev_caps, { x = 0, y = 0, z = 1 })
+check(svx._dead == true or svx:get_hp() <= 0, "one swing kills a living player")
+check(alpha:get_wielded_item():get_name() == "", "the Severance is consumed on the kill")
+check(W.last_cause[svx:get_player_name()] == "severance", "the incident report names the cause")
+check(#W.corpses == corpses_before + 1, "the kill leaves a corpse")
+
+-- A swing that lands nothing costs nothing (damage 0 = no consume)
+alpha:set_wielded_item(ItemStack("sl_weapons:severance"))
+local svz = new_victim("svz", "beacon_b")
+svz:punch(alpha, 1.0, { full_punch_interval = 1.0, damage_groups = {} }, { x = 0, y = 0, z = 1 })
+check(alpha:get_wielded_item():get_name() == "sl_weapons:severance",
+	"a swing that deals no damage wastes nothing")
+alpha:set_wielded_item(ItemStack(""))
+
+-- Monster execution: the same swing unmakes a stalker
+local drops_before = #H.item_drops
+local stk = game_mode.spawn_monster({ x = 980, y = 60, z = 0 }, "stalker", "gamma")
+alpha:set_wielded_item(ItemStack("sl_weapons:severance"))
+stk:punch(alpha, 1.0, sev_caps, { x = 0, y = 0, z = 1 })
+check(stk._removed or stk:get_hp() <= 0, "the swing deletes a monster")
+check(alpha:get_wielded_item():get_name() == "", "consumed on the monster kill too")
+check(#H.item_drops > drops_before, "the wreck still pays its spoils")
+
+-- Ordinary blades wear on monster hits (shared hook)
+alpha:set_wielded_item(ItemStack("sl_modebase:combat_blade"))
+local blade_w0 = alpha:get_wielded_item():get_wear()
+local sct = game_mode.spawn_monster({ x = 981, y = 60, z = 0 }, "scout", "gamma")
+sct:punch(alpha, 1.0, { full_punch_interval = 0.8, damage_groups = { fleshy = 6 } }, { x = 0, y = 0, z = 1 })
+check(alpha:get_wielded_item():get_wear() > blade_w0, "blades also wear on monsters now")
+alpha:set_wielded_item(ItemStack(""))
+
+-- The doctrine: hands only, never items — the sweep takes it from the MM
+gamma:get_inventory():add_item("main", ItemStack("sl_weapons:severance"))
+H.advance(1.3, 0.5)
+check(not gamma:get_inventory():contains_item("main", ItemStack("sl_weapons:severance")),
+	"the Monster Master cannot keep a Severance")
+
+gm.end_match(nil, "W1f cleanup")
+H.advance(1, 0.5)
 H.advance(2, 0.5)
 check(true, "engine steps still healthy after the full suite")
 

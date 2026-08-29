@@ -712,6 +712,9 @@ minetest.register_entity("sl_scary:nerobot", {
     on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
         self:play_sound("hurt")
         -- Optional: Apply knockback or other effects
+        if sl_weapons and sl_weapons.melee_entity_hit then
+            sl_weapons.melee_entity_hit(hitter)
+        end
     end,
     on_death = function(self, killer)
         self:play_sound("death")
@@ -1019,6 +1022,9 @@ minetest.register_entity("sl_scary:dredger", {
             self.state = "chase"
             self.target_player = hitter
         end
+        if sl_weapons and sl_weapons.melee_entity_hit then
+            sl_weapons.melee_entity_hit(hitter)
+        end
     end,
 
     on_death = function(self, killer)
@@ -1162,6 +1168,9 @@ minetest.register_entity("sl_scary:containment", {
     end,
 
     on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
+        if sl_weapons and sl_weapons.melee_entity_hit then
+            sl_weapons.melee_entity_hit(hitter)
+        end
         if self.state == "dormant" then
             self.state = "chasing"
             if hitter and hitter:is_player() then
@@ -1365,6 +1374,9 @@ minetest.register_entity("sl_scary:signal_wraith", {
             if pos then
                 minetest.add_item(pos, "sl_scary:corrupted_data")
             end
+        end
+        if sl_weapons and sl_weapons.melee_entity_hit then
+            sl_weapons.melee_entity_hit(hitter)
         end
     end,
 

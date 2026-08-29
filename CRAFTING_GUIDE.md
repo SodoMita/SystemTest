@@ -124,9 +124,13 @@ Every weapon is a catalog job (10 s each, parts from the machines you broke):
 | Fusion Mortar | Ingot × 4 + Circuit × 2 + Crystal × 2 |
 | Neon Six | Ingot × 2 + Crystal × 2 + Plastic × 1 |
 | Neon Repeater | Ingot × 3 + Crystal × 2 + Circuit × 1 |
+| **Severance** — single use | Ingot × 3 + Crystal × 2 | One swing, 200 damage, then it is gone. Works on monsters too. |
 
 **Jax:** *"No pads on the map, no crates that owe you a gun. You want the
 scatter? Go take an ingot out of a brute."*
+
+**Mo:** *"And the Severance? Three ingots, two crystals, one swing. Miss,
+and you're the richest corpse in the corridor."*
 
 **Barnaby** taps the table. *"You want the workshop? Fine. Go take it out of
 the things the Monster Master sends at your beacon, carry the pieces home
