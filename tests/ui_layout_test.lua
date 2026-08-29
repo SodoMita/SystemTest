@@ -49,6 +49,9 @@ function minetest.get_modpath(name)
 	return modpaths[name] or "mods/game/sl_modebase"
 end
 function minetest.close_formspec() end
+-- The achievement popup throws confetti through the particle spawner API.
+function minetest.add_particlespawner() return 1 end
+function minetest.delete_particlespawner() end
 
 -- sl_gui hooks into engine callbacks the stub does not implement; stub them so
 -- the formspec builders (the thing under test) can be reached.
@@ -586,6 +589,125 @@ for _, nodename in ipairs({ "sl_modebase:loot_crate", "sl_modebase:monster_spawn
 		end
 	end
 end
+
+section("PHASE 8 — achievement popup HUD images do not scale with the artwork")
+-- A HUD `image` is drawn at `source texture size * scale`
+-- (src/client/hud.cpp: dstsize = imgsize * scale), so an icon's own pixel
+-- dimensions decide how big the popup shows it. The achievement icons here run
+-- from 16x16 to 512x512, so one fixed `scale` used to mean 32px for one
+-- achievement and 1024px for another. Resolve each texture to a pixel size the
+-- way the engine does and assert every icon lands at the same size.
+
+-- PNG IHDR holds width/height big-endian at bytes 17..24.
+local function png_size(path)
+	local f = io.open(path, "rb")
+	if not f then return nil end
+	local head = f:read(24)
+	f:close()
+	if not head or head:sub(1, 8) ~= "\137PNG\r\n\26\n" then return nil end
+	local function be(i)
+		return head:byte(i) * 16777216 + head:byte(i + 1) * 65536
+			+ head:byte(i + 2) * 256 + head:byte(i + 3)
+	end
+	return be(17), be(21)
+end
+
+local TEX_DIRS = {}
+do
+	local p = io.popen("find mods -type d -name textures 2>/dev/null")
+	if p then
+		for line in p:lines() do TEX_DIRS[#TEX_DIRS + 1] = line .. "/" end
+		p:close()
+	end
+end
+
+local function texture_path(name)
+	for _, dir in ipairs(TEX_DIRS) do
+		local f = io.open(dir .. name, "rb")
+		if f then f:close() return dir .. name end
+	end
+	return nil
+end
+
+-- Apply the one texture modifier that changes the source size, `[resize:WxH]`,
+-- exactly as the engine's texture pipeline would before measuring it.
+local function resolved_size(text)
+	local base = text:match("^[^%^]*")
+	local path = texture_path(base)
+	if not path then return nil, nil, base end
+	local w, h = png_size(path)
+	if not w then return nil, nil, base end
+	for mw, mh in text:gmatch("%[resize:(%d+)x(%d+)%]") do
+		w, h = tonumber(mw), tonumber(mh)
+	end
+	return w, h, base
+end
+
+-- id/icon straight from the registration data.
+local ACH = {}
+do
+	local f = io.open("mods/apis/sl_gui/achievement_definitions.lua")
+	local src = f and f:read("*a") or ""
+	if f then f:close() end
+	for id, icon in src:gmatch('id%s*=%s*"([^"]+)".-icon%s*=%s*"([^"]+)"') do
+		ACH[#ACH + 1] = { id = id, icon = icon }
+	end
+end
+check(#ACH >= 30, string.format(
+	"read the achievement ids and icons from achievement_definitions.lua (%d)", #ACH))
+
+if game_mode and game_mode.state then game_mode.state.match_active = true end
+
+local drawn_sizes = {}   -- "WxH" of the icon as the engine would draw it
+local native_sizes = {}  -- the icon file's own resolution, for the report
+local measured = 0
+for i, a in ipairs(ACH) do
+	-- One throwaway player per achievement: `currently_showing` is keyed by
+	-- player name, so a fresh name always gets its popup immediately, and
+	-- pre-unlocking every *other* achievement satisfies this one's `requires`
+	-- without going through the popup path again.
+	local p = H.new_player("ach_probe_" .. i)
+	local unlocked = {}
+	for _, other in ipairs(ACH) do
+		if other.id ~= a.id then unlocked[other.id] = true end
+	end
+	p:get_meta():set_string("achievements",
+		minetest.serialize({ unlocked = unlocked, progress = {} }))
+	p._huds = {}
+
+	if unlock_achievement(p, a.id) then
+		for _, def in pairs(p._huds) do
+			if def.type == "image" and def.text
+				and def.text:sub(1, #a.icon) == a.icon then
+				local w, h = resolved_size(def.text)
+				if w then
+					measured = measured + 1
+					local dw = w * (def.scale and def.scale.x or 1)
+					local dh = h * (def.scale and def.scale.y or 1)
+					drawn_sizes[string.format("%gx%g", dw, dh)] = true
+					local nw, nh = png_size(texture_path(a.icon) or "")
+					if nw then native_sizes[string.format("%dx%d", nw, nh)] = true end
+				end
+			end
+		end
+	end
+	H.remove_player(p:get_player_name())
+end
+
+local natives = {}
+for k in pairs(native_sizes) do natives[#natives + 1] = k end
+table.sort(natives)
+check(measured > 0, string.format(
+	"measured the popup icon for %d achievements (native icon sizes: %s)",
+	measured, table.concat(natives, ", ")))
+
+local distinct = {}
+for k in pairs(drawn_sizes) do distinct[#distinct + 1] = k end
+table.sort(distinct)
+check(#distinct == 1, string.format(
+	"every achievement icon draws at the same size regardless of its own "
+		.. "resolution (%d native resolutions -> %s)",
+	#natives, table.concat(distinct, ", ")))
 
 print("")
 print(string.format("RESULT: %d passed, %d failed", pass_count, fail_count))

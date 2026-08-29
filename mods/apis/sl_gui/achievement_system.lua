@@ -158,6 +158,26 @@ local tier_config = {
     },
 }
 
+-- HUD `image` elements are sized as `source texture size * scale`
+-- (src/client/hud.cpp: dstsize = imgsize * scale), so the artwork's own pixel
+-- dimensions leak straight into the layout. The achievement icons in this game
+-- range from 16x16 to 512x512, so the popup's fixed `scale = {x = 2, y = 2}`
+-- drew a 32px icon for one achievement and a 1024px one for another.
+--
+-- Pinning every texture to a known size in the texture pipeline makes `scale`
+-- mean "multiples of this many pixels" and nothing else, so the popup is laid
+-- out identically whatever resolution the icon happens to ship at.
+-- `[resize:]` has existed since 5.0, matching this game's min_minetest_version.
+local function hud_texture(texture, px)
+    return string.format("%s^[resize:%dx%d]", texture, px, px)
+end
+
+-- On-screen pixel sizes, all independent of the source artwork now.
+local POPUP_ICON_PX = 32  -- what the 16x16 icons drew at with the old scale 2
+local POPUP_STAR_PX = 16  -- gui_achievement_star.png's native size
+local POPUP_UNIT_PX = 1   -- gui_blank.png is a solid colour field; 1x1 keeps
+                          -- the existing scale numbers meaning pixels
+
 -- Show achievement popup with particles and effects
 local function show_achievement_popup(player, achievement)
     local name = player:get_player_name()
@@ -171,7 +191,7 @@ local function show_achievement_popup(player, achievement)
         type = "image",
         position = {x = 0.5, y = 0.2},
         offset = {x = 0, y = 0},
-        text = "gui_blank.png^[colorize:#000000:220",
+        text = hud_texture("gui_blank.png^[colorize:#000000:220", POPUP_UNIT_PX),
         scale = {x = 21, y = 9},
         alignment = {x = 0, y = 0},
         z_index = 999,
@@ -181,7 +201,7 @@ local function show_achievement_popup(player, achievement)
         type = "image",
         position = {x = 0.5, y = 0.2},
         offset = {x = 0, y = 0},
-        text = "gui_blank.png^[colorize:" .. tier.color .. ":180",
+        text = hud_texture("gui_blank.png^[colorize:" .. tier.color .. ":180", POPUP_UNIT_PX),
         scale = {x = 300, y = 150},
         alignment = {x = 0, y = 0},
         z_index = 1000,
@@ -191,9 +211,9 @@ local function show_achievement_popup(player, achievement)
         type = "image",
         position = {x = 0.5, y = 0.18},
         offset = {x = 0, y = 0},
-        text = achievement.icon,
+        text = hud_texture(achievement.icon, POPUP_ICON_PX),
         alignment = {x = 0, y = 0},
-        scale = {x = 2, y = 2},
+        scale = {x = 1, y = 1},
         z_index = 1001,
     })
     
@@ -247,7 +267,7 @@ local function show_achievement_popup(player, achievement)
             type = "image",
             position = {x = start_x, y = start_y},
             offset = {x = 0, y = 0},
-            text = "gui_achievement_star.png^[colorize:" .. tier.color .. ":220",
+            text = hud_texture("gui_achievement_star.png^[colorize:" .. tier.color .. ":220", POPUP_STAR_PX),
             scale = {x = tier.particle_size * 0.5, y = tier.particle_size * 0.5},
             alignment = {x = 0, y = 0},
             z_index = 1002,
