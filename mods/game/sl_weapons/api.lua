@@ -94,10 +94,16 @@ function W.fire_gate(user)
 			if pl.role == "monster_master" then
 				return S("Your hands are the doctrine.")
 			end
-			if not (game_mode.state and game_mode.state.match_active) then
-				return S("Range systems are idle outside an active match.")
-			end
-			if pl.phase ~= "alive" then
+			if game_mode.state and game_mode.state.match_active then
+				if pl.phase ~= "alive" then
+					return S("The dead cannot wield the system's weapons.")
+				end
+			elseif pl.phase == "ghost" or pl.phase == "evil_ghost" then
+				-- Outside a match the range is open (sandbox doctrine,
+				-- MT CTF-style: unallocated players fight under full
+				-- rules). Only the dead and the Monster Master are
+				-- refused; lobby bodies are damageable and may test
+				-- their iron on each other.
 				return S("The dead cannot wield the system's weapons.")
 			end
 		end
@@ -339,6 +345,9 @@ function W.on_match_start()
 end
 
 function W.on_match_end()
+	-- Kill the generation first: any lash hook still in flight dies
+	-- before it can anchor into the swept scene.
+	W.match_gen = (W.match_gen or 0) + 1
 	-- Scene sweep (spec §7.3 "match end" row): the next match starts
 	-- with a clean scene — bodies, traces, turrets, puppets, lines.
 	if W.sweep_scene then W.sweep_scene() end

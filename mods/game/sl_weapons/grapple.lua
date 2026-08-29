@@ -20,6 +20,10 @@ local LASH_MAXTIME = 6.0
 
 W.lash = {}        -- [name] = { anchor = pos, hook = lua, at = time }
 W.lash_ready = {}  -- [name] = cooldown until
+-- Match generation: bumped at match end. A hook launched in match N
+-- must never anchor after the sweep — a stray line from a finished
+-- match would ride into the next one attached to a fresh body.
+W.match_gen = W.match_gen or 0
 
 minetest.register_entity(W.modname .. ":lash_hook", {
 	_stub_ray_radius = 0.25,
@@ -48,6 +52,12 @@ minetest.register_entity(W.modname .. ":lash_hook", {
 		local pos = obj:get_pos()
 		local vel = obj:get_velocity() or { x = 0, y = 0, z = 0 }
 		self.life = (self.life or 0) + dtime
+
+		-- Stray from a finished match: the line went with the sweep.
+		if self.gen and self.gen ~= W.match_gen then
+			obj:remove()
+			return
+		end
 
 		if not self.anchored then
 			local newpos = vector.add(pos, vector.multiply(vel, dtime))
@@ -177,6 +187,7 @@ minetest.register_tool(W.modname .. ":grapple", {
 		if lua then
 			lua.shooter = name
 			lua.sl_weapon_fx = true
+			lua.gen = W.match_gen
 		end
 		-- The launch is a crack the whole block hears (danger 1).
 		minetest.sound_play("sl_weapons_lash_launch", {

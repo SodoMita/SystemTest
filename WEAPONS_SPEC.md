@@ -216,7 +216,23 @@ Stations this funds (inventory crafting menu, **Tactical** tab):
 
 | Station | Cost | Unlocks |
 |---|---|---|
-| **Precision Fabricator** | Ingot × 6, Circuit × 4, Crystal × 2, Plastic × 3 | The Grapple Lash and Sentry Kit fabrication (§10.1, §6) |
+| **Precision Fabricator** | Ingot × 6, Circuit × 4, Crystal × 2, Plastic × 3 | The Grapple Lash, Sentry Kits, and the entire arsenal (below; §10.1, §6) |
+
+The Fabricator's catalog (every job 10 s, mob spoils only — pads are map
+furniture and mapgen places none, so the machine is the floor under the
+arsenal):
+
+| Job | Cost |
+|---|---|
+| Grapple Lash | Ingot × 2, Circuit × 2, Crystal × 2, Plastic × 1 |
+| Sentry Kit | Ingot × 3, Circuit × 1, Crystal × 1 |
+| Chatter SMG | Ingot × 2, Circuit × 1, Plastic × 1 |
+| Riot Scatter | Ingot × 3, Crystal × 1 |
+| Pulse Driver | Crystal × 2, Circuit × 2, Ingot × 1 |
+| Arc Lance | Crystal × 3, Circuit × 2 |
+| Fusion Mortar | Ingot × 4, Circuit × 2, Crystal × 2 |
+| Neon Six | Ingot × 2, Crystal × 2, Plastic × 1 |
+| Neon Repeater | Ingot × 3, Crystal × 2, Circuit × 1 |
 | **Ghost Altar** | Ingot × 2, Crystal × 2, Circuit × 1 | The revival ritual (summons a contained ghost for a relic) |
 
 Ambient monsters (anything not deployed through the Monster Master's
@@ -657,6 +673,22 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
    W3 freezes numbers.
 
 ## 18. Changelog
+
+- **v1.2.3 (2026-08-29, open range & the fabricable arsenal)** — two field
+  reports, both fixed the MT CTF way. (1) *Weapons did not damage players*:
+  three stacked gates — lobby bodies were `immortal`, the punchplayer guard
+  cancelled all PvP outside a match, and `fire_gate` refused to fire at all
+  outside a match. MT CTF keeps unallocated players under full combat rules
+  (only spawn immunity protects, and only temporarily): lobby players are
+  now `fleshy = 100`, the guard vetoes only ghosts/evil ghosts (and creative
+  mode), and the range is open outside matches — weapons fire and damage
+  lobby bodies. In-match rules unchanged (alive-only wielding, ghosts
+  refused, monsters still stand down in the lobby). (2) *No way to craft the
+  weapons*: all seven primaries join the Fabricator catalog (§5.1) at mob-
+  spoil prices; the formspec is data-driven now. Also fixed a race the soak
+  caught: a Lash hook in flight at match end anchored *after* the sweep and
+  rode into the next match — hooks now carry a match-generation stamp and
+  die if the generation turned.
 
 - **v1.2.2 (2026-08-29, workshops from spoils)** — mapgen places no
   workshops, so both crafting stations are now assembled by hand in the

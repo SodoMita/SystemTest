@@ -453,17 +453,23 @@ if state.match_active then
 end
 check(not state.match_active, "lobby state established")
 
--- (a) Damage pipeline guard: punches to players are cancelled in the lobby
+-- (a) Damage pipeline: no blanket lobby cancel anymore (sandbox
+-- doctrine, MT CTF — unallocated players fight under full rules; ghosts
+-- are still vetoed, monsters still stand down via their own gate).
 alpha._hp = 20
 alpha.dead = false
 local canceled_lobby = H.fire_punchplayer(alpha, beta, 1.0,
 	{ full_punch_interval = 1.0, damage_groups = { fleshy = 5 } }, nil, 5)
-check(canceled_lobby == true, "punch damage cancelled in lobby (pipeline guard)")
+check(canceled_lobby == false, "lobby punch passes the pipeline (sandbox doctrine)")
+alpha:set_hp(20)
+alpha:punch(beta, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 5 } }, nil)
+check(alpha:get_hp() == 15, "lobby body takes the punch (fleshy=100, not immortal)")
 
 -- (b) sl_scary direct-damage family: do_attack gated by match state
 local ok_scary = pcall(dofile, "mods/content/sl_scary/init.lua")
 check(ok_scary, "sl_scary loads under the stub harness")
 local dredger = minetest.registered_entities["sl_scary:dredger"]
+alpha:set_hp(20) -- (a) left a mark on purpose; the mob test starts clean
 local dpos = alpha:get_pos()
 local fake_self = {
 	attack_timer = 0, attack_range = 3, attack_damage = 4, attack_cooldown = 0,
@@ -488,12 +494,20 @@ alpha._hp = 20
 dredger.do_attack(fake_self, alpha, 1)
 check(alpha:get_hp() == 16, "horror mob attack lands during an active match (4 dmg)")
 
--- (d) Pipeline guard re-arms after the match ends
+-- (d) After the match ends the range stays open (sandbox doctrine);
+-- the guard vetoes the dead, not the lobby.
 gm.end_match(nil, "phase 16 cleanup")
 H.advance(1, 0.5)
 local canceled_after = H.fire_punchplayer(alpha, beta, 1.0,
 	{ full_punch_interval = 1.0, damage_groups = { fleshy = 5 } }, nil, 5)
-check(canceled_after == true, "punch damage cancelled again after match end")
+check(canceled_after == false, "post-match punch passes (no blanket lobby cancel)")
+local apl_sm = gm.get_player_state("alpha")
+local saved_phase = apl_sm.phase
+apl_sm.phase = "ghost"
+local canceled_ghost = H.fire_punchplayer(alpha, beta, 1.0,
+	{ full_punch_interval = 1.0, damage_groups = { fleshy = 5 } }, nil, 5)
+apl_sm.phase = saved_phase
+check(canceled_ghost == true, "the dead stay vetoed after the match")
 
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 os.exit(fail_count == 0 and 0 or 1)

@@ -514,15 +514,22 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 		return true -- No damage in creative mode
 	end
 
-	if not state.match_active then
-		return true -- Block damage in lobby
-	end
-	
+	-- No blanket "no match" cancel: outside a match, players are plain
+	-- damageable bodies so guns and fists can be tested in the open
+	-- (MT CTF doctrine — unallocated players fight under full rules).
+	-- Monsters still stand down outside matches via their own gate, and
+	-- the dead stay dead:
 	if hitter and hitter:is_player() then
 		local hname = hitter:get_player_name()
 		local hpl = game_mode.get_player_state(hname)
 		if hpl and (hpl.phase == "ghost" or hpl.phase == "evil_ghost") then
 			return true -- Ghosts cannot directly attack players
+		end
+	end
+	if player and player.is_player and player:is_player() then
+		local vpl = game_mode.get_player_state(player:get_player_name())
+		if vpl and (vpl.phase == "ghost" or vpl.phase == "evil_ghost") then
+			return true -- the dead cannot be re-killed
 		end
 	end
 end)

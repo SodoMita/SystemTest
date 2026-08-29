@@ -33,19 +33,91 @@ W.FAB_RECIPES = {
 			{ "sl_modebase:energy_crystal", 1 },
 		},
 	},
+	-- The arsenal itself (team directive 2026-08-29): pads are map
+	-- furniture and mapgen places none, so every weapon must also be
+	-- fabricable from monster spoils. Pads stay the fast lane during a
+	-- match; the Fabricator is the floor under the whole arsenal.
+	chatter = {
+		label = S("Chatter SMG"),
+		item = W.modname .. ":chatter",
+		mats = {
+			{ "sl_modebase:metal_ingot", 2 },
+			{ "sl_modebase:circuit_board", 1 },
+			{ "sl_modebase:plastic_scrap", 1 },
+		},
+	},
+	scatter = {
+		label = S("Riot Scatter"),
+		item = W.modname .. ":scatter",
+		mats = {
+			{ "sl_modebase:metal_ingot", 3 },
+			{ "sl_modebase:energy_crystal", 1 },
+		},
+	},
+	driver = {
+		label = S("Pulse Driver"),
+		item = W.modname .. ":driver",
+		mats = {
+			{ "sl_modebase:energy_crystal", 2 },
+			{ "sl_modebase:circuit_board", 2 },
+			{ "sl_modebase:metal_ingot", 1 },
+		},
+	},
+	lance = {
+		label = S("Arc Lance"),
+		item = W.modname .. ":lance",
+		mats = {
+			{ "sl_modebase:energy_crystal", 3 },
+			{ "sl_modebase:circuit_board", 2 },
+		},
+	},
+	mortar = {
+		label = S("Fusion Mortar"),
+		item = W.modname .. ":mortar",
+		mats = {
+			{ "sl_modebase:metal_ingot", 4 },
+			{ "sl_modebase:circuit_board", 2 },
+			{ "sl_modebase:energy_crystal", 2 },
+		},
+	},
+	neon_six = {
+		label = S("Neon Six"),
+		item = W.modname .. ":neon_six",
+		mats = {
+			{ "sl_modebase:metal_ingot", 2 },
+			{ "sl_modebase:energy_crystal", 2 },
+			{ "sl_modebase:plastic_scrap", 1 },
+		},
+	},
+	neon_repeater = {
+		label = S("Neon Repeater"),
+		item = W.modname .. ":neon_repeater",
+		mats = {
+			{ "sl_modebase:metal_ingot", 3 },
+			{ "sl_modebase:energy_crystal", 2 },
+			{ "sl_modebase:circuit_board", 1 },
+		},
+	},
 }
 
 W.fab_jobs = {} -- [phash] = { pos, recipe, done_at, user }
 
-local function recipe_lines(recipe_id)
-	local r = W.FAB_RECIPES[recipe_id]
-	local out = {}
+-- Stable catalog order for the formspec (lash first: the pilgrimage
+-- stays the headline; the arsenal follows).
+local FAB_ORDER = {
+	"lash", "sentry_kit", "chatter", "scatter", "driver",
+	"lance", "mortar", "neon_six", "neon_repeater",
+}
+
+local function recipe_line(id)
+	local r = W.FAB_RECIPES[id]
+	local parts = {}
 	for _, m in ipairs(r.mats) do
 		local def = minetest.registered_items[m[1]]
-		table.insert(out, string.format("  • %s ×%d",
+		table.insert(parts, string.format("%s ×%d",
 			(def and def.description or m[1]), m[2]))
 	end
-	return table.concat(out, "\n")
+	return r.label .. " — " .. table.concat(parts, ", ")
 end
 
 local function fab_formspec(pos, name)
@@ -58,16 +130,27 @@ local function fab_formspec(pos, name)
 	else
 		status = S("PRECISION FABRICATOR — ready")
 	end
-	local fs = "formspec_version[4]size[9,8]bgcolor[#10141aff;true]" ..
+	local fs = "formspec_version[4]size[9,10.4]bgcolor[#10141aff;true]" ..
 		"label[0.4,0.6;" .. minetest.formspec_escape(status) .. "]" ..
-		"label[0.4,1.6;" .. S("Grapple Lash") .. "]" ..
-		"textarea[0.4,2.0;4.0,2.2;;;" .. minetest.formspec_escape(recipe_lines("lash")) .. "]" ..
-		"button[0.4,4.4;3.4,1.0;make_lash;" .. S("Fabricate") .. "]" ..
-		"label[4.9,1.6;" .. S("Sentry Kit") .. "]" ..
-		"textarea[4.9,2.0;4.0,2.2;;;" .. minetest.formspec_escape(recipe_lines("sentry_kit")) .. "]" ..
-		"button[4.9,4.4;3.4,1.0;make_sentry_kit;" .. S("Fabricate") .. "]" ..
-		"label[0.4,5.8;" .. S("Jobs take 10 s. The machine hums.") .. "]" ..
-		"label[0.4,6.2;" .. minetest.formspec_escape(S("Operator: @1", name)) .. "]"
+		"label[0.4,1.2;" .. S("Catalog — every job takes 10 s. The machine hums.") .. "]"
+	-- Catalog buttons: five rows, two columns
+	local col_x = { [0] = 0.4, 4.9 }
+	for i, id in ipairs(FAB_ORDER) do
+		local r = W.FAB_RECIPES[id]
+		if r then
+			local col = (i <= 5) and 0 or 1
+			local row = (i - 1) % 5
+			fs = fs .. "button[" .. col_x[col] .. "," .. (1.8 + row * 0.9) ..
+				";4.2,0.75;make_" .. id .. ";" .. minetest.formspec_escape(r.label) .. "]"
+		end
+	end
+	-- One compact bill of materials under the buttons
+	local bill = {}
+	for _, id in ipairs(FAB_ORDER) do
+		if W.FAB_RECIPES[id] then table.insert(bill, recipe_line(id)) end
+	end
+	fs = fs .. "textarea[0.4,6.6;8.2,3.0;;;" .. minetest.formspec_escape(table.concat(bill, "\n")) .. "]" ..
+		"label[0.4,9.9;" .. minetest.formspec_escape(S("Operator: @1", name)) .. "]"
 	return fs
 end
 
@@ -115,9 +198,16 @@ local function start_job(pos, recipe_id, clicker)
 				S("Your hands are the doctrine.")))
 			return
 		end
-		if pl and pl.phase ~= "alive" then
-			minetest.chat_send_player(name, S("The dead order nothing built."))
-			return
+		if pl then
+			-- Inside a match only the living build; outside it the
+			-- range is open (sandbox doctrine) — the dead never order.
+			local dead = (game_mode.state and game_mode.state.match_active)
+				and pl.phase ~= "alive"
+				or pl.phase == "ghost" or pl.phase == "evil_ghost"
+			if dead then
+				minetest.chat_send_player(name, S("The dead order nothing built."))
+				return
+			end
 		end
 	end
 	local inv = clicker:get_inventory()
@@ -148,8 +238,9 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	local x, y, z = pos_str:match("^(%-?%d+),(%-?%d+),(%-?%d+)$")
 	if not x then return end
 	local pos = { x = tonumber(x), y = tonumber(y), z = tonumber(z) }
-	if fields.make_lash then start_job(pos, "lash", player) end
-	if fields.make_sentry_kit then start_job(pos, "sentry_kit", player) end
+	for id in pairs(W.FAB_RECIPES) do
+		if fields["make_" .. id] then start_job(pos, id, player) end
+	end
 end)
 
 local fab_accum = 0

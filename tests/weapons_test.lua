@@ -55,7 +55,9 @@ local function last_sounds(n)
 end
 
 local function sound_played(name, since)
-	for i = math.max(1, since or 1), #H.sounds do
+	-- `since` is a marker captured as #H.sounds BEFORE the act under
+	-- test; the window starts strictly after it.
+	for i = (since or 0) + 1, #H.sounds do
 		if H.sounds[i].name == name then return true end
 	end
 	return false
@@ -181,11 +183,18 @@ H.advance(1, 0.5)
 
 alpha._wielded = "sl_weapons:pistol"
 alpha:get_inventory():add_item("main", ItemStack("sl_weapons:pistol"))
+-- Sandbox doctrine (MT CTF): outside a match the range is OPEN —
+-- weapons fire, and lobby bodies are damageable (fleshy=100).
 local s0 = #H.sounds
+fire("sl_weapons:pistol", alpha) -- draw attempt (raise delay)
+H.advance(0.4, 0.1)
 fire("sl_weapons:pistol", alpha)
-check(#H.chat_player.alpha > 0 and H.chat_player.alpha[#H.chat_player.alpha]:find("idle outside an active match", 1, true) ~= nil,
-	"lobby fire refused with reason")
-check(not sound_played("sl_weapons_pistol_fire", s0), "no gunshot sound in lobby")
+check(sound_played("sl_weapons_pistol_fire", s0), "sandbox: weapons fire outside matches")
+local idle_refusal = false
+for _, l in ipairs(H.chat_player.alpha or {}) do
+	if l:find("idle outside an active match", 1, true) then idle_refusal = true end
+end
+check(not idle_refusal, "no 'range idle' refusal outside matches")
 
 -- ================================================================
 section("PHASE W1b — insertion, loadout, gates inside a match")
@@ -965,6 +974,80 @@ local d_amb = #H.item_drops
 local amb = minetest.add_entity({ x = 963, y = 60, z = 0 }, "sl_modebase:monster")
 amb:punch(nil, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 99 } }, nil)
 check(#H.item_drops == d_amb, "ambient monsters carry no workshop parts")
+
+-- ----------------------------------------------------------------
+section("PHASE W3c — the fabricable arsenal & the open range")
+-- ----------------------------------------------------------------
+
+-- Every primary weapon is a Fabricator job costing mob spoils only
+local ARSENAL = { "chatter", "scatter", "driver", "lance", "mortar", "neon_six", "neon_repeater" }
+local mob_items = {
+	["sl_modebase:metal_ingot"] = true,
+	["sl_modebase:circuit_board"] = true,
+	["sl_modebase:energy_crystal"] = true,
+	["sl_modebase:plastic_scrap"] = true,
+}
+local missing_jobs, foreign_mats = {}, 0
+for _, id in ipairs(ARSENAL) do
+	local r = W.FAB_RECIPES[id]
+	if not r then
+		table.insert(missing_jobs, id)
+	else
+		for _, m in ipairs(r.mats) do
+			if not mob_items[m[1]] then foreign_mats = foreign_mats + 1 end
+		end
+	end
+end
+check(#missing_jobs == 0, "all seven primaries fabricable (missing: " .. table.concat(missing_jobs, ",") .. ")")
+check(foreign_mats == 0, "arsenal jobs cost only mob-obtainable parts")
+
+-- End-to-end: a Chatter comes off the line (post-match: sandbox-open)
+local sbx_inv = alpha:get_inventory()
+sbx_inv:add_item("main", ItemStack("sl_modebase:metal_ingot 2"))
+sbx_inv:add_item("main", ItemStack("sl_modebase:circuit_board 1"))
+sbx_inv:add_item("main", ItemStack("sl_modebase:plastic_scrap 1"))
+H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(fpos), { make_chatter = "true" })
+check(W.fab_jobs[W.phash(fpos)] ~= nil, "chatter job started (sandbox)")
+H.advance(10.5, 0.5)
+check(sbx_inv:contains_item("main", ItemStack("sl_weapons:chatter")),
+	"chatter delivered after 10 s")
+
+-- The open range: with no match running, a lobby body takes fire
+local sbx = H.new_player("sbx")
+H.fire_joinplayer(sbx)
+H.advance(0.3, 0.1) -- join spawn settles -> lobby armor fleshy=100
+sbx:set_pos({ x = 970, y = 60, z = 0 }) -- clean air; corpse residue is off-line
+alpha:set_pos({ x = 966, y = 60, z = 0 })
+aim_at(alpha, sbx)
+local sh0 = #H.sounds
+fire("sl_weapons:pistol", alpha)
+H.advance(0.4, 0.1)
+fire("sl_weapons:pistol", alpha)
+check(sound_played("sl_weapons_pistol_fire", sh0), "pistol fires outside a match")
+check(sbx:get_hp() < (sbx:get_properties().hp_max or 20),
+	"and the shot damages a lobby player (open range)")
+
+-- A hook in flight when the match generation turns never anchors
+-- (stray lines must not ride into the next match)
+H.voxels[H.vhash({ x = 972, y = 60, z = 0 })] = "default:stone"
+aim_at(alpha, { x = 972, y = 61, z = 0 })
+W.get_pool("alpha").cells = 10
+H.advance(2.1, 0.5) -- lash cooldown clearance
+minetest.registered_tools["sl_weapons:grapple"].on_use(
+	ItemStack("sl_weapons:grapple"), alpha, nil)
+local stray_hooks = 0
+for _, lua in pairs(H.luaentities) do
+	if lua.name == "sl_weapons:lash_hook" then stray_hooks = stray_hooks + 1 end
+end
+check(stray_hooks >= 1, "hook launched in the open range")
+W.match_gen = W.match_gen + 1 -- the match-end generation bump
+H.advance(0.6, 0.05)
+check(W.lash["alpha"] == nil, "in-flight hook from a finished match never anchors")
+local live_hooks = 0
+for _, lua in pairs(H.luaentities) do
+	if lua.name == "sl_weapons:lash_hook" then live_hooks = live_hooks + 1 end
+end
+check(live_hooks == 0, "the stray hook entity is gone")
 
 check(gm.get_player_state("alpha").phase == "alive", "players normalized after match end")
 H.advance(2, 0.5)

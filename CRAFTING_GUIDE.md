@@ -111,7 +111,22 @@ scramble is the tax.
 | Station | Cost | What it opens |
 |---|---|---|
 | **Ghost Altar** | Ingot × 2 + Energy Crystal × 2 + Circuit Board × 1 | The revival ritual — summons a contained ghost for a relic. |
-| **Precision Fabricator** | Ingot × 6 + Circuit Board × 4 + Energy Crystal × 2 + Plastic Scrap × 3 | Fabricates the **Grapple Lash** and **Sentry Kits**. The Lash appears on no pad, in no crate, in no roll — only here. |
+| **Precision Fabricator** | Ingot × 6 + Circuit Board × 4 + Energy Crystal × 2 + Plastic Scrap × 3 | Fabricates the **Grapple Lash**, **Sentry Kits**, and the whole arsenal (below). The Lash appears on no pad, in no crate, in no roll — only here. |
+
+Every weapon is a catalog job (10 s each, parts from the machines you broke):
+
+| Off the line | Cost |
+|---|---|
+| Chatter SMG | Ingot × 2 + Circuit × 1 + Plastic × 1 |
+| Riot Scatter | Ingot × 3 + Crystal × 1 |
+| Pulse Driver | Crystal × 2 + Circuit × 2 + Ingot × 1 |
+| Arc Lance | Crystal × 3 + Circuit × 2 |
+| Fusion Mortar | Ingot × 4 + Circuit × 2 + Crystal × 2 |
+| Neon Six | Ingot × 2 + Crystal × 2 + Plastic × 1 |
+| Neon Repeater | Ingot × 3 + Crystal × 2 + Circuit × 1 |
+
+**Jax:** *"No pads on the map, no crates that owe you a gun. You want the
+scatter? Go take an ingot out of a brute."*
 
 **Barnaby** taps the table. *"You want the workshop? Fine. Go take it out of
 the things the Monster Master sends at your beacon, carry the pieces home
