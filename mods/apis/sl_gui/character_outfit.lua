@@ -191,7 +191,10 @@ function get_character_outfit_formspec(player, selected_slot)
 
     -- Background boxes FIRST
     table.insert(fs, "box[0,0;12,0.6;#1a1a1aff]")
-    table.insert(fs, "box[0.2,1.0;3.5,3.5;#101010ff]")
+    -- Preview panel sits between the two columns of slot buttons. It used to
+    -- span 0.2..3.7, so TORSO/L hand (0.0..0.9) and Back/R hand (3.1..4.0)
+    -- were painted over the character's torso and hands.
+    table.insert(fs, "box[1.0,1.0;2.0,3.5;#101010ff]")
     table.insert(fs, "box[4.2,0.8;7.5,4.8;#101010ff]")
     table.insert(fs, "box[0.2,6.2;5.6,4.8;#101010ff]")
     table.insert(fs, "box[5.8,6.2;6.0,4.8;#151515ff]")
@@ -204,7 +207,7 @@ function get_character_outfit_formspec(player, selected_slot)
     -- 3D preview using the System Looting boxman model.
     -- gui_character_model_element lives in unified_inventory.lua, which
     -- init.lua loads before this file (it also provides gui_get_tab_buttons).
-    table.insert(fs, gui_character_model_element("outfit_preview", 0.3, 1.1, 3.3, 3.3))
+    table.insert(fs, gui_character_model_element("outfit_preview", 1.05, 1.05, 1.9, 3.4))
 
     -- Slot buttons around the preview
     table.insert(fs, "button[1.4,0.4;1.0,0.6;slot_HEAD;Head]")

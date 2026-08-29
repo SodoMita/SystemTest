@@ -21,14 +21,17 @@
 local H = dofile("tests/minetest_stub.lua")
 
 local pass_count, fail_count = 0, 0
+-- Returns the verdict so a caller can skip the checks that depend on it.
 local function check(cond, label)
-	if cond then
+	local ok = cond and true or false
+	if ok then
 		pass_count = pass_count + 1
 		print("  [PASS] " .. label)
 	else
 		fail_count = fail_count + 1
 		print("  [FAIL] " .. label)
 	end
+	return ok
 end
 
 local function section(title)
@@ -181,6 +184,20 @@ local function xy(s)
 	return tonumber(a), tonumber(b)
 end
 
+-- `list[]` is the one element whose W,H are slot counts rather than units.
+-- parseList sizes the rect as (slots-1) * slot_spacing + slot_size, and in real
+-- coordinates slot_size is 1 unit with slot_spacing 1.25 units, so an 8-wide
+-- list is 9.75 units across, not 8.
+local SLOT_GEOM = { list = true }
+local SLOT_SPACING, SLOT_SIZE = 1.25, 1.0
+
+local function geom_to_units(el_name, w, h)
+	if SLOT_GEOM[el_name] then
+		return (w - 1) * SLOT_SPACING + SLOT_SIZE, (h - 1) * SLOT_SPACING + SLOT_SIZE
+	end
+	return w, h
+end
+
 -- Resolve every element to an absolute rect, applying container/scroll offsets
 -- the same way the engine does.
 local function layout(fs)
@@ -211,7 +228,8 @@ local function layout(fs)
 			local ax, ay = o.x + (x or 0), o.y + (y or 0)
 			order[#order + 1] = {
 				name = el.name, parts = p, field = p[3],
-				x = ax, y = ay, w = w or 0, h = h or 0, scrolling = false,
+				x = ax, y = ay, w = w or 0, h = h or 0,
+				scrolling = false, depth = #offsets,
 			}
 			offsets[#offsets + 1] = { x = ax, y = ay, scrolling = true }
 		elseif el.name == "scroll_container_end" then
@@ -221,10 +239,11 @@ local function layout(fs)
 			local w, h = xy(p[pos_i + 1])
 			local o = cur()
 			if x and y and w and h then
+				local uw, uh = geom_to_units(el.name, w, h)
 				order[#order + 1] = {
 					name = el.name, parts = p, field = p[name_i],
-					x = o.x + x, y = o.y + y, w = w, h = h,
-					scrolling = o.scrolling,
+					x = o.x + x, y = o.y + y, w = uw, h = uh,
+					scrolling = o.scrolling, depth = #offsets,
 				}
 			end
 		end
@@ -249,6 +268,57 @@ end
 -- The shared assertions
 -- ---------------------------------------------------------------
 
+-- Widgets that take input should not sit on top of each other: the engine
+-- paints the later element over the earlier one, so the earlier one loses
+-- visible area *and* part of its click target.
+local INTERACTIVE = {
+	button = true, button_exit = true, button_url = true, button_url_exit = true,
+	button_key = true, image_button = true, image_button_exit = true,
+	item_image_button = true, field = true, pwdfield = true, textarea = true,
+	textlist = true, table = true, dropdown = true, checkbox = true,
+	scrollbar = true, vertscrollbar = true, list = true, tabheader = true,
+	model = true, scroll_container = true,
+}
+
+-- Overlaps that are deliberate. The 3D character preview needs an invisible
+-- image_button on top of it to be clickable at all.
+local ALLOWED_OVERLAP = {
+	["model|image_button"] = true,
+}
+
+local function check_no_overlap(label, fs)
+	local rects = layout(fs)
+	local worst
+	for i = 1, #rects do
+		local a = rects[i]
+		-- Elements inside a scroll_container are clipped to its viewport, so
+		-- only compare widgets that share a coordinate space.
+		if INTERACTIVE[a.name] then
+			for j = i + 1, #rects do
+				local b = rects[j]
+				if INTERACTIVE[b.name] and a.depth == b.depth and overlaps(a, b) then
+					local key = a.name .. "|" .. b.name
+					if not ALLOWED_OVERLAP[key] and not ALLOWED_OVERLAP[b.name .. "|" .. a.name] then
+						local ar = overlap_area(a, b)
+						local small = math.min(a.w * a.h, b.w * b.h)
+						if small > 0 and ar / small > 0.02 then
+							local desc = string.format(
+								"%s: %s[%s] (%.2f,%.2f %.2fx%.2f) overlaps %s[%s] (%.2f,%.2f %.2fx%.2f) by %.0f%% of the smaller",
+								label, a.name, tostring(a.field), a.x, a.y, a.w, a.h,
+								b.name, tostring(b.field), b.x, b.y, b.w, b.h, 100 * ar / small)
+							if not worst or ar / small > worst.ratio then
+								worst = { ratio = ar / small, desc = desc }
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	if worst then print("        " .. worst.desc) end
+	check(worst == nil, label .. ": no interactive widget overlaps another")
+end
+
 -- container/container_end must balance: an unclosed container silently offsets
 -- everything after it, and an extra container_end shifts the rest of the
 -- window the other way.
@@ -267,6 +337,7 @@ end
 
 local function check_frame(label, fs)
 	check_containers(label, fs)
+	check_no_overlap(label, fs)
 	local rects, w, h = layout(fs)
 	if not w or not h then
 		check(false, label .. ": has a size[] element")
@@ -487,6 +558,31 @@ if mm then
 			check(start_btn.y + start_btn.h <= h + 1e-6, string.format(
 				"matchmaking: the start/stop control ends at %.2f, inside the %g-high frame",
 				start_btn.y + start_btn.h, h))
+		end
+	end
+end
+
+section("PHASE 7 — node GUIs opened by right-click")
+-- These carry inventory grids, the elements most likely to outgrow their
+-- frame: an 8-slot-wide list is 9.75 units across, not 8.
+-- The spawner unit only opens for a live Monster Master.
+if game_mode and game_mode.set_monster_master then
+	game_mode.set_monster_master("alpha")
+end
+local stack = ItemStack("")
+for _, nodename in ipairs({ "sl_modebase:loot_crate", "sl_modebase:monster_spawner" }) do
+	local def = minetest.registered_nodes[nodename]
+	check(def ~= nil and def.on_rightclick ~= nil, nodename .. " has a right-click GUI")
+	if def and def.on_rightclick then
+		local shown_before = #(H.formspecs.alpha or {})
+		local ok, err = pcall(function()
+			def.on_rightclick({ x = 0, y = 0, z = 0 },
+				{ name = nodename, param2 = 0 }, player, stack, {})
+		end)
+		check(ok, nodename .. " opens without error" .. (ok and "" or (" -> " .. tostring(err))))
+		local shown = H.formspecs.alpha or {}
+		if check(#shown > shown_before, nodename .. " sent a formspec") then
+			check_frame(nodename, shown[#shown].form)
 		end
 	end
 end

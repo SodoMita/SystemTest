@@ -527,7 +527,9 @@ function get_achievement_formspec(player)
     end
     
     -- Scrollable achievement list view
-    table.insert(formspec, "scroll_container[0.3,2.6;11.4,8.8;ach_scroll;vertical;0.1]")
+    -- The scrollbar sits beside the viewport, not on top of it: at x=11.5 it
+    -- covered the rightmost 0.2 units of every row.
+    table.insert(formspec, "scroll_container[0.3,2.6;11.3,8.8;ach_scroll;vertical;0.1]")
     
     local y = 0
     for category_name, category_achievements in pairs(categories) do
@@ -608,7 +610,7 @@ function get_achievement_formspec(player)
     table.insert(formspec, "scroll_container_end[]")
     
     -- Scrollbar
-    table.insert(formspec, "scrollbar[11.5,2.6;0.3,8.8;vertical;ach_scroll;0]")
+    table.insert(formspec, "scrollbar[11.65,2.6;0.3,8.8;vertical;ach_scroll;0]")
     
     return table.concat(formspec, "")
 end
