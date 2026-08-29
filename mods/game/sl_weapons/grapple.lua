@@ -28,14 +28,15 @@ W.match_gen = W.match_gen or 0
 minetest.register_entity(W.modname .. ":lash_hook", {
 	_stub_ray_radius = 0.25,
 	sl_weapon_fx = true,
-	visual = "sprite",
-	textures = { "sl_weapons_lash_hook.png" },
-	visual_size = { x = 0.8, y = 0.8 },
-	physical = false,
-	collide_with_objects = false,
-	pointable = true,
-	static_save = false,
-
+		initial_properties = {
+		visual = "sprite",
+		textures = { "sl_weapons_lash_hook.png" },
+		visual_size = { x = 0.8, y = 0.8 },
+		physical = false,
+		collide_with_objects = false,
+		pointable = true,
+		static_save = false,
+		},
 	on_punch = function(self, puncher)
 		-- One hit severs the line (spec §10.1, danger 4).
 		if self.shooter then

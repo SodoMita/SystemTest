@@ -182,6 +182,16 @@ minetest.register_on_joinplayer(function(player)
 	local name = player:get_player_name()
 	local pl = game_mode.get_player_state(name)
 
+	-- Tournament seasons lock their roster at start (v1.3.5): anyone
+	-- arriving mid-season watches from the rail. The flag clears itself
+	-- when the season (or /sl_tournament stop) runs its clean reset.
+	if state.tournament and not state.tournament_roster[name] then
+		pl.tournament_spectator = true
+		minetest.chat_send_player(name, S("A tournament is running — you join as a spectator until it ends."))
+	else
+		pl.tournament_spectator = nil
+	end
+
 	-- Initial spawn at lobby (or beacon if match is active)
 	minetest.after(0.2, function()
 		local p = minetest.get_player_by_name(name)

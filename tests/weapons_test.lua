@@ -389,6 +389,7 @@ local vic2 = new_victim("tgt", "beacon_b")
 vic2:set_pos({ x = 30, y = 60, z = 10 })
 alpha:set_pos({ x = 30, y = 60, z = 0 })
 aim_at(alpha, vic2)
+vic2:set_hp(40) -- the sprint shell below lands 28: keep 20 HP bodies out of it
 alpha:set_player_velocity({ x = 5, y = 0, z = 0 })
 W.get_pool("alpha").rockets = 5
 local rockets_before = W.get_pool("alpha").rockets
@@ -405,14 +406,17 @@ check(W.mag_get(mst) == 3 and W.get_pool("alpha").rockets == 2,
 	"loading fills the 3-rocket magazine from the reserve")
 local mortar_obj = nil
 for _, lua in pairs(H.luaentities) do
-	if lua.name == "sl_weapons:mortar" then mortar_obj = lua.object break end
+	if lua.name == "sl_weapons:mortar" and lua.object
+		and not lua.object._removed then
+		mortar_obj = lua.object break
+	end
 end
 check(mortar_obj ~= nil, "mortar entity tracked")
 if mortar_obj then
 	local v = mortar_obj:get_velocity()
 	check(v.x > 4 and v.x < 6, "velocity inheritance: shell carries the sprint (vx=" ..
 		tostring(math.floor(v.x)) .. ")")
-	check(v.z > 14 and v.z < 18, "shell speed along the shot line (vz=" ..
+	check(v.z > 20 and v.z < 27, "shell speed along the shot line (vz=" ..
 		tostring(math.floor(v.z)) .. ")")
 end
 alpha:set_player_velocity({ x = 0, y = 0, z = 0 })
@@ -421,26 +425,58 @@ alpha:set_player_velocity({ x = 0, y = 0, z = 0 })
 -- (the sprint shell keeps drifting sideways — that's the point).
 aim_at(alpha, vic2)
 H.advance(1.0, 0.1) -- refire window
-vic2:set_hp(20)
+vic2:set_hp(40) -- doubled direct damage (28) one-shots 20 HP bodies;
+-- the victim runs hot so the assert measures the wound, not the funeral
 local sndm = #H.sounds
 fire("sl_weapons:mortar", alpha)
 H.advance(0.9, 0.05)
-check(vic2:get_hp() <= 6, "mortar direct hit lands 14 (20 -> " .. tostring(vic2:get_hp()) .. ")")
+check(vic2:get_hp() == 12, "mortar direct hit lands 28 (40 -> " .. tostring(vic2:get_hp()) .. ")")
 check(sound_played("sl_weapons_explosion", sndm), "explosion heard")
+
+-- Parabola: fire flat into open sky and watch gravity bend the arc.
+alpha:set_player_velocity({ x = 0, y = 0, z = 0 })
+aim_at(alpha, { x = 30, y = 61.6, z = 20 })
+H.advance(1.0, 0.1) -- refire window
+local arc_es = #H.entity_spawns
+fire("sl_weapons:mortar", alpha)
+check(#H.entity_spawns == arc_es + 1, "arc probe shell away")
+local shell2 = nil
+for _, lua in pairs(H.luaentities) do
+	-- the sprint shell from earlier is still airborne, plunging at
+	-- vy ~ -25; the fresh probe leaves the muzzle near vy = 0.
+	if lua.name == "sl_weapons:mortar" and lua.object
+		and not lua.object._removed
+		and lua.object:get_velocity().y > -10 then
+		shell2 = lua.object break
+	end
+end
+if shell2 then
+	local vy0 = shell2:get_velocity().y
+	H.advance(0.2, 0.1)
+	local vy1 = shell2:get_velocity().y
+	check(vy1 - vy0 < -1.0, "parabolic arc: gravity drags the shell (vy " ..
+		string.format("%.1f -> %.1f", vy0, vy1) .. ")")
+	shell2:remove() -- probe retired: no stray shells wandering into W2
+end
 
 -- Splash + knockback: ground shot near a fresh victim
 local vic3 = new_victim("tgt", "beacon_b")
-vic3:set_pos({ x = 30, y = 60, z = 9 })
+vic3:set_pos({ x = 31, y = 60, z = 9 })
 vic3:set_hp(20)
-local ground = { x = 30, y = 59, z = 7 }
+local ground = { x = 30, y = 59, z = 8 }
 H.voxels[H.vhash(ground)] = "default:stone" -- somewhere for the shell to land
-aim_at(alpha, ground)
+-- Gravity arcs the shell down ~1 m over this range: aim above the stone
+-- so it falls INTO the cell (a flat aim skims the cell's top corner and
+-- sails under). Geometry proven by simulation: impact node (30,59,8),
+-- victim 1.73 m off-centre.
+aim_at(alpha, { x = 30, y = 59.7, z = 8.3 })
+H.advance(0.5, 0.1) -- refire window behind the arc probe
 W.get_pool("alpha").rockets = W.get_pool("alpha").rockets + 2
 fire("sl_weapons:mortar", alpha)
 H.advance(0.6, 0.05)
 local splash_dmg = 20 - vic3:get_hp()
-check(splash_dmg >= 1 and splash_dmg < 14, "splash falloff below direct (" ..
-	tostring(splash_dmg) .. " dmg)")
+check(splash_dmg >= 2 and splash_dmg <= 5, "splash falloff below direct (10 max, " ..
+	tostring(splash_dmg) .. " dmg at 2.2 m)")
 local kv = vic3:get_player_velocity()
 check(kv.x ~= 0 or kv.z ~= 0, "splash knockback applied to victim")
 
@@ -665,8 +701,10 @@ local dw = W.deadwalks[1]
 check(dw ~= nil and dw.object ~= nil and dw.object:get_hp() == 8, "deadwalk has 8 HP")
 
 -- Visible corruption flags + harmless by statute
-check(minetest.registered_entities["sl_weapons:deadwalk"].hp_max == 8,
-	"deadwalk hp_max is 8 (no healing path exists)")
+local dw_def = minetest.registered_entities["sl_weapons:deadwalk"]
+check(dw_def.initial_properties and dw_def.initial_properties.hp_max == 8
+	and dw_def.hp_max == nil,
+	"deadwalk hp_max is 8, declared in initial_properties (no healing path exists)")
 local other = new_victim("oth", "beacon_b")
 other:set_pos(dw.object:get_pos())
 H.advance(1.0, 0.1)
@@ -780,14 +818,16 @@ H.advance(2.0, 0.1)
 check(stranger:get_hp() < 20, "turret fires on strangers (deployer-only IFF)")
 check(alpha:get_hp() == 20, "deployer is spared")
 
--- Monsters are targets
+-- Monsters are targets. The turret keeps its lock while the first
+-- contact lives, so march the stranger out of range first — this
+-- window is about the lifeform, not the leftover contact.
+stranger:set_pos({ x = 490, y = 60, z = 0 })
 local mobj = gm.spawn_monster({ x = tpos.x, y = tpos.y, z = tpos.z + 4 }, "scout", "gamma")
 H.advance(2.0, 0.1)
 local mlua = mobj and mobj.get_luaentity and mobj:get_luaentity()
 check(mlua == nil or mobj:get_hp() < 30, "turret engages monsters")
 
 -- Possession flips IFF: the deployer becomes a target
-stranger:set_pos({ x = 500, y = 60, z = 0 }) -- clear the arc
 if mobj and mobj.remove then pcall(function() mobj:remove() end) end
 bpl.phase = "evil_ghost"
 bpl.possession_ready_at = 0 -- test surgery: separate possession economy
@@ -1320,9 +1360,22 @@ section("PHASE W3e — tournament mode: inventories reset, progression persists"
 
 local tcmd = minetest.registered_chatcommands.sl_tournament
 check(tcmd ~= nil, "the /sl_tournament command is registered")
-local tok, _tmsg = tcmd.func("alpha", "start")
-check(tok == true, "tournament starts between matches")
+local tok, _tmsg = tcmd.func("alpha", "start 2")
+check(tok == true, "tournament starts between matches (2-match season)")
 check(tcmd.func("alpha", "start") == false, "double-start is refused")
+check(state.tournament_planned == 2 and state.tournament_matches_left == 2,
+	"the season length is booked at start")
+check(state.tournament_roster["alpha"] and state.tournament_roster["beta"]
+	and state.tournament_roster["gamma"], "the roster locks in everyone connected")
+
+-- The roster locked at the starting gun: a late joiner spectates.
+local l8r = new_victim("l8r", nil)
+local l8r_name = l8r:get_player_name()
+check(gm.get_player_state(l8r_name).tournament_spectator == true,
+	"a late joiner is flagged tournament spectator")
+check(state.tournament_roster[l8r_name] == nil, "late joiners stay off the roster")
+check(gm.get_player_state("beta").tournament_spectator == nil,
+	"roster members are not spectators")
 
 -- Seed persistent progression: levels, abilities, an achievement, MM grip
 beta:get_meta():set_string("experience", "450")
@@ -1340,7 +1393,11 @@ for _, p in ipairs(minetest.get_connected_players()) do
 	minetest.registered_chatcommands.sl_ready.func(p:get_player_name(), "")
 end
 H.advance(4, 0.5)
-check(state.match_active == true, "tournament match started")
+check(state.match_active == true, "tournament match 1 started")
+check(gm.get_player_state(l8r_name).team == nil,
+	"spectators are left out of the team assignment")
+check(state.monster_master.player ~= l8r_name,
+	"spectators are never chosen as the Monster Master")
 check(not beta:get_inventory():contains_item("main", ItemStack("sl_modebase:metal_ingot 30")),
 	"inventories still reset each tournament match")
 check(beta:get_meta():get_string("experience") == "450",
@@ -1350,14 +1407,49 @@ check((tab.stat_points or 0) == 7 and tab.unlocked and tab.unlocked.sniper_eyes 
 	"abilities persist across the tournament match start")
 check(W.get_mm_levels(gamma).grip == 2, "MM grip levels persist in a tournament")
 
-gm.end_match(nil, "tournament check")
+-- Match 1 of 2: bank five points to beta, then the whistle.
+gm.get_player_state("beta").points = 5
+gm.end_match(nil, "tournament match 1")
 H.advance(1, 0.5)
+check((state.tournament_scores["beta"] or 0) == 5,
+	"match points bank into the season score")
+check(state.tournament_matches_left == 1, "one match remains on the season")
 local tac = minetest.deserialize(beta:get_meta():get_string("achievements")) or {}
 check(tac.unlocked and tac.unlocked.win_match == true,
 	"achievements persist across the tournament match end")
 
-local tok2 = tcmd.func("alpha", "stop")
-check(tok2 == true, "the tournament stops between matches")
+-- The results form must be a legal formspec: the table[] item list is
+-- ONE comma-separated element (the ";" row join crashed live servers).
+local rfs = H.formspecs["beta"] and H.formspecs["beta"][#H.formspecs["beta"]]
+check(rfs ~= nil and rfs.formname == "sl_modebase:results",
+	"results form shown after each match")
+if rfs then
+	local items = (rfs.form:match("results;([^]]+)") or ""):gsub(";%d+$", "")
+	check(items:find(";", 1, true) == nil,
+		"table element list carries no ';' separators (the live-server crash)")
+	check(items:find("Player", 1, true) and items:find(",beta,", 1, true),
+		"results table carries the scoreboard rows")
+end
+
+-- Match 2 of 2: the season decider — 3 more points and auto-close.
+state.settings.countdown = 1
+minetest.registered_chatcommands.sl_match_start.func("alpha", "")
+for _, p in ipairs(minetest.get_connected_players()) do
+	minetest.registered_chatcommands.sl_ready.func(p:get_player_name(), "")
+end
+H.advance(4, 0.5)
+check(state.match_active == true, "tournament match 2 started")
+gm.get_player_state("beta").points = 3
+gm.end_match(nil, "tournament match 2")
+check(state.tournament_matches_left == 0, "the season is exhausted")
+H.advance(2.6, 0.5) -- the ranking form pops out after 2 s
+check(state.tournament == false, "the tournament ends itself after the final match")
+local tfs = H.formspecs["beta"] and H.formspecs["beta"][#H.formspecs["beta"]]
+check(tfs ~= nil and tfs.formname == "sl_modebase:tournament_results"
+	and tfs.form:find("TOURNAMENT RESULTS", 1, true),
+	"the season ranking form pops out at the end")
+check(tfs ~= nil and tfs.form:find("1,beta,8", 1, true),
+	"ranking lists the champion by season points (1,beta,8)")
 check(beta:get_meta():get_string("experience") == "0",
 	"leaving the tournament resets levels once")
 local tab2 = minetest.deserialize(beta:get_meta():get_string("abilities_v2")) or {}
@@ -1366,6 +1458,9 @@ check((tab2.stat_points or 0) == 0 and (tab2.unlocked and next(tab2.unlocked)) =
 local tac2 = minetest.deserialize(beta:get_meta():get_string("achievements")) or {}
 check(tac2.unlocked == nil or next(tac2.unlocked) == nil,
 	"achievements reset when the tournament ends (times_earned kept)")
+check(gm.get_player_state(l8r_name).tournament_spectator == nil,
+	"spectator status clears with the season")
+check(next(state.tournament_roster) == nil, "roster cleared")
 check(tcmd.func("alpha", "stop") == false, "stopping twice is refused")
 check(gm.get_player_state("alpha").phase == "alive", "players normalized after tournament")
 H.advance(2, 0.5)

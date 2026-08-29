@@ -267,6 +267,12 @@ function W.knockback(obj, vel)
 end
 
 function W.player_velocity(user)
+	-- get_velocity replaced get_player_velocity (engine 5.3+); keep the
+	-- old name as a fallback for older engines.
+	if user and user.get_velocity then
+		local ok, v = pcall(user.get_velocity, user)
+		if ok and type(v) == "table" then return v end
+	end
 	if user and user.get_player_velocity then
 		return user:get_player_velocity()
 	end

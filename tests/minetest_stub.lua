@@ -749,10 +749,14 @@ function PlayerMeta:get_look_dir()
 end
 function PlayerMeta:set_look_dir(d) self._look_dir = { x = d.x, y = d.y, z = d.z } end
 
-function PlayerMeta:get_player_velocity()
+function PlayerMeta:get_velocity()
 	local v = self._velocity
 	return { x = v and v.x or 0, y = v and v.y or 0, z = v and v.z or 0 }
 end
+
+-- Deprecated twin of get_velocity, kept for older engines that only
+-- expose get_player_velocity.
+PlayerMeta.get_player_velocity = PlayerMeta.get_velocity
 function PlayerMeta:set_player_velocity(v) self._velocity = { x = v.x, y = v.y, z = v.z } end
 function PlayerMeta:add_player_velocity(v)
 	local cur = self._velocity or { x = 0, y = 0, z = 0 }
@@ -823,8 +827,8 @@ local function make_entity_object(pos, name)
 		_pos = { x = pos.x, y = pos.y, z = pos.z },
 		_velocity = { x = 0, y = 0, z = 0 },
 		_armor = { fleshy = 100 }, -- engine default for Lua entities
-		_props = { hp_max = def.hp_max or 10 },
-		_hp = def.hp_max or 10,
+		_props = { hp_max = (def.initial_properties and def.initial_properties.hp_max) or def.hp_max or 10 },
+		_hp = (def.initial_properties and def.initial_properties.hp_max) or def.hp_max or 10,
 		_removed = false,
 	}
 	local lua = {}
@@ -878,6 +882,9 @@ local function make_entity_object(pos, name)
 	function obj:remove()
 		if self._removed then return end
 		self._removed = true
+		-- Engine parity: a removed object is invalid; get_luaentity()
+		-- must return nil so stale references fail their checks.
+		self._lua = nil
 		if M.luaentities[self._id] then
 			M.luaentities[self._id] = nil
 		end

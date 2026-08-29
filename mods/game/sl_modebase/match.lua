@@ -98,6 +98,76 @@ function game_mode.end_match(winner, reason)
 		pl.ghost_summoned_by = nil
 		pl.ghost_summon_pos = nil
 	end
+
+	-- Tournament bookkeeping (v1.3.5): the tournament runs a fixed number
+	-- of matches. Each finished match banks its points into the roster's
+	-- season score; when the last planned match ends, the ranking form
+	-- pops out and one clean reset follows (see end_tournament).
+	if state.tournament then
+		for name, pl in pairs(state.players) do
+			if state.tournament_roster[name] then
+				state.tournament_scores[name] =
+					(state.tournament_scores[name] or 0) + (pl.points or 0)
+			end
+		end
+		state.tournament_matches_left = math.max(0,
+			(state.tournament_matches_left or 1) - 1)
+		if state.tournament_matches_left <= 0 then
+			local planned = state.tournament_planned or 0
+			minetest.after(2.0, function()
+				game_mode.end_tournament(
+					S("all @1 matches played", tostring(planned)))
+			end)
+		else
+			game_mode.broadcast(S("Tournament: @1 match(es) remaining.",
+				tostring(state.tournament_matches_left)))
+		end
+	end
+end
+
+-- End the tournament (v1.3.5): ranking form first, then the one clean
+-- reset — progression and achievements were on loan while it ran.
+function game_mode.end_tournament(reason)
+	if not state.tournament then return end
+	local ranked = {}
+	for name in pairs(state.tournament_roster) do
+		table.insert(ranked, { name = name, pts = state.tournament_scores[name] or 0 })
+	end
+	table.sort(ranked, function(a, b)
+		if a.pts ~= b.pts then return a.pts > b.pts end
+		return a.name < b.name
+	end)
+	local rows = {}
+	for i, entry in ipairs(ranked) do
+		table.insert(rows, { tostring(i), entry.name, tostring(entry.pts) })
+	end
+	local champion = ranked[1] and ranked[1].name or S("nobody")
+	game_mode.show_rank_formspec("sl_modebase:tournament_results",
+		S("TOURNAMENT RESULTS"),
+		S("Champion: @1 (@2)", champion, reason or ""),
+		{ "#", S("Operator"), S("Points") }, rows)
+	if ranked[1] then
+		game_mode.broadcast(S("TOURNAMENT OVER — champion: @1 with @2 points",
+			ranked[1].name, tostring(ranked[1].pts)))
+	end
+	-- The loan ends: progression, achievements and Monster Master grip
+	-- return to per-match rules with one clean reset (v1.3.4 semantics).
+	for _, player in ipairs(minetest.get_connected_players()) do
+		if reset_player_progression then
+			pcall(reset_player_progression, player)
+		end
+		if reset_match_achievements then
+			pcall(reset_match_achievements, player)
+		end
+	end
+	state.tournament = false
+	state.tournament_planned = 0
+	state.tournament_matches_left = 0
+	state.tournament_scores = {}
+	state.tournament_roster = {}
+	for _, pl in pairs(state.players) do
+		pl.tournament_spectator = nil
+	end
 end
 
 -- Reset for new match
@@ -186,17 +256,39 @@ function game_mode.send_results(winner, reason)
 	local rows = {}
 	for name, pl in pairs(state.players) do
 		if minetest.get_player_by_name(name) then
-			table.insert(rows, string.format("%s,%s,%d",
-				minetest.formspec_escape(name), tostring(pl.phase),
-				pl.points or 0))
+			table.insert(rows, { minetest.formspec_escape(name),
+				tostring(pl.phase), tostring(pl.points or 0) })
 		end
 	end
-	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;Player,Phase,Points;"
-		.. table.concat(rows, ";") .. ";0]")
+	game_mode.show_rank_formspec("sl_modebase:results", S("MATCH RESULTS"),
+		string.format("%s — %s", winner_label, reason or ""),
+		{ S("Player"), S("Phase"), S("Points") }, rows)
+end
+
+-- Shared ranking form (match results and the tournament leaderboard use
+-- the same layout). Rows arrive as arrays of cell strings; a formspec
+-- table[] carries the whole item list as ONE comma-separated element —
+-- ";"-joining rows produced "Invalid table element" on live servers, so
+-- never go back to that.
+function game_mode.show_rank_formspec(formname, title, subtitle, headers, rows)
+	local fs = {
+		"formspec_version[4]",
+		"size[8,6.5]",
+		"bgcolor[#0a0a12ee;true]",
+		"label[0.5,0.4;" .. minetest.formspec_escape(title) .. "]",
+		"label[0.5,0.9;" .. minetest.formspec_escape(subtitle) .. "]",
+		"tablecolumns[text;text;right]",
+	}
+	local items = { table.concat(headers, ",") }
+	for _, row in ipairs(rows) do
+		table.insert(items, table.concat(row, ","))
+	end
+	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;"
+		.. table.concat(items, ",") .. ";1]")
 	table.insert(fs, "button_exit[3,5.9;2,0.7;close;Close]")
 	local fs_str = table.concat(fs, "")
 	for _, player in ipairs(minetest.get_connected_players()) do
-		minetest.show_formspec(player:get_player_name(), "sl_modebase:results", fs_str)
+		minetest.show_formspec(player:get_player_name(), formname, fs_str)
 	end
 end
 
@@ -252,7 +344,8 @@ function game_mode.start_new_match(initiator)
 		local candidates = {}
 		for _, name in ipairs(connected) do
 			local pl = game_mode.get_player_state(name)
-			if not biggest_team or pl.team == biggest_team then
+			if (not biggest_team or pl.team == biggest_team)
+				and not pl.tournament_spectator then
 				table.insert(candidates, name)
 			end
 		end
@@ -267,7 +360,8 @@ function game_mode.start_new_match(initiator)
 	-- Ensure the active simulation has two actual beacon teams.
 	for _, name in ipairs(connected) do
 		local pl = game_mode.get_player_state(name)
-		if not pl.team and pl.role ~= "monster_master" then
+		if not pl.team and pl.role ~= "monster_master"
+			and not pl.tournament_spectator then
 			game_mode.assign_beacon_team(name)
 		end
 	end
@@ -306,7 +400,8 @@ function game_mode.start_new_match(initiator)
 		local player = minetest.get_player_by_name(name)
 		if player then
 			local pl = game_mode.get_player_state(name)
-			if not pl.team and pl.role ~= "monster_master" then
+			if not pl.team and pl.role ~= "monster_master"
+			and not pl.tournament_spectator then
 				game_mode.assign_beacon_team(name)
 			end
 			game_mode.spawn_player(player)

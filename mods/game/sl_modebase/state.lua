@@ -34,8 +34,15 @@ local state = {
 	match_ended_at = 0,
 	-- Tournament mode (/sl_tournament): while true, match start still
 	-- resets inventories but achievements, levels, and abilities
-	-- persist across matches (v1.3.4).
+	-- persist across matches (v1.3.4). v1.3.5: a tournament is a season
+	-- of N matches with a roster locked at start — late joiners are
+	-- spectators; when the last match ends the ranking form pops out
+	-- and one clean reset follows.
 	tournament = false,
+	tournament_planned = 0, -- N matches the admin booked
+	tournament_matches_left = 0, -- countdown, decremented at each end_match
+	tournament_scores = {}, -- [player name] = banked season points
+	tournament_roster = {}, -- [player name] = true for locked-in operators
 
 	-- Ready check / insertion sequencing (LOBBY -> READY CHECK -> COUNTDOWN -> INSERTION)
 	ready_check = {

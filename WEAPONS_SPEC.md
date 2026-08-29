@@ -98,7 +98,7 @@ no armor in scope. `n/s` = nodes per second.
 | **Chatter SMG** | Machinegun | Hitscan | 2 | 0.09 s | 22.2 | 10 hits ≈ 0.9 s (bloom pushes real TTK ≥ 1.5 s) | Bullets (150) | First shot exact; bloom 0.5°→4° while held, resets in 0.6 s. Bloom is a published function, never a die roll |
 | **Riot Scatter** | Shotgun | Hitscan ×8 pellets | 1.5/pellet = 12 point-blank | 0.9 s | 13.3 | 2 shots ≈ 0.9 s (point-blank) | Shells (30) | 9° cone, pellets expire at 24 m, damage falls with pellet spread |
 | **Arc Lance** | Railgun | Hitscan | 18 | 1.6 s | 11.25 | 2 hits ≈ 1.6 s — **or one lance + one pistol tap** | Cells (60) | RMB zoom ×2.5; beam tracer; report audible 48 m; one shot breaks a possession (§7.3) |
-| **Fusion Mortar** | Rocket launcher | Projectile, 18 n/s | 14 direct + splash 6→0 over 3 m | 0.9 s | ~22 | 2 directs ≈ 0.9 s — both dodgeable | Rockets (15) | 50 % self-damage; mortar-jump (§10); splash damages beacons 1; cremates corpses (§7.3) |
+| **Fusion Mortar** | Rocket launcher | Projectile, 24 n/s, engine gravity (lobbed parabola) | 28 direct + splash 10→0 over 3 m | 0.9 s | ~22 | 1 direct kills — the counterplay is the arc, not the duel | Rockets (15) | 50 % self-damage; mortar-jump (§10); splash damages beacons 2; cremates corpses (§7.3) |
 | **Pulse Driver** | Plasma gun | Projectile, 26 n/s | 5 | 0.15 s | 33.3 | 4 bolts ≈ 0.6 s theoretical; slow bolts make real TTK ~1.5–2 s | Cells (60) | Bolts apply 0.4 n/s knockback — target juggling; best monster-clearer |
 
 Design intent per slot:
@@ -434,7 +434,7 @@ safe variant was a choice.
 | Monster Master | Cannot fire ranged, cannot deploy turrets (§6.1); `fleshy = 100` armor stands vs. the chip damage that still leaks through; mortars still shove monsters |
 | MM bare hands | Skill-tree evolution only (§6.1); never items, never ranged |
 | Monsters | Full weapon damage; mortars/pulse are the intended anti-swarm tools; corpses do not exist for monsters (entities die as today) |
-| Beacons | Ranged damage deliberately poor (§9): mortar direct 4 / splash 1, lance 3, everything else 1, turret 0 — via `game_mode.damage_beacon()` |
+| Beacons | Ranged damage deliberately poor (§9): mortar direct 4 / splash 2, lance 3, everything else 1, turret 0 — via `game_mode.damage_beacon()` |
 | Possessed objects | Two weapon hits at range break a possession, same as two punches (§5, council #5) |
 | Match reset | Turrets dismantled, pads rearmed, ammo cleared, **corpses/mounds/scorch/residue swept**, achievement match-state reset (§12.1) |
 | Identity | See §11 audit |
@@ -449,7 +449,7 @@ gameplay instead of turning matches into artillery exchanges.
 
 ## 10. Movement tech
 
-- **Mortar-jump**: mortar explosion within 3 m applies up to 9 n/s velocity
+- **Mortar-jump**: mortar explosion within 3 m applies up to 11 n/s velocity
   away from blast (7.5 % of self-damage at direct feet-shot ≈ 1 HP cost with
   50 % self-damage falloff). Horizontal mortar-hops cost more HP, go farther.
   Arc drop stays at the safe flat 2 n/s² (team decision 2026-08-29, §17.3).
@@ -583,10 +583,18 @@ Team decision 2026-08-29, built on `mods/apis/sl_gui/achievement_system.lua`:
   at match end, joining the existing end-of-match normalization (inventories,
   phases, sabotages, possessions). A new match is a clean record — the same
   principle as the corpse sweep: the next scene starts clean.
-- **Tournament exception (v1.3.4).** While `/sl_tournament start` runs,
-  achievements persist across match ends along with levels and abilities
-  (inventories still reset every match). `/sl_tournament stop` performs the
-  one clean reset that returns everyone to the per-match economy.
+- **Tournament exception (v1.3.4, season format v1.3.5).** While a
+  tournament runs, achievements persist across match ends along with levels
+  and abilities (inventories still reset every match). A tournament is a
+  **season of N matches**: `/sl_tournament start [N]` (default 5, capped at
+  50) locks the roster to everyone connected at the starting gun — anyone
+  joining mid-season is flagged a **tournament spectator**: no team
+  assignment, never the Monster Master, never a targeting candidate. Each
+  finished match banks its points into the roster's season score; when the
+  last planned match ends, the **ranking form** (shared match-results
+  layout, sorted by season points) pops out and the one clean reset follows
+  automatically. `/sl_tournament stop` ends a season early through the same
+  ranking-then-reset path.
 - **Lifetime counters persist.** Each award also increments a per-player,
   per-achievement **`times_earned`** counter in mod storage, which survives
   every reset (and `/resetachievements` resets it explicitly, admin-intent
@@ -688,6 +696,32 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
    W3 freezes numbers.
 
 ## 18. Changelog
+
+- **v1.3.5 (2026-08-29, tournament seasons + mortar rework + live-server
+  fixes)** — three threads in one sitting. *Tournaments* (team decision
+  2026-08-29: "limited quantity of plays or games or matches"):
+  `/sl_tournament start [N]` books an N-match season (default 5, 1–50),
+  locks the roster at the starting gun — late joiners are flagged
+  tournament spectators: no team, no Monster Master slot, they watch —
+  banks each match's points into season scores, counts the matches down,
+  and when the last one ends pops the ranking form (champion first) and
+  performs the one clean progression + achievement reset automatically;
+  `/sl_tournament stop` now routes through the same ranking-then-reset
+  path. *Mortar rework* (team decision 2026-08-29, reversing the v1.2
+  flat-arc): engine-gravity parabola (grav 8) at 24 n/s, direct damage
+  doubled to 28 (one shell settles a 20 HP argument), splash 10→0 over
+  3 m, knockback up to 11 n/s (the mortar-jump rides higher), splash
+  chip on beacons 1→2, and the boom is now a public event — 32-flash
+  blast plus a rising smoke column. *Live-server fixes*: the match
+  results formspec crashed on `Invalid table element(7)` — a formspec
+  `table[]` carries its whole item list as ONE comma-separated element,
+  never `;`-joined rows (shared ranking form introduced, both forms
+  audited); all `sl_weapons` entities declare visuals through
+  `initial_properties` (corpse, deadwalk, lash hook, projectiles — the
+  deprecated top-level `physical`/`visual`/`textures` are gone);
+  `W.player_velocity` prefers `get_velocity` with the deprecated
+  `get_player_velocity` kept as a fallback. Suites: weapons 269/269,
+  smoke 127/127, soak PASS (3 seeds × 40 matches).
 
 - **v1.3.4 (2026-08-29, tournament mode)** — `/sl_tournament start|stop`
   (server priv, between matches only): while a tournament runs, match

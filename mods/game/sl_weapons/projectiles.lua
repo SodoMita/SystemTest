@@ -24,13 +24,15 @@ function W.register_projectile(id, cfg)
 		_stub_ray_radius = 0.15,
 		sl_weapon_fx = true,
 
-		visual = "sprite",
-		textures = { cfg.texture or "sl_weapons_tracer.png" },
-		visual_size = { x = 0.6, y = 0.6 },
-		physical = false,
-		collisionbox = { 0, 0, 0, 0, 0, 0 },
-		pointable = false,
-		static_save = false,
+		initial_properties = {
+			visual = "sprite",
+			textures = { cfg.texture or "sl_weapons_tracer.png" },
+			visual_size = { x = 0.6, y = 0.6 },
+			physical = false,
+			collisionbox = { 0, 0, 0, 0, 0, 0 },
+			pointable = false,
+			static_save = false,
+		},
 
 		on_step = function(self, dtime)
 			local obj = self.object
@@ -132,7 +134,8 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 	minetest.sound_play("sl_weapons_explosion", {
 		pos = pos, gain = 1.0, max_hear_distance = 48,
 	})
-	for _ = 1, 18 do
+	-- The boom is a public event: flash, then a rising smoke column.
+	for _ = 1, 32 do
 		minetest.add_particle({
 			pos = pos,
 			velocity = {
@@ -142,10 +145,23 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 			},
 			acceleration = { x = 0, y = -9, z = 0 },
 			expirationtime = 0.8,
-			size = 3,
+			size = 4,
 			collisiondetection = false,
 			texture = "sl_weapons_blast.png",
 			glow = 14,
+		})
+	end
+	for _ = 1, 16 do
+		minetest.add_particle({
+			pos = { x = pos.x + (math.random() - 0.5) * 0.6,
+				y = pos.y + 0.2,
+				z = pos.z + (math.random() - 0.5) * 0.6 },
+			velocity = { x = (math.random() - 0.5) * 1.2, y = 2 + math.random() * 2.5, z = (math.random() - 0.5) * 1.2 },
+			acceleration = { x = 0, y = 1.2, z = 0 },
+			expirationtime = 1.6 + math.random() * 0.8,
+			size = 5,
+			collisiondetection = false,
+			texture = "sl_weapons_grit.png",
 		})
 	end
 
@@ -166,7 +182,7 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 						away = { x = 0, y = 1, z = 0 }
 					end
 					away = vector.normalize(away)
-					W.knockback(obj, vector.multiply(away, 9 * (1 - dist / radius)))
+					W.knockback(obj, vector.multiply(away, 11 * (1 - dist / radius)))
 					W.punch_object(shooter_obj, obj, dmg, cause, dist)
 				end
 			elseif obj == shooter_obj then
@@ -178,7 +194,7 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 					local dmg = math.max(1, math.floor(
 						(splash.max * (1 - dist / radius) + 0.5) * (cfg.self_dmg or 0.5)))
 					local away = vector.normalize(vector.subtract(opos, pos))
-					W.knockback(obj, vector.multiply(away, 9 * (1 - dist / radius)))
+					W.knockback(obj, vector.multiply(away, 11 * (1 - dist / radius)))
 					W.punch_object(nil, obj, dmg, "mortar_self", dist)
 				end
 			end
@@ -205,11 +221,14 @@ end
 -- The two projectiles (numbers: spec §3 table)
 -- ----------------------------------------------------------------
 W.register_projectile("mortar", {
-	speed = 18,
-	grav = 2, -- flat, safe arc constant (team decision 2026-08-29)
-	damage = 14,
+	speed = 24,
+	-- Real mortar ballistics (team decision 2026-08-29, second sitting):
+	-- a lobbed parabola at full engine gravity — this reverses the v1.2
+	-- "safe flat arc" constant. You aim ABOVE what you want to hit.
+	grav = 8,
+	damage = 28, -- doubled: a direct hit settles any 20 HP argument
 	cause = "mortar",
-	splash = { radius = 3, max = 6, beacon = 1 },
+	splash = { radius = 3, max = 10, beacon = 2 },
 	self_dmg = 0.5,
 	inherit = true,
 	texture = "sl_weapons_mortar_shell.png",

@@ -62,15 +62,16 @@ trace_node("scorch", "Scorch", "sl_weapons_scorch.png", 3)
 minetest.register_entity(W.modname .. ":corpse", {
 	_stub_ray_radius = 1.2,
 	sl_corpse = true,
-	physical = false,
-	collide_with_objects = false,
-	visual = "cube",
-	textures = { CORPSE_TEX, CORPSE_TEX, CORPSE_TEX, CORPSE_TEX, CORPSE_TEX, CORPSE_TEX },
-	visual_size = { x = 3.0, y = 3.0 },
-	collisionbox = { 0, 0, 0, 0, 0, 0 },
-	pointable = true,
-	static_save = false,
-
+		initial_properties = {
+		physical = false,
+		collide_with_objects = false,
+		visual = "cube",
+		textures = { CORPSE_TEX, CORPSE_TEX, CORPSE_TEX, CORPSE_TEX, CORPSE_TEX, CORPSE_TEX },
+		visual_size = { x = 3.0, y = 3.0 },
+		collisionbox = { 0, 0, 0, 0, 0, 0 },
+		pointable = true,
+		static_save = false,
+		},
 	on_punch = function(self, _puncher)
 		-- Bodies soak nothing and take no damage: bullets pass
 		-- (handled in the fire pipeline); shovels and fire are the
@@ -355,16 +356,17 @@ local DEADWALK_HP = 8
 minetest.register_entity(W.modname .. ":deadwalk", {
 	_stub_ray_radius = 0.6,
 	sl_weapon_fx = false,
-	physical = false,
-	collide_with_objects = false,
-	visual = "cube",
-	textures = { DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX },
-	visual_size = { x = 6.0, y = 6.0 },
-	collisionbox = { -0.3, 0.0, -0.3, 0.3, 1.6, 0.3 },
-	pointable = true,
-	hp_max = DEADWALK_HP,
-	static_save = false,
-
+		initial_properties = {
+		physical = false,
+		collide_with_objects = false,
+		visual = "cube",
+		textures = { DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX, DEADWALK_TEX },
+		visual_size = { x = 6.0, y = 6.0 },
+		collisionbox = { -0.3, 0.0, -0.3, 0.3, 1.6, 0.3 },
+		pointable = true,
+		hp_max = DEADWALK_HP,
+		static_save = false,
+		},
 	on_step = function(self, dtime)
 		local ghost = self.ghost and minetest.get_player_by_name(self.ghost)
 		local now = W.now()
