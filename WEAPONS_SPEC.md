@@ -628,6 +628,16 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.2.1 (2026-08-29, implementation notes)** — no design changes; records
+  how two §5 bullets landed: (1) the "crate loot tables get a weapons
+  section" bullet is implemented on the salvage-pickup roll table
+  (`game_mode.register_pickup_roll`, weighted): Sentry Kit ≈ 10 %, a 4-shell
+  bundle beside it, Grapple Lash on no table, ever; (2) council resolution
+  #3 ("a gun lifted from a body shows the dead man's last number") is
+  implemented as a read-only charge note stamped on weapon stacks inside the
+  corpse — `Recovered — last charge: bullets/shells/cells/rockets` frozen at
+  the moment of death. Pools die with the owner: the note is intel, never
+  inheritance (a looted gun does not import ammo into the looter's pool).
 - **v1.2 (2026-08-29, second review)** — casino removed: Grapple Lash pulled
   from all random tables, now fabricated at hard-to-reach Precision
   Fabricator workshops from ordinary materials (the tool is rare, not the

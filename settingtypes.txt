@@ -23,3 +23,23 @@ sl_cube_size (Underground cube size) int 8 4 32
 # Total monsters spawned once during mapgen (not per cube / per chunk).
 # They are placed in underground cubes around the origin, then never again.
 sl_cube_monsters (Mapgen monster count) int 12 0 64
+
+# Enable the ranged weapons layer (WEAPONS_SPEC): guns, pads, turrets,
+# corpses, the Grapple Lash, MM hand doctrine.
+sl_weapons_enabled (Enable sl_weapons) bool true
+
+# Players spawn with a Pulsar Pistol and a Combat Blade at insertion.
+sl_weapons_spawn_loadout (Give spawn loadout) bool true
+
+# Seconds before a taken weapon pad re-arms itself (ammo pads: 20).
+sl_weapons_pad_respawn (Weapon pad respawn) int 30 5 120
+
+# Maximum deployed sentries per player / per beacon team.
+sl_weapons_turret_max_player (Sentry cap per player) int 1 1 4
+sl_weapons_turret_max_team (Sentry cap per team) int 3 0 8
+
+# Sentry battery life in seconds before self-dismantle.
+sl_weapons_turret_lifetime (Sentry battery) int 90 20 300
+
+# Shared weapon-raise delay in seconds after switching weapons.
+sl_weapons_raise_delay (Weapon raise delay) float 0.3 0.0 1.0

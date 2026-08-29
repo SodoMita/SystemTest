@@ -541,9 +541,15 @@ minetest.register_on_dieplayer(function(player, reason)
 	local name = player:get_player_name()
 	local pl = game_mode.get_player_state(name)
 
-	-- Drop items on death
+	-- Drop items on death. When the corpse system is present
+	-- (WEAPONS_SPEC §7.1), the fountain is redirected into the body
+	-- instead of the floor: the inventory lands in the corpse, a
+	-- third of the loose ammo is smashed, and a residue node stays.
 	local pos = player:get_pos()
 	local inv = player:get_inventory()
+	if sl_weapons and sl_weapons.capture_death_items then
+		sl_weapons.capture_death_items(player, pos, inv)
+	else
 	for i = 1, inv:get_size("main") do
 		local stack = inv:get_stack("main", i)
 		if not stack:is_empty() then
@@ -561,6 +567,7 @@ minetest.register_on_dieplayer(function(player, reason)
 				inv:set_stack("main", i, ItemStack(""))
 			end
 		end
+	end
 	end
 
 	if not state.match_active then

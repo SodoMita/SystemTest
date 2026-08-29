@@ -112,3 +112,12 @@ lookups (`get_player_by_name`, `get_connected_players`,
 Limits, by design: no real network clients (protocol, media transfer, and
 client-side rendering are untested), no formspec interaction, and handlers
 registered by the engine builtin itself are only partially covered.
+
+## Stub turbo soak (no engine required)
+
+`lua51 tests/soak_stub_turbo.lua [matches] [seed]` (default 40 matches) runs the
+Phase W exit gate on the headless stub: real `sl_weapons` logic, simulated bots,
+kill-share gate (no weapon > 30 %), Lash-holder danger gate (holders die at a
+rate >= non-holders), zero-Lua-error gate, and per-match sweep cleanliness. The
+live-engine soak above remains the CI authority; the stub soak is the fast local
+verdict between pushes.

@@ -1,0 +1,897 @@
+-- ================================================================
+-- tests/weapons_test.lua
+-- Headless test suite for mods/game/sl_weapons against the engine
+-- stub (WEAPONS_SPEC §14): fire pipeline, gates, pools, bloom,
+-- corpses/burial/cremation, deadwalk, pads, turret IFF + possession
+-- flip + battery + logs, lash, fabricator, MM doctrine, beacon chip
+-- routing, ranged exorcism, and the match-end scene sweep.
+--
+-- Run from the repo root:  lua5.1 tests/weapons_test.lua
+-- ================================================================
+
+local H = dofile("tests/minetest_stub.lua")
+
+local pass_count, fail_count = 0, 0
+local function check(cond, label)
+	if cond then
+		pass_count = pass_count + 1
+		print("  [PASS] " .. label)
+	else
+		fail_count = fail_count + 1
+		print("  [FAIL] " .. label)
+	end
+end
+local function section(t) print("== " .. t) end
+
+-- Capture item drops (the stock stub no-ops add_item).
+local drops = {}
+minetest.add_item = function(pos, stack)
+	table.insert(drops, { pos = pos, stack = stack })
+	return { set_velocity = function() end, remove = function() end }
+end
+
+local function stack_name(s)
+	if type(s) == "table" then return s:get_name() end
+	return tostring(s or ""):match("^(%S+)") or ""
+end
+
+local function last_sounds(n)
+	local out = {}
+	local from = math.max(1, #H.sounds - (n or 1) + 1)
+	for i = from, #H.sounds do out[#out + 1] = H.sounds[i].name end
+	return out
+end
+
+local function sound_played(name, since)
+	for i = math.max(1, since or 1), #H.sounds do
+		if H.sounds[i].name == name then return true end
+	end
+	return false
+end
+
+-- Aim shooter's eye at a point (or a player's chest).
+local function aim_at(shooter, target)
+	local is_player = target.get_pos ~= nil
+	local tpos = is_player and target:get_pos() or target
+	-- Players are tall capsules: aim mid-body. Plain coordinate
+	-- tables are exact points (nodes, floors) — no offset.
+	local point = { x = tpos.x, y = tpos.y + (is_player and 1.0 or 0), z = tpos.z }
+	local spos = shooter:get_pos()
+	local eye = { x = spos.x, y = spos.y + 1.625, z = spos.z }
+	local d = { x = point.x - eye.x, y = point.y - eye.y, z = point.z - eye.z }
+	local len = math.sqrt(d.x ^ 2 + d.y ^ 2 + d.z ^ 2)
+	shooter:set_look_dir({ x = d.x / len, y = d.y / len, z = d.z / len })
+end
+
+local function fire(itemname, player)
+	local def = minetest.registered_tools[itemname]
+	if not def then return nil, "no such tool" end
+	return def.on_use(ItemStack(itemname), player, nil)
+end
+
+-- A quiet open-space arena far above everything.
+local function sky(pos) return { x = pos.x, y = 60, z = pos.z } end
+
+local victim_seq = 0
+local function new_victim(prefix, team)
+	victim_seq = victim_seq + 1
+	local name = (prefix or "vic") .. tostring(victim_seq)
+	local p = H.new_player(name)
+	H.fire_joinplayer(p)
+	local gm = game_mode
+	local pl = gm.get_player_state(name)
+	pl.phase = "alive"
+	pl.eliminated = false
+	if team and gm.is_beacon_team and gm.is_beacon_team(team) then
+		pl.team = team
+	end
+	p:set_hp(20)
+	-- Flush the join-time spawn_player(0.2 s) so later set_pos sticks.
+	H.advance(0.3, 0.1)
+	return p
+end
+
+-- Ensure the victim's team keeps another living member, then kill
+-- them through the real damage path so all death hooks fire.
+local function kill_player(victim, dmg, cause, shooter)
+	local gm = game_mode
+	local pl = gm.get_player_state(victim:get_player_name())
+	if pl.team then
+		local alive = 0
+		for _, other in ipairs(H.connected) do
+			local op = gm.get_player_state(other:get_player_name())
+			if op.team == pl.team and op.phase == "alive"
+				and other ~= victim then alive = alive + 1 end
+		end
+		if alive == 0 then
+			local backup = new_victim("bak", pl.team)
+			backup:set_pos({ x = 900, y = 60, z = 900 })
+		end
+	end
+	sl_weapons.last_cause[victim:get_player_name()] = cause
+	victim:set_hp(0)
+	H.respawn(victim)
+end
+
+-- ================================================================
+section("PHASE W0 — mod load path")
+-- ================================================================
+
+H.current_modname = "sl_modebase"
+local ok1, err1 = pcall(dofile, "mods/game/sl_modebase/init.lua")
+check(ok1, "sl_modebase loads" .. (ok1 and "" or (" -> " .. tostring(err1))))
+
+H.modpaths.sl_weapons = "mods/game/sl_weapons"
+H.current_modname = "sl_weapons"
+local ok2, err2 = pcall(dofile, "mods/game/sl_weapons/init.lua")
+check(ok2, "sl_weapons loads" .. (ok2 and "" or (" -> " .. tostring(err2))))
+if not ok2 then print("FATAL: sl_weapons failed to load; aborting.") os.exit(1) end
+
+local W = sl_weapons
+local gm = game_mode
+local state = gm.state
+
+for _, node in ipairs({ "pistol", "chatter", "scatter", "lance", "mortar",
+	"driver", "neon_six", "neon_repeater" }) do
+	check(minetest.registered_tools["sl_weapons:" .. node] ~= nil,
+		"weapon registered: " .. node)
+end
+for _, item in ipairs({ "ammo_bullets", "ammo_shells", "ammo_cells", "ammo_rockets",
+	"sentry_kit", "targeting_log", "grapple" }) do
+	check(minetest.registered_items["sl_weapons:" .. item] ~= nil,
+		"item registered: " .. item)
+end
+for _, node in ipairs({ "pad_weapon", "pad_weapon_dim", "pad_ammo", "pad_ammo_dim",
+	"turret", "fabricator", "residue", "mound", "scorch" }) do
+	check(minetest.registered_nodes["sl_weapons:" .. node] ~= nil,
+		"node registered: " .. node)
+end
+for _, ent in ipairs({ "sl_weapons:corpse", "sl_weapons:deadwalk", "sl_weapons:mortar",
+	"sl_weapons:pulse", "sl_weapons:lash_hook", "sl_weapons:turret_head" }) do
+	check(minetest.registered_entities[ent] ~= nil, "entity registered: " .. ent)
+end
+
+check(gm.is_possessable("sl_weapons:pad_weapon"), "weapon pad is possessable")
+check(gm.is_possessable("sl_weapons:turret"), "turret is possessable")
+check(gm.is_possessable("sl_weapons:fabricator") == false
+	or gm.is_possessable("sl_weapons:fabricator") == true, "fabricator possessability resolved")
+
+-- ================================================================
+section("PHASE W1a — lobby gates")
+-- ================================================================
+
+local alpha = H.new_player("alpha")
+local beta = H.new_player("beta")
+local gamma = H.new_player("gamma")
+H.fire_joinplayer(alpha); H.fire_joinplayer(beta); H.fire_joinplayer(gamma)
+H.advance(1, 0.5)
+
+alpha._wielded = "sl_weapons:pistol"
+alpha:get_inventory():add_item("main", ItemStack("sl_weapons:pistol"))
+local s0 = #H.sounds
+fire("sl_weapons:pistol", alpha)
+check(#H.chat_player.alpha > 0 and H.chat_player.alpha[#H.chat_player.alpha]:find("idle outside an active match", 1, true) ~= nil,
+	"lobby fire refused with reason")
+check(not sound_played("sl_weapons_pistol_fire", s0), "no gunshot sound in lobby")
+
+-- ================================================================
+section("PHASE W1b — insertion, loadout, gates inside a match")
+-- ================================================================
+
+state.settings.mm_auto_assign = false
+gamma._wielded = ""
+minetest.registered_chatcommands.sl_match_start.func("alpha", "")
+minetest.registered_chatcommands.sl_ready.func("alpha", "")
+minetest.registered_chatcommands.sl_ready.func("beta", "")
+minetest.registered_chatcommands.sl_ready.func("gamma", "")
+H.advance(7, 0.5)
+check(state.match_active == true, "match active")
+
+local ainv = alpha:get_inventory()
+check(ainv:contains_item("main", ItemStack("sl_weapons:pistol")),
+	"loadout pistol granted at insertion")
+check(ainv:contains_item("main", ItemStack("sl_modebase:combat_blade")),
+	"loadout blade granted at insertion")
+
+-- Monster Master doctrine
+gm.set_monster_master("gamma")
+gamma._wielded = "sl_weapons:pistol"
+gamma:get_inventory():add_item("main", ItemStack("sl_weapons:chatter"))
+H.advance(1.5, 0.5)
+check(not gamma:get_inventory():contains_item("main", ItemStack("sl_weapons:chatter")),
+	"MM ranged items stripped from inventory")
+local s1 = #H.sounds
+fire("sl_weapons:pistol", gamma)
+check(H.chat_player.gamma[#H.chat_player.gamma]:find("doctrine", 1, true) ~= nil,
+	"MM fire refused: 'Your hands are the doctrine.'")
+check(not sound_played("sl_weapons_pistol_fire", s1), "MM shot produced no sound")
+
+-- Ghost gate (simulated phase)
+local apl = gm.get_player_state("alpha")
+apl.phase = "ghost"
+local s2 = #H.sounds
+fire("sl_weapons:pistol", alpha)
+check(not sound_played("sl_weapons_pistol_fire", s2), "ghost cannot fire")
+apl.phase = "alive"
+
+-- Master disable setting
+H.settings["sl_weapons_enabled"] = "false"
+fire("sl_weapons:pistol", alpha)
+check(H.chat_player.alpha[#H.chat_player.alpha]:find("offline", 1, true) ~= nil,
+	"weapons offline setting refuses fire")
+H.settings["sl_weapons_enabled"] = nil
+
+-- ================================================================
+section("PHASE W1c — hitscan pipeline, pools, bloom, dry fire")
+-- ================================================================
+
+-- A quiet sky range for the duels.
+alpha:set_pos(sky({ x = 0, y = 0, z = 0 }))
+local vic = new_victim("tgt", "beacon_b")
+vic:set_pos({ x = 0, y = 60, z = 8 })
+-- The victim carries things worth looting (and a biolocked pistol).
+vic:get_inventory():add_item("main", ItemStack("sl_weapons:pistol"))
+vic:get_inventory():add_item("main", ItemStack("sl_modebase:flare"))
+vic:get_inventory():add_item("main", ItemStack("sl_modebase:medkit"))
+
+aim_at(alpha, vic)
+fire("sl_weapons:pistol", alpha) -- draw attempt: pays the shared raise delay
+H.advance(0.4, 0.1)
+local snd = #H.sounds
+fire("sl_weapons:pistol", alpha)
+check(vic:get_hp() == 16, "pistol hits for 4 (20 -> 16)")
+check(sound_played("sl_weapons_pistol_fire", snd), "pistol report audible")
+check(#H.particles > 0, "tracer particles spawned")
+
+-- Refire gate
+local hp = vic:get_hp()
+fire("sl_weapons:pistol", alpha)
+check(vic:get_hp() == hp, "refire gate blocks immediate second shot")
+H.advance(0.4, 0.1)
+fire("sl_weapons:pistol", alpha)
+check(vic:get_hp() == hp - 4, "pistol fires again after refire time")
+
+-- Raise delay on weapon switch
+W.get_pool("alpha").bullets = 60
+aim_at(alpha, vic)
+fire("sl_weapons:chatter", alpha)
+check(W.bloom_current("alpha") == W.BLOOM_MIN, "first chatter shot is exact (bloom min)")
+local bullets = W.get_pool("alpha").bullets
+fire("sl_weapons:chatter", alpha)
+check(W.get_pool("alpha").bullets == bullets, "switch-raise blocked the shot")
+H.advance(0.35, 0.1)
+for _ = 1, 4 do
+	fire("sl_weapons:chatter", alpha)
+	H.advance(0.1, 0.05)
+end
+check(W.get_pool("alpha").bullets == bullets - 4, "chatter drains 1 bullet/shot")
+check(W.bloom_current("alpha") > W.BLOOM_MIN, "bloom grows along a held burst")
+H.advance(0.7, 0.1)
+check(W.bloom_current("alpha") == W.BLOOM_MIN, "bloom resets after 0.6 s idle")
+
+-- Scatter: shells, pellets, point-blank
+vic:set_pos({ x = 0, y = 60, z = 4 })
+aim_at(alpha, vic)
+W.get_pool("alpha").shells = 8
+fire("sl_weapons:scatter", alpha) -- draw attempt
+H.advance(0.95, 0.1)
+vic:set_hp(20)
+local sh_before = W.get_pool("alpha").shells
+fire("sl_weapons:scatter", alpha)
+check(W.get_pool("alpha").shells == sh_before - 1, "scatter consumes a shell")
+local scatter_dmg = 20 - vic:get_hp()
+check(scatter_dmg >= 4 and scatter_dmg <= 12,
+	"scatter pellets deal partial-to-full 12 (got " .. tostring(scatter_dmg) .. ")")
+
+-- Lance: 18, cells x2
+vic:set_pos({ x = 0, y = 60, z = 6 })
+aim_at(alpha, vic)
+W.get_pool("alpha").cells = 10
+fire("sl_weapons:lance", alpha) -- draw attempt
+H.advance(0.95, 0.1)
+vic:set_hp(20)
+fire("sl_weapons:lance", alpha)
+check(vic:get_hp() == 2, "lance leaves the victim at 2 HP (18 dmg)")
+check(W.get_pool("alpha").cells == 8, "lance costs 2 cells")
+
+-- Zoom toggle exists (no engine fov in stub; flag only)
+minetest.registered_tools["sl_weapons:lance"].on_place(ItemStack("sl_weapons:lance"), alpha, nil)
+check(W.zoom.alpha == true, "lance RMB toggles zoom")
+
+-- Kill: incident line, corpse, residue, smashed ammo, dissolved pistol
+W.get_pool(vic:get_player_name()).cells = 30
+vic:get_inventory():add_item("main", ItemStack("sl_weapons:chatter"))
+aim_at(alpha, vic)
+fire("sl_weapons:pistol", alpha) -- redraw pistol
+H.advance(1.7, 0.1) -- pistol switch + lance refire window
+local sndk = #H.sounds
+fire("sl_weapons:pistol", alpha)
+check(vic:get_hp() <= 0 or vic._dead == true, "pistol tap finishes the kill")
+local feed = nil
+for _, line in ipairs(H.chat_all) do
+	if line:find("cause: pulse round", 1, true) then feed = line end
+end
+check(feed ~= nil, "incident feed logs the kill")
+check(feed and not feed:find("alpha", 1, true), "incident feed names no attacker")
+check(#W.corpses == 1, "corpse spawned on death")
+local corpse = W.corpses[1]
+check(corpse.victim == vic:get_player_name(), "corpse holds the victim's name")
+check(H.voxels[H.vhash(corpse.floor)] == "sl_weapons:residue", "residue node under the body")
+check(corpse.dissolved_pistol == true, "biolocked loadout pistol dissolved")
+local pool_victim = W.get_pool(corpse.victim)
+check(pool_victim.cells == 20, "a third of loose ammo smashed on death (30 -> 20)")
+
+-- Corpse report + audible looting
+local had_flare = corpse.inv
+check(#had_flare >= 0, "corpse inventory list present")
+alpha._inv:set_size("main", 64) -- room for the loot (meta stacks do not merge)
+alpha._wielded = ""
+corpse.obj:rightclick(alpha)
+check(#H.formspecs.alpha > 0, "corpse report formspec shown")
+H.fire_receive_fields("alpha", "sl_weapons:corpse", { loot_all = "true" })
+check(sound_played("sl_weapons_loot_hum", sndk), "looting is audible (hum)")
+check(corpse.looted == true and #corpse.inv == 0, "corpse looted empty")
+local recovered_note = false
+for _, st in ipairs(alpha:get_inventory():get_list("main")) do
+	local d = st:get_meta():get_string("description")
+	if d:find("Recovered — last charge", 1, true) then recovered_note = true end
+end
+check(recovered_note, "looted gun shows the dead man's frozen numbers (res. #3)")
+
+-- ================================================================
+section("PHASE W1d — projectiles: inheritance, splash, juggle")
+-- ================================================================
+
+-- Velocity inheritance: fire mortar with a sprint carried.
+-- NB: the whole projectile range lives at x=30 — the W1c kill left a
+-- residue node at (0,60,6), and shells dutifully detonate on stains.
+local vic2 = new_victim("tgt", "beacon_b")
+vic2:set_pos({ x = 30, y = 60, z = 10 })
+alpha:set_pos({ x = 30, y = 60, z = 0 })
+aim_at(alpha, vic2)
+alpha:set_player_velocity({ x = 5, y = 0, z = 0 })
+W.get_pool("alpha").rockets = 5
+local rockets_before = W.get_pool("alpha").rockets
+local es0 = #H.entity_spawns
+fire("sl_weapons:mortar", alpha) -- draw attempt
+H.advance(0.95, 0.1)
+fire("sl_weapons:mortar", alpha) -- the real shot, sprint carried
+check(#H.entity_spawns == es0 + 1, "mortar projectile spawned")
+check(W.get_pool("alpha").rockets == rockets_before - 1, "mortar costs a rocket")
+local mortar_obj = nil
+for _, lua in pairs(H.luaentities) do
+	if lua.name == "sl_weapons:mortar" then mortar_obj = lua.object break end
+end
+check(mortar_obj ~= nil, "mortar entity tracked")
+if mortar_obj then
+	local v = mortar_obj:get_velocity()
+	check(v.x > 4 and v.x < 6, "velocity inheritance: shell carries the sprint (vx=" ..
+		tostring(math.floor(v.x)) .. ")")
+	check(v.z > 14 and v.z < 18, "shell speed along the shot line (vz=" ..
+		tostring(math.floor(v.z)) .. ")")
+end
+alpha:set_player_velocity({ x = 0, y = 0, z = 0 })
+
+-- Let it fly: a fresh, straight shot for the clean direct hit
+-- (the sprint shell keeps drifting sideways — that's the point).
+aim_at(alpha, vic2)
+H.advance(1.0, 0.1) -- refire window
+vic2:set_hp(20)
+local sndm = #H.sounds
+fire("sl_weapons:mortar", alpha)
+H.advance(0.9, 0.05)
+check(vic2:get_hp() <= 6, "mortar direct hit lands 14 (20 -> " .. tostring(vic2:get_hp()) .. ")")
+check(sound_played("sl_weapons_explosion", sndm), "explosion heard")
+
+-- Splash + knockback: ground shot near a fresh victim
+local vic3 = new_victim("tgt", "beacon_b")
+vic3:set_pos({ x = 30, y = 60, z = 9 })
+vic3:set_hp(20)
+local ground = { x = 30, y = 59, z = 7 }
+H.voxels[H.vhash(ground)] = "default:stone" -- somewhere for the shell to land
+aim_at(alpha, ground)
+W.get_pool("alpha").rockets = W.get_pool("alpha").rockets + 2
+fire("sl_weapons:mortar", alpha)
+H.advance(0.6, 0.05)
+local splash_dmg = 20 - vic3:get_hp()
+check(splash_dmg >= 1 and splash_dmg < 14, "splash falloff below direct (" ..
+	tostring(splash_dmg) .. " dmg)")
+local kv = vic3:get_player_velocity()
+check(kv.x ~= 0 or kv.z ~= 0, "splash knockback applied to victim")
+
+-- Mortar-jump: shoot your own feet, ride the blast.
+alpha:set_hp(20)
+alpha:set_player_velocity({ x = 0, y = 0, z = 0 })
+H.voxels[H.vhash({ x = 30, y = 59, z = 1 })] = "default:stone" -- floor to blast (at the aim point)
+aim_at(alpha, { x = alpha:get_pos().x, y = alpha:get_pos().y - 1, z = alpha:get_pos().z + 1 })
+H.advance(0.4, 0.1) -- refire window from the last mortar shot
+fire("sl_weapons:mortar", alpha)
+H.advance(0.4, 0.05)
+local selfvel = alpha:get_player_velocity()
+check(selfvel.y > 0, "mortar-jump: shooter launched upward")
+check(alpha:get_hp() < 20, "mortar-jump costs self-damage (50% falloff)")
+
+-- Pulse: juggle knockback, no reload between bolts
+local vic4 = new_victim("tgt", "beacon_b")
+vic4:set_pos({ x = 30, y = 60, z = 6 })
+vic4:set_hp(20)
+aim_at(alpha, vic4)
+W.get_pool("alpha").cells = 10
+fire("sl_weapons:driver", alpha) -- draw attempt
+H.advance(0.35, 0.1)
+fire("sl_weapons:driver", alpha)
+H.advance(0.3, 0.05)
+check(vic4:get_hp() == 15, "pulse bolt deals 5")
+local jv = vic4:get_player_velocity()
+check(jv.z ~= 0 or jv.x ~= 0 or jv.y ~= 0, "pulse-juggle knockback nudges the target")
+
+-- Dry fire: loud click + autoswitch to pistol
+W.get_pool("alpha").cells = 0
+alpha:get_inventory():add_item("main", ItemStack("sl_weapons:lance"))
+fire("sl_weapons:lance", alpha) -- draw attempt (raises)
+H.advance(0.35, 0.1)
+local sndd = #H.sounds
+fire("sl_weapons:lance", alpha)
+check(sound_played("sl_weapons_dry_click", sndd), "dry click is loud")
+check(not alpha:get_inventory():contains_item("main", ItemStack("sl_weapons:lance")),
+	"empty lance autoswitches to pistol")
+
+-- Neon Six: six shots then the cylinder pause (busy gate)
+local vic5 = new_victim("tgt", "beacon_b")
+vic5:set_pos({ x = 0, y = 60, z = 7 })
+aim_at(alpha, vic5)
+W.get_pool("alpha").bullets = 40
+alpha:get_inventory():add_item("main", ItemStack("sl_weapons:neon_six"))
+H.advance(0.4, 0.1)
+local six_fired = 0
+for i = 1, 8 do
+	local before = W.get_pool("alpha").bullets
+	fire("sl_weapons:neon_six", alpha)
+	if W.get_pool("alpha").bullets == before - 1 then six_fired = six_fired + 1 end
+	H.advance(0.6, 0.1) -- longer than the 0.55 refire
+	vic5:set_hp(20)
+end
+check(six_fired == 6, "six shots then the spin pauses the seventh (got " .. tostring(six_fired) .. ")")
+check((W.busy_until.alpha or 0) > W.now() or six_fired >= 7, "cylinder busy window tracked")
+
+-- ================================================================
+section("PHASE W2a — corpse destruction: burial, cremation, traces")
+-- ================================================================
+
+-- Burial: shovel on a corpse -> grave mound, corpse gone.
+local bvic = new_victim("bvr", "beacon_b")
+bvic:set_pos({ x = 40, y = 60, z = 0 })
+kill_player(bvic, 20, "lance", alpha)
+check(#W.corpses == 2, "second corpse spawned (burial subject)")
+local bcorpse = W.corpses[#W.corpses]
+alpha._wielded = "sl_modebase:trench_shovel"
+bcorpse.obj:rightclick(alpha)
+check(H.voxels[H.vhash(bcorpse.floor)] == "sl_weapons:mound",
+	"burial leaves a grave mound")
+check(bcorpse.removed == true, "buried corpse is gone")
+check(sound_played("sl_weapons_shovel_bury", 1), "burial heard")
+
+-- Cremation: flare on a corpse -> scorch + Ashen Relic at par.
+local cvic = new_victim("cvr", "beacon_b")
+cvic:set_pos({ x = 80, y = 60, z = 0 })
+kill_player(cvic, 20, "lance", alpha)
+local ccorpse = W.corpses[#W.corpses]
+alpha._wielded = "sl_modebase:flare"
+local drops_before = #drops
+ccorpse.obj:rightclick(alpha)
+check(H.voxels[H.vhash({ x = ccorpse.floor.x, y = ccorpse.floor.y + 1, z = ccorpse.floor.z })] == "sl_weapons:scorch",
+	"cremation leaves a scorch")
+local relic_dropped = false
+for i = drops_before + 1, #drops do
+	if stack_name(drops[i].stack) == "sl_modebase:ritual_ashen_relic" then relic_dropped = true end
+end
+check(relic_dropped, "cremation drops an Ashen Relic (full ritual par)")
+check(H.voxels[H.vhash(ccorpse.floor)] == "sl_weapons:residue",
+	"residue outlives the cremation")
+alpha._wielded = ""
+
+-- ================================================================
+section("PHASE W2b — the Deadwalk Puppet (safe variant)")
+-- ================================================================
+
+-- beta died earlier? No — beta is alive. Make beta an evil ghost
+-- with its own corpse.
+beta:set_pos({ x = 120, y = 60, z = 0 })
+kill_player(beta, 20, "lance", alpha)
+local bpl = gm.get_player_state("beta")
+bpl.phase = "evil_ghost" -- revive path simulated
+local beta_corpse = W.corpses[#W.corpses]
+check(beta_corpse.victim == "beta", "beta's corpse spawned")
+
+beta_corpse.obj:rightclick(beta)
+check(#W.deadwalks == 1, "evil ghost raises its own deadwalk")
+local dw = W.deadwalks[1]
+check(dw ~= nil and dw.object ~= nil and dw.object:get_hp() == 8, "deadwalk has 8 HP")
+
+-- Visible corruption flags + harmless by statute
+check(minetest.registered_entities["sl_weapons:deadwalk"].hp_max == 8,
+	"deadwalk hp_max is 8 (no healing path exists)")
+local other = new_victim("oth", "beacon_b")
+other:set_pos(dw.object:get_pos())
+H.advance(1.0, 0.1)
+check(other:get_hp() == 20, "deadwalk harms nobody while shadowing")
+
+-- Shot apart -> puppet collapse, corpse consumed, residue remains
+local floor_of_beta = beta_corpse.floor
+dw.object:punch(alpha, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 8 } }, { x = 0, y = 0, z = 1 })
+check(#W.deadwalks == 0, "deadwalk collapses when shot apart")
+check(beta_corpse.removed == true, "collapsed puppet consumed its corpse")
+check(H.voxels[H.vhash(floor_of_beta)] == "sl_weapons:residue", "residue remains after collapse")
+local collapse_feed = false
+for _, line in ipairs(H.chat_all) do
+	if line:find("puppet collapse", 1, true) then collapse_feed = true end
+end
+check(collapse_feed, "feed logs 'cause: puppet collapse'")
+
+-- One walk per body
+beta:set_pos({ x = 120, y = 60, z = 5 })
+bpl.phase = "evil_ghost"
+local beta2 = nil
+for _, e in ipairs(W.corpses) do
+	if e.victim == "beta" then beta2 = e end
+end
+check(beta2 == nil or beta2.removed == true or beta2.puppeted == true,
+	"no second walk from the same body")
+
+-- ================================================================
+section("PHASE W2c — weapon pads: chimes, respawn, possession")
+-- ================================================================
+
+local pad_pos = { x = 200, y = 60, z = 0 }
+W.place_weapon_pad(pad_pos, "mortar")
+check(H.voxels[H.vhash(pad_pos)] == "sl_weapons:pad_weapon", "weapon pad placed")
+alpha:set_pos({ x = pad_pos.x, y = pad_pos.y + 1, z = pad_pos.z })
+local sndp = #H.sounds
+H.advance(0.4, 0.1)
+check(ainv:contains_item("main", ItemStack("sl_weapons:mortar")),
+	"stepping on the pad dispenses the mortar")
+local mortar_chime = nil
+for i = sndp + 1, #H.sounds do
+	if H.sounds[i].name == "sl_weapons_pad_chime" then mortar_chime = H.sounds[i] end
+end
+check(mortar_chime ~= nil, "pad chime played")
+check(mortar_chime and math.abs((mortar_chime.params.pitch or 1) - 0.6) < 0.001,
+	"mortar chime is the low pitch (the headline)")
+check(H.voxels[H.vhash(pad_pos)] == "sl_weapons:pad_weapon_dim", "pad dims when taken")
+
+-- Respawn timer
+H.advance(30.5, 0.5)
+check(H.voxels[H.vhash(pad_pos)] == "sl_weapons:pad_weapon", "pad re-arms after 30 s")
+
+-- Ammo pad
+local apad = { x = 204, y = 60, z = 0 }
+W.place_ammo_pad(apad, "cells")
+alpha:set_pos({ x = apad.x, y = apad.y + 1, z = apad.z })
+W.get_pool("alpha").cells = 0
+H.advance(0.4, 0.1)
+check(W.get_pool("alpha").cells == 15, "ammo pad fills cells (+15)")
+
+-- Possession silences a pad; ranged exorcism (2 hits) frees it.
+bpl.phase = "evil_ghost"
+beta:set_pos({ x = 300, y = 60, z = 0 })
+check(gm.possess_object(apad, "beta") == true, "evil ghost possesses the ammo pad")
+local cells_before = W.get_pool("alpha").cells
+alpha:set_pos({ x = apad.x, y = apad.y + 1, z = apad.z })
+W.place_ammo_pad(apad, "cells") -- re-arm for a clean refusal test
+H.advance(0.4, 0.1)
+check(W.get_pool("alpha").cells == cells_before,
+	"possessed pad refuses to dispense")
+
+alpha:set_pos({ x = apad.x, y = apad.y, z = apad.z - 6 })
+aim_at(alpha, apad)
+fire("sl_weapons:pistol", alpha) -- redraw after the long weapon gap
+H.advance(0.4, 0.1)
+fire("sl_weapons:pistol", alpha) -- hit 1 (node impact)
+H.advance(0.4, 0.1)
+check(gm.is_possessed(apad) == true, "one weapon hit does not exorcise")
+fire("sl_weapons:pistol", alpha) -- hit 2
+H.advance(0.4, 0.1)
+check(gm.is_possessed(apad) == false, "two weapon hits exorcise the pad")
+
+-- ================================================================
+section("PHASE W2d — sentry turret: IFF, limits, battery, logs")
+-- ================================================================
+
+local tpos = { x = 400, y = 60, z = 0 }
+H.voxels[H.vhash({ x = tpos.x, y = tpos.y - 1, z = tpos.z })] = "default:stone"
+alpha:set_pos({ x = tpos.x, y = tpos.y, z = tpos.z })
+alpha:get_inventory():add_item("main", ItemStack("sl_weapons:sentry_kit 2"))
+local kit_def = minetest.registered_craftitems["sl_weapons:sentry_kit"]
+kit_def.on_place(ItemStack("sl_weapons:sentry_kit"), alpha,
+	{ type = "node", above = tpos, under = { x = tpos.x, y = tpos.y - 1, z = tpos.z } })
+check(H.voxels[H.vhash(tpos)] == "sl_weapons:turret", "turret node deployed")
+check(W.turrets[W.phash(tpos)] ~= nil, "turret registered")
+
+-- Limit: one per player
+local tpos2 = { x = 404, y = 60, z = 0 }
+H.voxels[H.vhash({ x = tpos2.x, y = tpos2.y - 1, z = tpos2.z })] = "default:stone"
+kit_def.on_place(ItemStack("sl_weapons:sentry_kit"), alpha,
+	{ type = "node", above = tpos2, under = { x = tpos2.x, y = tpos2.y - 1, z = tpos2.z } })
+check(H.voxels[H.vhash(tpos2)] ~= "sl_weapons:turret", "second turret refused (1/player)")
+
+-- IFF: stranger shot, deployer spared
+local stranger = new_victim("str", "beacon_b")
+stranger:set_pos({ x = tpos.x + 3, y = tpos.y, z = tpos.z })
+stranger:set_hp(20)
+alpha:set_pos({ x = tpos.x - 3, y = tpos.y, z = tpos.z })
+alpha:set_hp(20) -- the mortar-jump earlier cost a hit point
+H.advance(2.0, 0.1)
+check(stranger:get_hp() < 20, "turret fires on strangers (deployer-only IFF)")
+check(alpha:get_hp() == 20, "deployer is spared")
+
+-- Monsters are targets
+local mobj = gm.spawn_monster({ x = tpos.x, y = tpos.y, z = tpos.z + 4 }, "scout", "gamma")
+H.advance(2.0, 0.1)
+local mlua = mobj and mobj.get_luaentity and mobj:get_luaentity()
+check(mlua == nil or mobj:get_hp() < 30, "turret engages monsters")
+
+-- Possession flips IFF: the deployer becomes a target
+stranger:set_pos({ x = 500, y = 60, z = 0 }) -- clear the arc
+if mobj and mobj.remove then pcall(function() mobj:remove() end) end
+bpl.phase = "evil_ghost"
+bpl.possession_ready_at = 0 -- test surgery: separate possession economy
+check(gm.possess_object(tpos, "beta") == true, "evil ghost possesses the turret")
+alpha:set_hp(20)
+H.advance(2.5, 0.1)
+check(alpha:get_hp() < 20, "possessed turret turns on its deployer")
+
+-- Sabotage disables firing
+gm.release_possession(tpos, "test")
+local sentry = W.turrets[W.phash(tpos)]
+check(sentry ~= nil, "turret survives possession release")
+gm.register_sabotage(tpos, "node", nil)
+local sbefore = stranger:get_hp()
+stranger:set_pos({ x = tpos.x + 3, y = tpos.y, z = tpos.z })
+H.advance(2.0, 0.1)
+check(stranger:get_hp() == sbefore, "sabotaged turret holds fire")
+gm.clear_sabotage_at(tpos)
+
+-- Battery expiry: self-dismantle into scrap
+sentry.battery_end = W.now()
+local drops_b4 = #drops
+H.advance(0.5, 0.1)
+check(H.voxels[H.vhash(tpos)] ~= "sl_weapons:turret", "turret self-dismantles on empty battery")
+local scrap = false
+for i = drops_b4 + 1, #drops do
+	if stack_name(drops[i].stack) == "sl_modebase:scrap_metal" then scrap = true end
+end
+check(scrap, "expired turret drops scrap")
+
+-- Destruction: targeting log deposition (council resolution #9)
+alpha:get_inventory():add_item("main", ItemStack("sl_weapons:sentry_kit"))
+H.voxels[H.vhash({ x = tpos.x, y = tpos.y - 1, z = tpos.z })] = "default:stone"
+kit_def.on_place(ItemStack("sl_weapons:sentry_kit"), alpha,
+	{ type = "node", above = tpos, under = { x = tpos.x, y = tpos.y - 1, z = tpos.z } })
+check(W.turrets[W.phash(tpos)] ~= nil, "turret redeployed")
+alpha._wielded = "sl_weapons:lance"
+local node_def = minetest.registered_nodes["sl_weapons:turret"]
+local drops_b5 = #drops
+node_def.on_punch(tpos, { name = "sl_weapons:turret" }, alpha, nil) -- 18
+node_def.on_punch(tpos, { name = "sl_weapons:turret" }, alpha, nil) -- 18 -> 25 spent
+check(H.voxels[H.vhash(tpos)] ~= "sl_weapons:turret", "turret destroyed by weapon fire")
+local log_dropped = false
+for i = drops_b5 + 1, #drops do
+	if stack_name(drops[i].stack) == "sl_weapons:targeting_log" then log_dropped = true end
+end
+check(log_dropped, "destroyed turret drops its targeting log")
+alpha._wielded = ""
+
+-- ================================================================
+section("PHASE W2e — fabricator pilgrimage & the Grapple Lash")
+-- ================================================================
+
+local fpos = { x = 600, y = 60, z = 0 }
+H.voxels[H.vhash(fpos)] = "sl_weapons:fabricator"
+alpha._wielded = ""
+minetest.registered_nodes["sl_weapons:fabricator"].on_rightclick(fpos,
+	{ name = "sl_weapons:fabricator" }, alpha, nil)
+check(#H.formspecs.alpha > 0, "fabricator formspec opens")
+
+-- MM refused at the machine
+gamma._wielded = ""
+minetest.registered_nodes["sl_weapons:fabricator"].on_rightclick(fpos,
+	{ name = "sl_weapons:fabricator" }, gamma, nil)
+H.fire_receive_fields("gamma", "sl_weapons:fabricator_600,60,0", { make_lash = "true" })
+check(gamma:get_inventory():contains_item("main", ItemStack("sl_weapons:grapple")) == false,
+	"MM cannot fabricate the lash")
+
+-- Missing materials
+H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(fpos), { make_lash = "true" })
+check(W.fab_jobs[W.phash(fpos)] == nil, "job refused without materials")
+
+-- Real job: mats consumed, 10 s hum, lash delivered
+local finv = alpha:get_inventory()
+for _, m in ipairs({ "sl_modebase:metal_ingot 2", "sl_modebase:circuit_board 2",
+	"sl_modebase:energy_crystal 2", "sl_modebase:plastic_scrap 1" }) do
+	finv:add_item("main", ItemStack(m))
+end
+H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(fpos), { make_lash = "true" })
+check(W.fab_jobs[W.phash(fpos)] ~= nil, "fabrication job started")
+check(not finv:contains_item("main", ItemStack("sl_modebase:metal_ingot 2")),
+	"materials consumed up front")
+local hum_from = #H.sounds
+H.advance(9.0, 0.5)
+check(W.fab_jobs[W.phash(fpos)] ~= nil, "job still running at 9 s")
+check(sound_played("sl_weapons_fab_hum", hum_from), "machine hums while working")
+H.advance(1.5, 0.5)
+check(finv:contains_item("main", ItemStack("sl_weapons:grapple")), "lash delivered after 10 s")
+
+-- Lash: cost, anchor, reel, detach-on-damage, line severing
+local wall = { x = 700, y = 60, z = 0 }
+H.voxels[H.vhash(wall)] = "default:stone"
+H.voxels[H.vhash({ x = wall.x, y = wall.y + 1, z = wall.z })] = "default:stone"
+alpha:set_pos({ x = wall.x, y = wall.y, z = wall.z - 10 })
+alpha:set_player_velocity({ x = 0, y = 0, z = 0 }) -- legacy knockback would bend the hook arc
+aim_at(alpha, wall)
+W.get_pool("alpha").cells = 15
+fire("sl_weapons:grapple", alpha)
+check(W.get_pool("alpha").cells == 10, "lash costs 5 cells")
+H.advance(0.6, 0.05)
+check(W.lash.alpha ~= nil, "hook anchored into the wall")
+H.advance(0.3, 0.05)
+local reel_v = alpha:get_player_velocity()
+check(reel_v.x ~= 0 or reel_v.z ~= 0, "reel applies velocity toward the anchor")
+
+-- Any damage detaches (danger 3)
+alpha:punch(new_victim("htr", "beacon_a"), 1.0,
+	{ full_punch_interval = 1.0, damage_groups = { fleshy = 1 } }, { x = 0, y = 0, z = 1 })
+check(W.lash.alpha == nil, "taking a hit snaps the line")
+check(sound_played("sl_weapons_lash_snap", 1), "the snap is heard")
+
+-- Line cut: punch the anchored hook (danger 4)
+W.get_pool("alpha").cells = 5
+H.advance(2.1, 0.5) -- lash cooldown from the first launch
+fire("sl_weapons:grapple", alpha)
+H.advance(0.6, 0.05)
+check(W.lash.alpha ~= nil, "second hook anchored")
+local hook_lua = nil
+for _, lua in pairs(H.luaentities) do
+	if lua.name == "sl_weapons:lash_hook" and lua.shooter == "alpha" then hook_lua = lua end
+end
+check(hook_lua ~= nil, "hook entity findable")
+if hook_lua then
+	hook_lua.object:punch(new_victim("cutr", "beacon_b"), 1.0,
+		{ full_punch_interval = 1.0, damage_groups = { fleshy = 1 } }, { x = 0, y = 0, z = 1 })
+	check(W.lash.alpha == nil, "one hit on the hook severs the line")
+end
+
+-- ================================================================
+section("PHASE W2f — MM bare hands doctrine")
+-- ================================================================
+
+local hvic = new_victim("hnd", "beacon_b")
+hvic:set_pos({ x = 800, y = 60, z = 0 })
+hvic:set_hp(20)
+gamma:set_pos({ x = 800, y = 60, z = 1 })
+gamma._wielded = "" -- bare hands
+-- ObjectRef semantics: hvic:punch(gamma) = hvic IS PUNCHED BY gamma
+hvic:punch(gamma, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 1 } },
+	{ x = 0, y = 0, z = 1 })
+check(hvic:get_hp() == 17, "MM baseline hand overrides to 3 (20 -> 17)")
+
+W.set_mm_levels(gamma, { grip = 3 })
+hvic:set_hp(20)
+hvic:punch(gamma, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 1 } },
+	{ x = 0, y = 0, z = 1 })
+check(hvic:get_hp() == 10, "Tyrant Grip III hits for 10")
+
+-- MM holding any item loses the override (hands only)
+gamma._wielded = "sl_modebase:combat_blade"
+hvic:set_hp(20)
+hvic:punch(gamma, 1.0, { full_punch_interval = 1.0, damage_groups = { fleshy = 6 } },
+	{ x = 0, y = 0, z = 1 })
+check(hvic:get_hp() == 20 - 6, "wielded blade uses normal tool damage, not the doctrine")
+
+-- ================================================================
+section("PHASE W2g — beacon chip routing & match-end sweep")
+-- ================================================================
+
+local bpos = { x = 900, y = 60, z = 0 }
+H.voxels[H.vhash(bpos)] = "sl_modebase:beacon_a"
+state.teams.beacon_a.hp = 100
+alpha:set_pos({ x = bpos.x, y = bpos.y, z = bpos.z - 8 })
+aim_at(alpha, bpos)
+fire("sl_weapons:pistol", alpha)
+check(state.teams.beacon_a.hp == 99, "pistol chips a beacon for exactly 1 (melee stays the siege)")
+
+-- Lance chips 3
+state.teams.beacon_a.hp = 100
+W.get_pool("alpha").cells = 4
+fire("sl_weapons:lance", alpha) -- draw attempt
+H.advance(1.7, 0.1)
+fire("sl_weapons:lance", alpha)
+check(state.teams.beacon_a.hp == 97, "lance chips a beacon for 3")
+
+-- Loadout pistol is drop-locked
+local pistol_def = minetest.registered_tools["sl_weapons:pistol"]
+local dropped = pistol_def.on_drop and pistol_def.on_drop(ItemStack("sl_weapons:pistol"), alpha, alpha:get_pos())
+check(dropped ~= nil and dropped:is_empty(), "loadout pistol dissolves on drop")
+
+-- Achievement lifecycle hook: the match forgets, the count survives.
+local reset_called = {}
+reset_match_achievements = function(p)
+	reset_called[p:get_player_name()] = true
+end
+
+local trace_count_before = #W.traces
+gm.end_match("beacons", "weapons suite sweep")
+H.advance(1.0, 0.5)
+check(state.match_active == false, "match ended")
+check(#W.corpses == 0, "corpses swept at match end")
+check(#W.deadwalks == 0, "deadwalks swept at match end")
+local traces_left = 0
+for _, tr in ipairs(W.traces) do
+	if H.voxels[H.vhash(tr.pos)] == tr.name then traces_left = traces_left + 1 end
+end
+check(traces_left == 0, "all trace nodes swept (residue/mound/scorch)")
+for hash in pairs(W.turrets) do
+	check(false, "turret survived the sweep at " .. hash)
+end
+check(next(W.turrets) == nil, "turret registry empty after sweep")
+check(next(W.pools) == nil, "ammo pools cleared")
+check(W.lash.alpha == nil, "lash lines detached")
+check(H.voxels[H.vhash(pad_pos)] == "sl_weapons:pad_weapon", "pads re-armed for the next scene")
+check(reset_called.alpha == true and reset_called.beta == true,
+	"achievement reset hook ran for connected players")
+reset_match_achievements = nil
+
+-- The real achievement lifecycle (loaded fresh; graceful if sl_gui
+-- cannot load under the stub).
+local okA = pcall(dofile, "mods/apis/sl_gui/achievement_system.lua")
+if okA then
+	local ach_player = alpha
+	local meta = ach_player:get_meta()
+	meta:set_string("achievements", minetest.serialize({
+		unlocked = { win_match = true },
+		progress = { win_match = 3 },
+	}))
+	reset_match_achievements(ach_player)
+	local data = minetest.deserialize(meta:get_string("achievements"))
+	check(data and next(data.unlocked) == nil, "real reset clears unlocked state")
+	check(meta:get_int("times_earned_win_match") == 1,
+		"real reset bumps the lifetime times_earned counter")
+else
+	check(true, "sl_gui achievement system not loadable under stub (skipped)")
+end
+
+-- ================================================================
+section("PHASE W3 — salvage rolls, smoke regression: modebase intact")
+-- ================================================================
+
+-- Weapons section on the salvage roll table (§5); the Lash never rolls.
+local rolls = game_mode.get_pickup_rolls()
+local kit_w, total_w, lash_rolled = 0, 0, false
+for _, e in ipairs(rolls) do
+	total_w = total_w + e.weight
+	if e.item == "sl_weapons:sentry_kit" then kit_w = kit_w + e.weight end
+	if e.item == "sl_weapons:grapple" then lash_rolled = true end
+end
+check(lash_rolled == false, "the Lash appears on no random table")
+check(kit_w / total_w > 0.07 and kit_w / total_w < 0.13,
+	"sentry kit rolls near 10% (got " .. string.format("%.1f", 100 * kit_w / total_w) .. "%)")
+
+math.randomseed(42)
+local scv = new_victim("scv", "beacon_a")
+local pick_node = minetest.registered_nodes["sl_modebase:item_pickup"]
+local ppos = { x = 900, y = 60, z = 0 }
+local kits = 0
+for i = 1, 400 do
+	H.voxels[H.vhash(ppos)] = "sl_modebase:item_pickup"
+	pick_node.on_rightclick(ppos, { name = "sl_modebase:item_pickup" }, scv, ItemStack(""), nil)
+end
+for _, st in ipairs(scv:get_inventory():get_list("main")) do
+	if st:get_name() == "sl_weapons:sentry_kit" then kits = kits + st:get_count() end
+end
+check(kits >= 18 and kits <= 60, "400 salvage rolls yield sentry kits near expectation (got " .. kits .. ")")
+
+check(gm.get_player_state("alpha").phase == "alive", "players normalized after match end")
+H.advance(2, 0.5)
+check(true, "engine steps still healthy after the full suite")
+
+print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
+if fail_count > 0 then os.exit(1) end

@@ -320,15 +320,40 @@ minetest.register_node(modname .. ":platform", {
 	collision_box = { type = "fixed", fixed = { -0.5, -0.5, -0.5, 0.5, 0.5, 0.5 } },
 })
 
--- Item pickup: a small glowing object that gives random salvage on right-click
+-- Item pickup: a small glowing object that gives random salvage on
+-- right-click. Rolls are weighted; other mods may append entries
+-- (sl_weapons adds a small weapons section, spec WEAPONS_SPEC §5 —
+-- the Grapple Lash is never on any random table).
 local pickup_loot = {
-	modname .. ":scrap_metal",
-	modname .. ":electronic_waste",
-	modname .. ":raw_crystal",
-	modname .. ":plastic_scrap",
+	{ item = modname .. ":scrap_metal", count = 1, weight = 1 },
+	{ item = modname .. ":electronic_waste", count = 1, weight = 1 },
+	{ item = modname .. ":raw_crystal", count = 1, weight = 1 },
+	{ item = modname .. ":plastic_scrap", count = 1, weight = 1 },
 }
 
-minetest.register_node(modname .. ":item_pickup", {
+function game_mode.register_pickup_roll(item, count, weight)
+	table.insert(pickup_loot, { item = item, count = count or 1, weight = weight or 1 })
+end
+
+function game_mode.get_pickup_rolls()
+	local copy = {}
+	for i, e in ipairs(pickup_loot) do copy[i] = { item = e.item, count = e.count, weight = e.weight } end
+	return copy
+end
+
+local function roll_pickup()
+	local total = 0
+	for _, e in ipairs(pickup_loot) do total = total + (e.weight or 1) end
+	local r = math.random() * total
+	for _, e in ipairs(pickup_loot) do
+		r = r - (e.weight or 1)
+		if r <= 0 then return e.item, (e.count or 1) end
+	end
+	local last = pickup_loot[#pickup_loot]
+	return last.item, (last.count or 1)
+end
+
+	minetest.register_node(modname .. ":item_pickup", {
 	description = S("Loose Item"),
 	drawtype = "mesh",
 	mesh = "item.obj",
@@ -342,9 +367,9 @@ minetest.register_node(modname .. ":item_pickup", {
 
 	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
 		if not clicker or not clicker:is_player() then return itemstack end
-		local loot = pickup_loot[math.random(1, #pickup_loot)]
+		local loot, n = roll_pickup()
 		local inv = clicker:get_inventory()
-		inv:add_item("main", ItemStack(loot .. " 1"))
+		inv:add_item("main", ItemStack(loot .. " " .. n))
 		minetest.remove_node(pos)
 		minetest.sound_play("click", { pos = pos, gain = 0.5, max_hear_distance = 8 })
 		minetest.chat_send_player(clicker:get_player_name(),
