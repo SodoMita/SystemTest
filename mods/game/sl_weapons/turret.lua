@@ -73,7 +73,11 @@ minetest.register_entity(W.modname .. ":turret_head", {
 	_stub_ray_radius = 0.3,
 	initial_properties = {
 		visual = "cube",
-		textures = { "sl_weapons_turret_head.png" },
+		-- Cube visuals index six faces; one texture is engine abuse
+		-- even when it happens to render.
+		textures = { "sl_weapons_turret_head.png", "sl_weapons_turret_head.png",
+			"sl_weapons_turret_head.png", "sl_weapons_turret_head.png",
+			"sl_weapons_turret_head.png", "sl_weapons_turret_head.png" },
 		visual_size = { x = 4, y = 4 },
 		physical = false,
 		pointable = false,

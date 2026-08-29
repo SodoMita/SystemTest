@@ -67,7 +67,7 @@ function W.register_projectile(id, cfg)
 							W.punch_object(self.shooter_obj, target, cfg.damage, cfg.cause, dist)
 							if cfg.knock then
 								W.knockback(target, vector.multiply(
-									vector.normalize(vel), cfg.knock))
+									vector.safe_dir(vel), cfg.knock))
 							end
 							if cfg.splash then
 								W.explode(hit.pos or pos, self.shooter_name, cfg, target)
@@ -108,6 +108,9 @@ function W.spawn_projectile(user, cfg)
 	if cfg.inherit then
 		vel = vector.add(vel, W.player_velocity(user))
 	end
+	-- A poisoned velocity (NaN from anywhere upstream) must never
+	-- reach an entity: refuse the shot instead of crashing clients.
+	if vector.finite and not vector.finite(vel) then return end
 	local obj = minetest.add_entity(muzzle, "sl_weapons:" .. cfg.id)
 	if not obj then return end
 	obj:set_velocity(vel)
@@ -177,11 +180,10 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 				if dist <= radius then
 					local dmg = math.max(1, math.floor(splash.max * (1 - dist / radius) + 0.5))
 					local cause = cause_key
-					local away = vector.subtract(opos, pos)
-					if vector.distance(away, { x = 0, y = 0, z = 0 }) < 0.01 then
-						away = { x = 0, y = 1, z = 0 }
-					end
-					away = vector.normalize(away)
+					-- Zero-length deltas must never reach normalize(): NaN
+					-- velocity segfaults clients (2026-08-29 live incident).
+					local away = vector.safe_dir(vector.subtract(opos, pos),
+						{ x = 0, y = 1, z = 0 })
 					W.knockback(obj, vector.multiply(away, 11 * (1 - dist / radius)))
 					W.punch_object(shooter_obj, obj, dmg, cause, dist)
 				end
@@ -193,7 +195,11 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 				if dist <= radius then
 					local dmg = math.max(1, math.floor(
 						(splash.max * (1 - dist / radius) + 0.5) * (cfg.self_dmg or 0.5)))
-					local away = vector.normalize(vector.subtract(opos, pos))
+					-- THE crash: a blast centred exactly on the shooter made
+					-- this normalize({0,0,0}) -> NaN -> add_velocity(NaN) ->
+					-- client segfault. Point-blank now throws straight up.
+					local away = vector.safe_dir(vector.subtract(opos, pos),
+						{ x = 0, y = 1, z = 0 })
 					W.knockback(obj, vector.multiply(away, 11 * (1 - dist / radius)))
 					W.punch_object(nil, obj, dmg, "mortar_self", dist)
 				end

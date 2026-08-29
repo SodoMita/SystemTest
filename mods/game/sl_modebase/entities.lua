@@ -242,7 +242,9 @@ minetest.register_entity(MONSTER_NAME, {
 			
 			if tpos then
 				local dist = vector.distance(pos, tpos)
-				local dir = vector.normalize(vector.subtract(tpos, pos))
+				-- A monster standing exactly on its target must stand
+				-- still, not sprint toward NaN.
+				local dir = vector.safe_dir(vector.subtract(tpos, pos))
 				
 			-- Add slight jitter to movement
 			local jitter = {x=(math.random()-0.5)*0.5, y=0, z=(math.random()-0.5)*0.5}

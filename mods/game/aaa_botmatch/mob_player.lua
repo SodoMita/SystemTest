@@ -95,7 +95,7 @@ local function pathfind_walk(self, bot, dtime)
 	end
 	if self.path and self.path[self.path_i or 1] then
 		local wp = self.path[self.path_i]
-		dir = vector.normalize(vector.subtract(wp, pos))
+		dir = vector.safe_dir(vector.subtract(wp, pos))
 	else
 		-- Straight-line fallback (open floor or path exhausted).
 		local flat = { x = target.x - pos.x, y = 0, z = target.z - pos.z }

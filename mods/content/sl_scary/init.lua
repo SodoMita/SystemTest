@@ -109,7 +109,7 @@ minetest.register_entity("sl_scary:mob", {
         target_pos.y=target_pos.y+1
 
         -- Calculate direction toward the player
-        local dir = vector.normalize(vector.subtract(target_pos, pos))
+        local dir = vector.safe_dir(vector.subtract(target_pos, pos))
 
         -- Simple steering to avoid other entities
         local move_dir = dir
@@ -196,10 +196,14 @@ minetest.register_entity("sl_scary:mob", {
 
             -- Drag the player
             local direction = vector.direction(target_pos, pos+random_vector(-3,3)) -- Direction to random point near self
-            direction = vector.normalize(direction)
-            direction = direction * self.player_move_speed * math.random() * (self.drag_timer/self.drag_time)
-
-            self.target_player:add_velocity(direction)
+            -- A zero-length drag vector must not become NaN player
+            -- velocity (client segfault); it becomes a no-op.
+            direction = vector.safe_dir(direction)
+            direction = vector.multiply(direction,
+                self.player_move_speed * math.random() * (self.drag_timer/self.drag_time))
+            if vector.finite(direction) then
+                self.target_player:add_velocity(direction)
+            end
 
             -- Push player's camera toward the mob and force look at the mob while dragging
             do
@@ -1159,7 +1163,7 @@ minetest.register_entity("sl_scary:containment", {
                 return
             end
             set_sprite_anim(self, "walk")
-            local dir = vector.normalize(vector.subtract(player_pos, pos))
+            local dir = vector.safe_dir(vector.subtract(player_pos, pos))
             local new_pos = vector.add(pos, vector.multiply(dir, self.chase_speed * dtime))
             self.object:set_pos(new_pos)
             local yaw = math.atan2(dir.z, dir.x) - math.pi / 2
@@ -1340,7 +1344,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
                 end
             else
                 set_sprite_anim(self, "walk")
-                local dir = vector.normalize(vector.subtract(player_pos, pos))
+                local dir = vector.safe_dir(vector.subtract(player_pos, pos))
                 self.object:set_pos(vector.add(pos, vector.multiply(dir, self.chase_speed * dtime)))
             end
             -- Glitch during chase

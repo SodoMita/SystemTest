@@ -713,6 +713,74 @@ check(six_fired == 6, "six shots then the spin pauses the seventh (got " .. tost
 check((W.busy_until.alpha or 0) > W.now() or six_fired >= 7, "cylinder busy window tracked")
 
 -- ================================================================
+-- ================================================================
+section("PHASE W1g — NaN armour: the point-blank lesson")
+-- ================================================================
+
+-- Live server 2026-08-29: a mortar-jump with the blast centred exactly
+-- on the shooter normalized a zero vector -> NaN -> add_velocity(NaN)
+-- -> client segfault. Every vector that reaches a movement write must
+-- be finite; the checks below reproduce the crash verbatim.
+local function is_finite(v)
+	return v ~= nil and v.x == v.x and v.y == v.y and v.z == v.z
+		and math.abs(v.x) ~= math.huge
+		and math.abs(v.y) ~= math.huge
+		and math.abs(v.z) ~= math.huge
+end
+
+check(type(vector.safe_dir) == "function" and type(vector.finite) == "function",
+	"the vector armor (safe_dir / finite) is installed")
+check(vector.safe_dir({ x = 0, y = 0, z = 0 }).y == 0,
+	"safe_dir of a zero vector stands still by default")
+check(vector.safe_dir({ x = 0, y = 0, z = 0 }, { x = 0, y = 1, z = 0 }).y == 1,
+	"safe_dir of a zero vector honours the fallback (point-blank = up)")
+local sd = vector.safe_dir({ x = 0, y = 0, z = 3 })
+check(math.abs(sd.z - 1) < 1e-9, "safe_dir normalizes real directions")
+local nan = 0 / 0
+check(vector.safe_dir({ x = nan, y = nan, z = nan }).y == 0,
+	"safe_dir quarantines NaN input")
+check(vector.finite({ x = 1, y = 2, z = 3 })
+	and not vector.finite({ x = nan, y = 0, z = 0 })
+	and not vector.finite({ x = math.huge, y = 0, z = 0 }),
+	"vector.finite detects NaN and infinity")
+
+-- The exact live crash: a blast centred precisely on the shooter.
+alpha:set_pos({ x = 50, y = 60, z = 0 })
+alpha:set_velocity({ x = 0, y = 0, z = 0 })
+alpha:set_hp(20)
+local pvic = new_victim("pnt", "beacon_b") -- a victim at ground zero too
+pvic:set_pos({ x = 50, y = 60, z = 0 })
+pvic:set_hp(20)
+W.explode({ x = 50, y = 60, z = 0 }, "alpha", W.projectiles.mortar)
+H.advance(0.1, 0.05)
+local pvel = alpha:get_velocity()
+check(is_finite(pvel), "point-blank self-blast leaves the shooter finite (the segfault)")
+check(pvel.y > 0, "point-blank blast still mortar-jumps (straight up)")
+check(is_finite(pvic:get_velocity()), "a victim at ground zero stays finite")
+check(alpha:get_hp() < 20 and pvic:get_hp() < 20, "ground zero still hurts")
+
+-- The full pipeline repro: fire at your own feet — the shell detonates
+-- at the shooter's exact position ("uses sl_weapons:mortar, pointing
+-- at" the node you stand on).
+alpha:set_pos({ x = 55, y = 60, z = 0 })
+alpha:set_velocity({ x = 0, y = 0, z = 0 })
+H.voxels[H.vhash({ x = 55, y = 59, z = 0 })] = "default:stone"
+aim_at(alpha, { x = 55, y = 59, z = 0 })
+W.get_pool("alpha").rockets = 2
+H.advance(1.8, 0.2) -- refire window behind whatever came before
+fire("sl_weapons:mortar", alpha)
+H.advance(0.4, 0.05)
+H.voxels[H.vhash({ x = 55, y = 59, z = 0 })] = nil -- leave no residue
+check(is_finite(alpha:get_velocity()), "firing at your own feet stays finite (pipeline)")
+
+-- Boundary guards: a NaN shove is refused, degenerate spread collapses
+local pre_v = alpha:get_velocity()
+W.knockback(alpha, { x = nan, y = nan, z = nan })
+check(alpha:get_velocity().x == pre_v.x and alpha:get_velocity().y == pre_v.y,
+	"knockback refuses a NaN vector")
+check(is_finite(W.spread_dir({ x = 0, y = 1, z = 0 }, 4)),
+	"spread stays finite when aiming straight up")
+
 section("PHASE W2a — corpse destruction: burial, cremation, traces")
 -- ================================================================
 
@@ -889,7 +957,10 @@ check(alpha:get_hp() == 20, "deployer is spared")
 -- window is about the lifeform, not the leftover contact.
 stranger:set_pos({ x = 490, y = 60, z = 0 })
 local mobj = gm.spawn_monster({ x = tpos.x, y = tpos.y, z = tpos.z + 4 }, "scout", "gamma")
-H.advance(2.0, 0.1)
+-- 3 s, not 2: acquisition runs on a 0.2 s tick after the lock drops,
+-- and the acquire delay alone can eat a second. The assert must see
+-- the SHOT, not the acquisition.
+H.advance(3.0, 0.1)
 local mlua = mobj and mobj.get_luaentity and mobj:get_luaentity()
 check(mlua == nil or mobj:get_hp() < 30, "turret engages monsters")
 

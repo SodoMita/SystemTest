@@ -697,6 +697,33 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.3.6.1 (2026-08-29, the point-blank segfault)** — the second crash
+  report ("uses sl_weapons:mortar" at own feet, client segfault) was a
+  division by zero: a blast centred exactly on the shooter made the
+  self-splash branch normalize a zero-length vector → NaN →
+  `add_velocity(NaN)` on the local player → client segfault. The
+  mortar-jump at point-blank range is the designed trigger, and the
+  grav-8 arc made point-blank blasts routine. Fixed with tree-wide
+  **division-by-zero armour**, installed in `sl_modebase`:
+  `vector.safe_dir(v, fallback)` (normalize that returns the fallback
+  for zero/NaN input) and `vector.finite(v)` (NaN/∞ detector) — every
+  direction that feeds a movement write now goes through safe_dir: the
+  splash branches (point-blank throws you straight up — the
+  mortar-jump survives), pulse juggle, spread (degenerate bloom
+  collapses to the plain aim), monster steering (a monster standing on
+  its target stands still), bot waypoints, and the sl_scary chase/drag
+  loops (a zero-length drag becomes a no-op, never NaN player
+  velocity). Boundary guards: `W.knockback` refuses non-finite
+  vectors, `W.spawn_projectile` refuses to spawn a shell with a
+  poisoned velocity. Also: `sl_weapons:turret_head` now feeds its cube
+  visual all six faces (one texture was engine abuse). Regression
+  phase **W1g** reproduces the crash three ways — a blast centred on
+  the shooter, a victim at ground zero, and the full fire-at-your-own-
+  feet pipeline — plus NaN-refusal and spread checks. The turret
+  monster-engagement window widened from 2 s to 3 s (the assert must
+  see the shot, not the acquisition; 0.2 s tick alignment made 2 s a
+  coin flip). Suites: weapons 285/285, smoke 127/127, soak PASS.
+
 - **v1.3.6 (2026-08-29, live-server hardening round 2)** — the second
   field report, resolved against MT CTF as the reference implementation.
   *Deprecations, finished:* `W.knockback` calls `add_velocity` on

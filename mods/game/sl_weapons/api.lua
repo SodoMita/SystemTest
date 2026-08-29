@@ -249,11 +249,15 @@ function W.spread_dir(dir, deg)
 	local out = vector.add(dir, vector.add(
 		vector.multiply(right, math.cos(a) * r),
 		vector.multiply(true_up, math.sin(a) * r)))
-	return vector.normalize(out)
+	-- Degenerate spread collapses to the unspread aim rather than NaN.
+	return vector.safe_dir(out, dir)
 end
 
 function W.knockback(obj, vel)
 	if not obj or not vel then return end
+	-- NaN never reaches a client: a non-finite shove is a bug
+	-- upstream, and silence beats a segfault (2026-08-29 incident).
+	if vector.finite and not vector.finite(vel) then return end
 	-- MT CTF pattern (ctf_mode_nade_fight knockback): plain add_velocity
 	-- on whatever moves; the old player-only variants are deprecated and
 	-- gone from this tree.
