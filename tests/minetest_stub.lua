@@ -33,6 +33,7 @@ M.luaentities = {}
 M.current_modname = "sl_modebase"
 M.entity_spawns = {}  -- list of { pos = ..., name = ... }, in spawn order
 M.item_drops = {}    -- list of { pos = ..., name = ..., count = ... } from minetest.add_item
+M.engine_crashes = {} -- modeled engine segfaults (see PlayerMeta:punch)
 
 local handlers = {
 	joinplayer = {}, leaveplayer = {}, respawnplayer = {}, dieplayer = {},
@@ -820,6 +821,20 @@ function PlayerMeta:punch(puncher, time_from_last_punch, tool_capabilities, dir)
 		time_from_last_punch)
 	local canceled = M.fire_punchplayer(self, puncher, time_from_last_punch,
 		tool_capabilities, dir, damage)
+	-- Engine parity (Luanti PlayerSAO::punch, 5.15 through 5.17 and
+	-- master): the engine pushes a NIL puncher into the
+	-- on_punchplayer handlers just fine, but the moment ANY handler
+	-- returns true it does `puncher->getType()` with no null check and
+	-- SEGFAULTS the whole process. Model that here as a hard error so
+	-- the suites catch nil-puncher punches (2026-08-29 incident).
+	if canceled and puncher == nil then
+		M.engine_crashes[#M.engine_crashes + 1] = {
+			victim = self._name,
+			where = "PlayerSAO::punch (nil puncher + handled damage)",
+		}
+		error("STUB ENGINE SEGFAULT: PlayerSAO::punch null-deref — nil puncher "
+			.. "with a handled on_punchplayer (puncher->getType())", 0)
+	end
 	if canceled then return end
 	if damage > 0 then
 		self:set_hp(self._hp - damage)

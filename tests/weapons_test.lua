@@ -1623,8 +1623,105 @@ check(gm.get_player_state(l8r_name).tournament_spectator == nil,
 check(next(state.tournament_roster) == nil, "roster cleared")
 check(tcmd.func("alpha", "stop") == false, "stopping twice is refused")
 check(gm.get_player_state("alpha").phase == "alive", "players normalized after tournament")
-H.advance(2, 0.5)
-check(true, "engine steps still healthy after the full suite")
+
+local function regression_w3()
+	-- (is_finite is block-scoped inside W1g's do...end; local twin.)
+	local function is_finite(v)
+		return v ~= nil and v.x == v.x and v.y == v.y and v.z == v.z
+			and math.abs(v.x) ~= math.huge
+			and math.abs(v.y) ~= math.huge
+			and math.abs(v.z) ~= math.huge
+	end
+
+	-- ================================================================
+	section("PHASE W3f — 2026-08-29 segfault regression (nil puncher x engine)")
+	-- ================================================================
+
+	-- The incident (live log 2026-08-29 13:05:43): zzt, in the lobby's
+	-- open test range, used sl_weapons:mortar at the node at their feet.
+	-- The self-splash punched the shooter with a NIL puncher;
+	-- sl_modebase's lobby guard returned true; the engine's
+	-- PlayerSAO::punch then did `puncher->getType()` with no null check
+	-- and segfaulted the whole process (Luanti 5.15 through 5.17 and
+	-- master — unfixed upstream; MT CTF never hits it because a throw
+	-- always punches with the thrower's ObjectRef, even against itself).
+	check(state.match_active == false, "incident geometry: post-tournament lobby")
+
+	-- 1) The stub models the engine flaw: a nil puncher whose damage is
+	--    handled must look exactly like the process crash.
+	local crashvic = new_victim("seg", "beacon_b")
+	crashvic:set_hp(20)
+	local crashes_before = #H.engine_crashes
+	local ok_seg, seg_err = pcall(function()
+		crashvic:punch(nil, 1.0, { full_punch_interval = 1.0,
+			damage_groups = { fleshy = 5 } }, { x = 0, y = 0, z = 1 })
+	end)
+	check(ok_seg == false and tostring(seg_err):find("SEGFAULT") ~= nil,
+		"stub models the engine: nil puncher + handled damage is a process crash")
+	check(#H.engine_crashes == crashes_before + 1, "the modeled crash is recorded")
+
+	-- 2) The incident itself, replayed end to end: mortar at your own feet
+	--    in the lobby. Pre-fix this was the segfault; post-fix it is a
+	--    jump with no damage (the lobby guard still holds).
+	alpha:set_pos({ x = 600, y = 60, z = 0 })
+	alpha:set_velocity({ x = 0, y = 0, z = 0 })
+	alpha:set_hp(20)
+	H.voxels[H.vhash({ x = 600, y = 59, z = 0 })] = "default:stone"
+	aim_at(alpha, { x = 600, y = 59, z = 0 })
+	fire("sl_weapons:mortar", alpha)  -- raise delay
+	H.advance(0.45, 0.1)
+	fire("sl_weapons:mortar", alpha)  -- zzt's shot
+	H.advance(0.6, 0.05)
+	H.voxels[H.vhash({ x = 600, y = 59, z = 0 })] = nil
+	local crashes_after = #H.engine_crashes
+	check(crashes_after == crashes_before + 1,
+		"the incident: a lobby self-mortar no longer crashes the engine")
+	local avel = alpha:get_velocity()
+	check(is_finite(avel), "shooter velocity stays finite after the lobby self-blast")
+	check(avel.y > 0, "the self-blast is still the mortar-jump (knockback intact)")
+	check(alpha:get_hp() == 20, "lobby guard still blocks lobby damage")
+
+	-- 3) The sentry's second trigger: its rounds punched with nil too.
+	--    Turrets deploy only during a match, and the guard that makes a
+	--    nil puncher fatal is the creative-mode one (it returns true for
+	--    EVERY punch). Test surgery: satisfy the deploy gate (match flag
+	--    + fresh start clock) and turn creative on, deploy, let it fire,
+	--    restore. Pre-fix, the first sentry round segfaulted this exact
+	--    sequence (nil puncher + creative guard -> engine null-deref).
+	local svt = new_victim("snt", "beacon_b")
+	svt:set_pos({ x = 623, y = 60, z = 0 })
+	svt:set_hp(20)
+	state.match_active = true    -- test surgery: deploy gate only
+	state.match_started_at = W.now()
+	H.settings.creative_mode = true
+	local spos = { x = 620, y = 60, z = 0 }
+	H.voxels[H.vhash({ x = spos.x, y = spos.y - 1, z = spos.z })] = "default:stone"
+	alpha:set_pos({ x = spos.x - 4, y = spos.y, z = spos.z })
+	alpha:get_inventory():add_item("main", ItemStack("sl_weapons:sentry_kit"))
+	kit_def.on_place(ItemStack("sl_weapons:sentry_kit"), alpha,
+		{ type = "node", above = spos, under = { x = spos.x, y = spos.y - 1, z = spos.z } })
+	check(W.turrets[W.phash(spos)] ~= nil, "sentry deployed (deploy gate satisfied)")
+	H.advance(2.5, 0.1)
+	state.match_active = false
+	state.match_started_at = nil
+	H.settings.creative_mode = false
+	local sentry_entry = W.turrets[W.phash(spos)]
+	local shots = 0
+	for _, line in ipairs(sentry_entry and sentry_entry.log or {}) do
+		if line:find("fired at") then shots = shots + 1 end
+	end
+	check(shots >= 1, "sentry actually fired (log evidence, "
+		.. tostring(shots) .. " shot(s)) — the no-crash check is not vacuous")
+	check(#H.engine_crashes == crashes_after,
+		"sentry rounds with a true-returning guard no longer crash the engine")
+	check(svt:get_hp() == 20, "creative guard still blocks damage")
+	W.remove_turret(spos, "test") -- leave the scene as found
+	check(W.turrets[W.phash(spos)] == nil, "test sentry dismantled")
+
+	H.advance(2, 0.5)
+	check(true, "engine steps still healthy after the full suite")
+end
+regression_w3()
 
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 if fail_count > 0 then os.exit(1) end

@@ -209,12 +209,16 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 				if dist <= radius then
 					local dmg = math.max(1, math.floor(
 						(splash.max * (1 - dist / radius) + 0.5) * (cfg.self_dmg or 0.5)))
-					-- THE crash geometry, now CTF-style: engine direction from
-					-- the blast to the shooter's HEAD is (0,1,0) at point-blank
-					-- — a pure jump, structurally immune to the NaN that
-					-- crashed clients twice.
+					-- CTF-style on both axes: the push is the engine direction
+					-- from the blast to the shooter's HEAD — (0,1,0) at
+					-- point-blank, a pure jump, immune to the NaN that crashed
+					-- clients in v1.3.6 — and the punch goes through the
+					-- SHOOTER's own ObjectRef, exactly like a CTF throw against
+					-- itself. Never nil: a nil puncher segfaults the engine
+					-- whenever an on_punchplayer handler returns true (the
+					-- 2026-08-29 crash; see W.punch_object).
 					blast_push(obj, opos, pos, splash.knock or 11)
-					W.punch_object(nil, obj, dmg, "mortar_self", dist)
+					W.punch_object(shooter_obj, obj, dmg, "mortar_self", dist)
 				end
 			end
 		end

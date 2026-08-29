@@ -697,6 +697,43 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
+- **v1.3.8 (2026-08-29, the nil-puncher segfault — audit of the
+  13:05:43 crash)** — third crash on the same log line
+  ("zzt uses sl_weapons:mortar, pointing at [node under=6,0,0
+  above=5,0,0]"), and a different beast: not NaN, but an engine
+  **null dereference**. The v1.3.7 CTF port changed the self-splash to
+  punch with a **nil** puncher (`W.punch_object(nil, obj, …,
+  "mortar_self", …)`), whereas MT CTF always punches with the
+  thrower's ObjectRef — even against itself. The engine's
+  `PlayerSAO::punch` passes a nil puncher to the `on_punchplayer`
+  handlers without issue, but the moment **any** handler returns true
+  it does `puncher->getType()` with no null check and segfaults the
+  whole process — verified present in Luanti 5.15.0, 5.16.1, 5.17.0
+  and current master (unfixed upstream; ready-to-file issue text in
+  `docs/agent_logs/2026-08-29-mortar-segfault.md`). sl_modebase's
+  lobby/creative guards return true unconditionally, so a
+  nil-puncher punch in the open test range — exactly where players
+  test the mortar — was a guaranteed crash. Fixed at the only funnel:
+  `W.punch_object` now never hands the engine a nil puncher (fallback:
+  the victim itself); the self-splash punches through the shooter's
+  own ObjectRef, CTF-faithful; the sentry — the second
+  nil-puncher call site (its rounds punched with nil too; trigger:
+  creative-mode servers) — now punches through its own head entity
+  (non-nil, non-player, so MM bare-hand doctrine cannot read a sentry
+  round as a doctrine strike). The stub now **models the engine flaw**
+  (nil puncher + handled damage = process crash), which is why every
+  earlier suite run was green while the live engine died — the same
+  stub-vs-engine divergence class as v1.3.6.1, in a new location.
+  Regression phase **W3f** replays the incident end to end (lobby
+  self-mortar: no crash, jump intact, lobby guard still blocks
+  damage), proves the stub models the crash (direct nil punch), and
+  fires a live sentry under a true-returning guard. The
+  `min_minetest_version` floor rises 5.0 → **5.6** — the CTF
+  baseline of the ported code (its `vector.offset` et al. do not
+  exist below). Suites: weapons 300/300, smoke 127/127, all mod files
+  parse under the engine's LuaJIT; W3f fails 3 checks on the
+  pre-fix code (verified by revert-and-rerun).
+
 - **v1.3.7 (2026-08-29, mortar knockback = the CTF jump grenade)** —
   after the second point-blank crash, the splash push was rebuilt
   verbatim from MT CTF's knockback grenade
@@ -719,7 +756,9 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
   while the live client crashed. W1g extended: point-blank jump is
   exactly 11 n/s straight up, engine-direction zero-safety parity, and
   the overhead-blast y-clamp. Suites: weapons 288/288, smoke 127/127,
-  soak PASS.
+  soak PASS. *(Corrigendum, v1.3.8: the NaN crash class was fixed, but
+  this port's nil puncher in the self-splash introduced a different
+  crash — the 13:05:43 engine null dereference. See v1.3.8.)*
 
 - **v1.3.6.1 (2026-08-29, the point-blank segfault)** — the second crash
   report ("uses sl_weapons:mortar" at own feet, client segfault) was a

@@ -415,10 +415,17 @@ minetest.register_globalstep(function(dtime)
 				local from = { x = entry.pos.x, y = entry.pos.y + 1.4, z = entry.pos.z }
 				local tpos = entry.target:get_pos()
 				local to = { x = tpos.x, y = tpos.y + 1.0, z = tpos.z }
-				if not los_blocked(from, to) then
-					entry.next_shot = now + TURRET_TRACK.shot
-					W.punch_object(nil, entry.target, TURRET_TRACK.dmg, "sentry",
-						vector.distance(from, tpos))
+			if not los_blocked(from, to) then
+				entry.next_shot = now + TURRET_TRACK.shot
+				-- The round is the SENTRY's, not a player's: punch with
+				-- the head entity (always live while the entry exists —
+				-- destruction removes the entry first). Never nil: a
+				-- nil puncher segfaults the engine when an
+				-- on_punchplayer handler returns true (2026-08-29).
+				-- Non-player too: MM bare-hand doctrine must not read
+				-- a sentry round as a doctrine strike.
+				W.punch_object(entry.head, entry.target, TURRET_TRACK.dmg, "sentry",
+					vector.distance(from, tpos))
 					W.tracer_fx(from, to)
 					minetest.sound_play("sl_weapons_turret_fire", {
 						pos = from, gain = 0.5, max_hear_distance = 20,

@@ -339,12 +339,26 @@ W.last_cause = {} -- [victim name] = cause key
 
 function W.punch_object(shooter, obj, dmg, cause, range_m)
 	if not obj or not dmg or dmg <= 0 then return end
+	-- THE 2026-08-29 segfault, backstopped at the only funnel: a
+	-- puncher passed to ObjectRef:punch must NEVER be nil. The engine
+	-- happily pushes a nil puncher into the on_punchplayer handlers,
+	-- but PlayerSAO::punch then does `puncher->getType()` with no null
+	-- check whenever ANY handler returns true (Luanti 5.15 through
+	-- 5.17 and master alike). sl_modebase's lobby/creative guard
+	-- returns true unconditionally, so a nil-puncher punch in the
+	-- lobby — the open test range, where players actually test the
+	-- mortar — is a guaranteed process crash. MT CTF never hits this:
+	-- a throw always punches with the thrower's ObjectRef, even
+	-- against itself. The fallback to the victim itself keeps the
+	-- punch non-nil in every case (a self-punch is legal and the
+	-- cause stamp above stays authoritative for the incident feed).
+	local puncher = shooter or obj
 	local victim_name = obj.is_player and obj:is_player() and obj:get_player_name() or nil
 	if victim_name and cause then
 		W.last_cause[victim_name] = cause
 	end
 	local before = obj.get_hp and obj:get_hp() or 1
-	obj:punch(shooter, 1.0, {
+	obj:punch(puncher, 1.0, {
 		full_punch_interval = 1.0,
 		damage_groups = { fleshy = dmg },
 	}, { x = 0, y = 0, z = 1 })
