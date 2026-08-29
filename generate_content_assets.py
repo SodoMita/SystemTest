@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Generate placeholder textures for the System Looting content pass.
+"""OBSOLETE: superseded by generate_pixel_textures.py (canonical art pass 2026-08).
+
+Kept only for reference; do not run against the live tree.
+
+Generate placeholder textures for the System Looting content pass.
 
 Creates simple labelled icons for the new sl_modebase craftitems, tools,
 interactive nodes and crafting categories.  These are intentionally

@@ -537,8 +537,15 @@ minetest.is_protected = function(_, _) return false end
 -- vector + table extensions the engine provides
 -- ---------------------------------------------------------------
 vector = {
+	new = function(x, y, z)
+		if type(x) == "table" then return { x = x.x, y = x.y, z = x.z } end
+		return { x = x or 0, y = y or 0, z = z or 0 }
+	end,
 	add = function(a, b) return { x = a.x + b.x, y = a.y + b.y, z = a.z + b.z } end,
 	subtract = function(a, b) return { x = a.x - b.x, y = a.y - b.y, z = a.z - b.z } end,
+	offset = function(a, x, y, z)
+		return { x = a.x + x, y = a.y + y, z = a.z + z }
+	end,
 	round = function(v)
 		return {
 			x = math.floor(v.x + 0.5),

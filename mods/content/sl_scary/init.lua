@@ -728,7 +728,15 @@ minetest.register_node("sl_scary:hide_spot", {
         type = "fixed",
         fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}
     },
---     tiles = {"hide_spot_top.png", "hide_spot_bottom.png", "hide_spot_side.png"},
+    tiles = {
+        "hide_spot_top.png",      -- top
+        "hide_spot_bottom.png",   -- bottom
+        "hide_spot_side.png",     -- +X
+        "hide_spot_side.png",     -- -X
+        "hide_spot_side.png",     -- +Z
+        "hide_spot_side.png",     -- -Z
+    },
+    use_texture_alpha = "opaque",
     groups = {cracky = 1},
 })
 

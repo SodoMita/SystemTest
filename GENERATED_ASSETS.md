@@ -2,6 +2,18 @@
 
 This asset pass was generated procedurally for prototype use.  It fills missing media references found in the repository and the MVP list in `NEEDED ASSETS.md`.
 
+> **2026-08 ART DIRECTION (owner):** colours are only **white with glow**; other
+> colours appear very rarely and only where essential (caution yellow, medkit
+> red, status LEDs, fire/water where the material demands it).  Symbols must
+> resemble **real-world symbols**.  Clouds must be **real clouds** — `sky:cloud`
+> is an opaque walkable cumulus block, `sky:cloud_puff` is a leaves-style
+> walk-through vapor node.  The canonical generator for all of this art is now
+> **`generate_pixel_textures.py`** (run `python3 generate_pixel_textures.py` —
+> deterministic, no network, PIL only).  The older placeholder generators
+> (`tools_generate_missing_assets.py` texture half, `generate_content_assets.py`,
+> `create_ui_assets.py`, `finalize_assets.py`) are retired and can no longer
+> overwrite the canonical art.
+
 ## Added
 
 - `mods/content/sl_mvp_assets/` — MVP placeholder models (`player.obj`, `monster.obj`, `platform.obj`, `terminal.obj`, `door.obj`, `hatch.obj`, `item.obj`, `item_pickup.obj`, `pulse.obj`, `scanner_pulse.obj`, `flare_light.obj`, `particle.obj`, `death_particle.obj`), textures/UI (`neon_cube.png`, `cursor.png`, `hud.png`, `hud_frame.png`, `font.png`, model textures), and OGG sounds (`ambience`, `music`, footsteps, alerts, monster cues, radio static, etc.).
@@ -22,6 +34,52 @@ This asset pass was generated procedurally for prototype use.  It fills missing 
 - `mods/content/dark_skybox/sounds/` — `creepy_ambient.ogg` for the optional dark-skybox ambience hook.
 - `mods/sl_blocks/ground/textures/` — white/rainbow noise animated and still textures.
 - `menu/` — `header.png`, `background.png`, and `menu_music.ogg` for Luanti-compatible menu branding/audio.
+
+## White-Glow Pixel Pass (2026-08, canonical)
+
+`generate_pixel_textures.py` regenerated every game-custom texture in the owner
+palette (white with glow; rare essential colour; real-world symbols). Highlights:
+
+- **`mods/sl_blocks/sky/`** — `sky:cloud` is now an **opaque, walkable** cumulus
+  block (`sky_cloud.png`, full-bleed white mass, dithered under-shading), and the
+  new `sky:cloud_puff` is a leaves-style **walk-through vapor** node
+  (`sky_cloud_puff.png` / `_hi`, allfaces + glow-particle ABM). The ghost cloud
+  cage (`game_mode.build_cloud_cage`) is now built from a `sky:cloud` floor +
+  `sky:cloud_puff` walls with white glow braziers (was glass floor + obsidian
+  pylons).
+- **`mods/game/sl_modebase/textures/`** — all icons redrawn as crisp 16×16
+  glyphs on the standard dark plate: breaching pick, machete, riot shield with
+  vision slit, PCB with chip, battery with charge window, pistol drill, radar
+  dish, relay mast, ammo crate, ingot, riveted plate, torn scrap, cut gems,
+  emergency flare, medkit with red cross (essential colour), caution-yellow
+  hafts on axe/shovel (essential colour), summoning-circle slab, objective core.
+  `sl_warning_sign.png` is now a rounded dark board with the yellow hazard
+  triangle + exclamation.
+- **`mods/content/workshops/textures/`** — all 50 furniture tiles redrawn
+  (mottled steel, bevelled panels, locker vents, filing drawers, server 1U
+  LEDs, control screen with waveform, louvred vent, flanged pipes, diagonal
+  caution tape, hazard/radiation-trefoil/biohazard signs, windows).
+- **`mods/apis/sl_gui/textures/`** — every ability glyph, button, tab, slot and
+  category banner redrawn white-on-dark; achievement icons are now white octagon
+  badges with pictograms; ladder rungs show a hex-ring stack + the number
+  (5/25/1k/20k...).
+- **`mods/sl_blocks/construction/textures/`** — all animation strips redrawn
+  32×32/frame: white-hot fire with warm tips, rising white smoke, bubbles,
+  spark streaks, pale-blue water (essential), white ice/snowflakes, energy
+  plasma arcs, plus static decor/platform/wall/crystal tiles.
+- **`mods/content/sl_mvp_assets/textures/`** — monster texture is a grey
+  silhouette beast with white glow eyes (entities `^[colorize` per variant),
+  identity-neutral pale player texture, white radial glows, wireframe neon cube,
+  crosshair cursor, monochrome HUD bars/frame.
+- **`mods/content/sl_clothing/`**, **`mods/content/sl_scary/`** (locker-style
+  hide spot + pitch-black mob with white eyes), **`mods/content/sl_characters/`**
+  (boxman), **`mods/apis/dignodes/`**, **`mods/apis/sl_hand/`**,
+  **`mods/apis/sl_formspec/`**, **`mods/content/dark_skybox/`** (crisp pixel
+  sun), **`menu/icon.png`** (white SL monogram) — all redrawn in the same style.
+- **Kept untouched on purpose:** the ground neon tiles (`square_neon`,
+  `rhombus_neon`, `x_neon`, `x2_neon`), the menu header/background (already
+  white-on-dark), the rainbow "sus" task node (distinct gameplay node), and all
+  vendored `mods/default` / `mods/external` / `player_api` stock art.
 
 ## Notes
 

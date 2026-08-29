@@ -830,39 +830,61 @@ minetest.register_lbm({
 -- Only fills air/ignore, so hand-built arenas and admin edits survive.
 -- ================================================================
 
-function game_mode.build_cloud_cage()
-	if not state.ghost_spawn then return 0 end
-	local base = vector.round(state.ghost_spawn)
-	local placed = 0
+	function game_mode.build_cloud_cage()
+		if not state.ghost_spawn then return 0 end
+		local base = vector.round(state.ghost_spawn)
+		local placed = 0
 
-	local function fill(p, node_name)
-		local node = minetest.get_node_or_nil(p)
-		if node and (node.name == "air" or node.name == "ignore") then
-			minetest.set_node(p, { name = node_name })
-			placed = placed + 1
+		local function fill(p, node_name)
+			local node = minetest.get_node_or_nil(p)
+			if node and (node.name == "air" or node.name == "ignore") then
+				minetest.set_node(p, { name = node_name })
+				placed = placed + 1
+			end
 		end
-	end
 
-	-- Floor slab one node below the spawn point.
-	for x = -5, 5 do
-		for z = -5, 5 do
-			fill({ x = base.x + x, y = base.y - 1, z = base.z + z }, "default:glass")
+		-- Floor slab one node below the spawn point: solid cloud you can
+		-- stand on (owner directive: clouds are opaque and walkable).
+		for x = -5, 5 do
+			for z = -5, 5 do
+				fill({ x = base.x + x, y = base.y - 1, z = base.z + z }, "sky:cloud")
+			end
 		end
-	end
 
-	-- Corner pylons marking the containment perimeter.
-	for _, c in ipairs({ {-5, -5}, {-5, 5}, {5, -5}, {5, 5} }) do
+		-- Puffy vapor walls: walk-through, drift glow particles (sky ABM).
 		for y = 0, 3 do
-			fill({ x = base.x + c[1], y = base.y + y, z = base.z + c[2] }, "default:obsidianbrick")
+			for x = -5, 5 do
+				fill({ x = base.x + x, y = base.y + y, z = base.z - 5 }, "sky:cloud_puff")
+				fill({ x = base.x + x, y = base.y + y, z = base.z + 5 }, "sky:cloud_puff")
+			end
+			for z = -4, 4 do
+				fill({ x = base.x - 5, y = base.y + y, z = base.z + z }, "sky:cloud_puff")
+				fill({ x = base.x + 5, y = base.y + y, z = base.z + z }, "sky:cloud_puff")
+			end
 		end
-	end
 
-	if placed > 0 then
-		minetest.log("action", "[game_mode] Cloud cage materialized at "
-			.. minetest.pos_to_string(base) .. " (" .. placed .. " nodes)")
+		-- White glow braziers at the corners so the cage reads as "holy".
+		for _, c in ipairs({ {-4, -4}, {-4, 4}, {4, -4}, {4, 4} }) do
+			local p = { x = base.x + c[1], y = base.y, z = base.z + c[2] }
+			fill(p, "sky:cloud_puff")
+			minetest.add_particle({
+				pos = vector.offset(p, 0.5, 0.8, 0.5),
+				velocity = vector.new(0, 0.25, 0),
+				acceleration = vector.new(0, 0.05, 0),
+				expiration = 6,
+				size = 2.4,
+				collisiondetection = false,
+				texture = "sky_glow.png",
+				glow = 8,
+			})
+		end
+
+		if placed > 0 then
+			minetest.log("action", "[game_mode] Cloud cage materialized at "
+				.. minetest.pos_to_string(base) .. " (" .. placed .. " nodes)")
+		end
+		return placed
 	end
-	return placed
-end
 
 if minetest.load_area then
 	minetest.register_on_mods_loaded(function()

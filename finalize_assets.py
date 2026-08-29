@@ -1,3 +1,4 @@
+# OBSOLETE (2026-08): superseded by generate_pixel_textures.py — do not run.
 from PIL import Image, ImageDraw, ImageFont
 import os
 

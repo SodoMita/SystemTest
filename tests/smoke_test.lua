@@ -74,10 +74,10 @@ section("PHASE 2 — cloud cage materialization")
 H.run_mods_loaded()
 H.advance(3, 0.5) -- the builder runs 2 s after mods_loaded
 local gs = state.ghost_spawn
-check(H.voxels[H.vhash({ x = gs.x, y = gs.y - 1, z = gs.z })] == "default:glass",
-	"cage floor materialized below ghost spawn")
-check(H.voxels[H.vhash({ x = gs.x - 5, y = gs.y, z = gs.z - 5 })] == "default:obsidianbrick",
-	"cage corner pylon materialized")
+check(H.voxels[H.vhash({ x = gs.x, y = gs.y - 1, z = gs.z })] == "sky:cloud",
+	"cage floor materialized below ghost spawn (solid walkable cloud)")
+check(H.voxels[H.vhash({ x = gs.x - 5, y = gs.y, z = gs.z - 5 })] == "sky:cloud_puff",
+	"cage vapor wall materialized (puffy cloud)")
 
 section("PHASE 3 — players join into lobby")
 -- Three players: with only two, eliminating one ends the match instantly

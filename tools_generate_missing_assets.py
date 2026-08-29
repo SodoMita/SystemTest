@@ -477,16 +477,20 @@ def make_sound(kind: str) -> np.ndarray:
     return sine(440, .2, .2)*env(int(SR*.2), .01, .5)
 
 
+# NOTE (2026-08 art pass): PNG texture generation moved to
+# generate_pixel_textures.py (canonical, owner-directed white-with-glow art).
+# This script now only (re)generates OBJ models and audio. Textures must not
+# be overwritten here.
 def create_all():
     # MVP mod container so non-code assets are shipped with the game.
     mvp = ROOT / "mods/content/sl_mvp_assets"
     ensure(mvp / "textures"); ensure(mvp / "models"); ensure(mvp / "sounds")
     (mvp / "mod.conf").write_text("name = sl_mvp_assets\ndescription = Generated placeholder MVP media: models, textures, UI, and sounds.\ndepends =\n", encoding="utf-8")
-    make_neon_cube(mvp / "textures/neon_cube.png")
-    make_cursor(mvp / "textures/cursor.png")
-    make_hud(mvp / "textures/hud.png", frame_only=False)
-    make_hud(mvp / "textures/hud_frame.png", frame_only=True)
-    make_font_sheet(mvp / "textures/font.png")
+    pass  # make_neon_cube(mvp / "textures/neon_cube.png")  # disabled: textures live in generate_pixel_textures.py
+    pass  # make_cursor(mvp / "textures/cursor.png")  # disabled: textures live in generate_pixel_textures.py
+    pass  # make_hud(mvp / "textures/hud.png", frame_only=False)  # disabled: textures live in generate_pixel_textures.py
+    pass  # make_hud(mvp / "textures/hud_frame.png", frame_only=True)  # disabled: textures live in generate_pixel_textures.py
+    pass  # make_font_sheet(mvp / "textures/font.png")  # disabled: textures live in generate_pixel_textures.py
     make_mvp_models(mvp / "models", mvp / "textures")
 
     for name in ["ambience", "music", "footstep_metal", "footstep_water", "hit", "damage", "place", "click", "alert", "swim", "monster_idle", "monster_chase", "radio_static"]:
@@ -505,7 +509,7 @@ def create_all():
         "character_tool_feet_01.png": ("boot L", "boot"), "character_tool_feet_02.png": ("boot R", "boot"),
     }
     for fn, (label, shape) in icon_specs.items():
-        make_icon(clothing_tex / fn, label, shape=shape)
+    pass  # make_icon(clothing_tex / fn, label, shape=shape)  # disabled: textures live in generate_pixel_textures.py
     # Valid B3D placeholders: copy existing tiny B3D stand-in so media loads cleanly.
     source_b3d = ROOT / "mods/content/sl_scary/models/scary_mob.b3d"
     for fn in ["hood.b3d", "cap.b3d", "jacket.b3d", "coat.b3d", "backpack.b3d", "glove_l.b3d", "glove_r.b3d", "trousers_l.b3d", "trousers_r.b3d", "boot_l.b3d", "boot_r.b3d", "clothing_hood.b3d"]:
@@ -532,13 +536,13 @@ def create_all():
         "window_frame.png":"glass", "window_glass.png":"glass", "window_broken.png":"glass",
     }
     for fn, pal in workshop_specs.items():
-        make_node_texture(workshop_tex / fn, fn.rsplit(".", 1)[0], pal)
+    pass  # make_node_texture(workshop_tex / fn, fn.rsplit(".", 1)[0], pal)  # disabled: textures live in generate_pixel_textures.py
 
     # sl_scary optional hide spot textures + missing sound IDs.
     scary_tex = ROOT / "mods/content/sl_scary/textures"
     ensure(scary_tex)
     for fn in ["hide_spot_top.png", "hide_spot_bottom.png", "hide_spot_side.png"]:
-        make_node_texture(scary_tex / fn, fn.rsplit(".", 1)[0], "dark")
+    pass  # make_node_texture(scary_tex / fn, fn.rsplit(".", 1)[0], "dark")  # disabled: textures live in generate_pixel_textures.py
     scary_sounds = ROOT / "mods/content/sl_scary/sounds"
     for name in ["scary_attack", "mob_idle", "mob_death"]:
         write_ogg(scary_sounds / f"{name}.ogg", make_sound(name))
@@ -549,7 +553,7 @@ def create_all():
         write_ogg(gui_sounds / f"{name}.ogg", make_sound(name))
 
     # sl_blocks ground animated/noanim noise textures.
-    make_noise_textures(ROOT / "mods/sl_blocks/ground/textures")
+    pass  # make_noise_textures(ROOT / "mods/sl_blocks/ground/textures")  # disabled: textures live in generate_pixel_textures.py
 
     # Manifest for humans.
     manifest = ROOT / "GENERATED_ASSETS.md"
