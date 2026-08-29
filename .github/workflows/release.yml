@@ -297,8 +297,16 @@ jobs:
           # Clone OUTSIDE the checkout — rsyncing the workspace into the
           # game dir would otherwise recurse into the build tree
           # (gotcha ledger #1 — do not repeat it).
-          git clone --depth 1 https://github.com/paradust7/luanti-wasm "$RUNNER_TEMP/luanti-wasm"
+          # PINNED to upstream 51c2d4ee (OPFS persistent storage,
+          # minetest_game removed, emsdk 6.0.4). Upstream main at 5394b645
+          # bumped emsdk to 6.0.8, which breaks the libarchive cross-build
+          # ('cannot compute sizeof (wchar_t)') — proven by runs
+          # 33246259186 (6.0.4, green) vs 33252174022 (6.0.8, red x2).
+          # Bump deliberately, never float.
+          git init -q "$RUNNER_TEMP/luanti-wasm"
           cd "$RUNNER_TEMP/luanti-wasm"
+          git fetch -q --depth 1 https://github.com/paradust7/luanti-wasm 51c2d4ee
+          git checkout -q FETCH_HEAD
           # Pre-seed sources, then patch the pack installer: upstream
           # src/mainloop.cpp hard-aborts pack installation when libarchive
           # lacks zstd (the wasm libarchive is built without HAVE_ZSTD
