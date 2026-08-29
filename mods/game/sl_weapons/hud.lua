@@ -9,23 +9,10 @@ local S = W.S
 
 W.hud_ids = {} -- [name] = hud element id
 
-local function hud_line(name, wdef, loaded)
-	local line
-	if wdef and wdef.mag then
-		-- The wielded weapon owns the readout: LOADED n/cap +reserve.
-		-- Full shows full; empty shows zero (v1.3).
-		local pool = W.peek_pool(name)
-		line = string.format("%s %d/%d +%d",
-			(wdef.desc or wdef.id):upper(), loaded or 0, wdef.mag,
-			pool[wdef.pool] or 0)
-	else
-		local pool = W.peek_pool(name)
-		line = string.format("B %d/%d  S %d/%d  C %d/%d  R %d/%d",
-			pool.bullets, W.POOL_MAX.bullets,
-			pool.shells, W.POOL_MAX.shells,
-			pool.cells, W.POOL_MAX.cells,
-			pool.rockets, W.POOL_MAX.rockets)
-	end
+local function hud_line(name)
+	-- Ammo lives on the weapon's durability bar (v1.3.2, CTF-style);
+	-- the only text left here is weapon-state flags.
+	local line = ""
 	if W.lash and W.lash[name] then
 		line = line .. "  [LASH]"
 	end
@@ -35,6 +22,7 @@ local function hud_line(name, wdef, loaded)
 	if (W.busy_until[name] or 0) > W.now() then
 		line = line .. "  [SPIN]"
 	end
+	if line ~= "" then line = line:sub(3) end
 	return line
 end
 
@@ -49,16 +37,6 @@ end
 
 W.hud_line = hud_line -- exported for the test bench
 
-local function wield_def(_, player)
-	local wielded = player and player.get_wielded_item and player:get_wielded_item() or nil
-	return wielded and W.defs_by_item[wielded:get_name()] or nil
-end
-
-local function wield_loaded(_, player)
-	local wielded = player and player.get_wielded_item and player:get_wielded_item() or nil
-	return wielded and W.mag_get(wielded) or 0
-end
-
 local hud_accum = 0
 minetest.register_globalstep(function(dtime)
 	hud_accum = hud_accum + dtime
@@ -66,20 +44,9 @@ minetest.register_globalstep(function(dtime)
 	hud_accum = 0
 	for _, player in ipairs(minetest.get_connected_players()) do
 		local name = player:get_player_name()
-		local has_weapon = false
-		local inv = player:get_inventory()
-		if inv then
-			for i = 1, inv:get_size("main") do
-				local iname = inv:get_stack("main", i):get_name()
-				if W.defs_by_item[iname] or iname == W.modname .. ":grapple" then
-					has_weapon = true
-					break
-				end
-			end
-		end
-		local pool = W.peek_pool(name)
-		local has_ammo = pool.bullets + pool.shells + pool.cells + pool.rockets > 0
-		local show = has_weapon or has_ammo
+		-- The durability bar carries the ammo readout; the HUD text
+		-- exists only while a weapon-state flag is set.
+		local show = hud_line(name) ~= ""
 
 		local id = W.hud_ids[name]
 		if show and not id then
@@ -90,11 +57,11 @@ minetest.register_globalstep(function(dtime)
 				alignment = { x = -1, y = 0 },
 				scale = { x = 100, y = 100 },
 				number = 0x66ddff,
-				text = hud_line(name, wield_def(name, player), wield_loaded(name, player)),
+				text = hud_line(name),
 				z_index = 100,
 			})
 		elseif show and id then
-			player:hud_change(id, "text", hud_line(name, wield_def(name, player), wield_loaded(name, player)))
+			player:hud_change(id, "text", hud_line(name))
 		elseif not show and id then
 			player:hud_remove(id)
 			W.hud_ids[name] = nil

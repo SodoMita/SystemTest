@@ -91,6 +91,7 @@ function StackMeta:get_meta()
 	return self._stackmeta
 end
 function StackMeta:get_wear() return self._wear or 0 end
+function StackMeta:set_wear(w) self._wear = math.max(0, math.min(65535, math.floor(w))) end
 function StackMeta:add_wear(n)
 	self._wear = math.min(65535, (self._wear or 0) + math.max(0, math.floor(n)))
 end

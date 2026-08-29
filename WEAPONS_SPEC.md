@@ -64,8 +64,11 @@ beacon damage is deliberately weak).
    the *reserve*, and loading is one convenient action: right-click the
    weapon, or use a cache — a cache click even tops up the wielded
    matching weapon. Every weapon needs ammo, the Pulsar Pistol included
-   (12-round magazine; no free guns). The HUD reads `WEAPON n/cap +reserve`
-   — full shows full, empty shows 0. (The Neon Six's auto-spin still
+   (12-round magazine; no free guns). **The ammo indicator is the item's
+   own durability bar** (v1.3.2, exactly MT CTF's `rawf` model): wear 0
+   is a full magazine, 65535 is empty — the engine draws the bar in the
+   hotbar, the inventory, and over the wield item; there is no custom
+   ammo HUD. (The Neon Six's auto-spin still
    belongs to the gun, never a button the player presses. §3.1.) Melee is
    consumable: the Combat Blade wears on landed hits (~40) and breaks;
    a spare edge is 2 ingots through the inventory crafting menu.
@@ -681,6 +684,17 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
    W3 freezes numbers.
 
 ## 18. Changelog
+
+- **v1.3.2 (2026-08-29, the bar is the magazine)** — the custom ammo HUD
+  text is gone. Rounds are stored as item wear, exactly like MT CTF's
+  `rawf` (`set_wear` per shot, `65535` = empty): the durability bar in
+  the hotbar/inventory/wield IS the ammo indicator — full bar is a full
+  magazine, drained bar is an empty gun. The `sl_mag` metadata field is
+  retired; `mag_get`/`mag_set` read and write wear. Loading restores the
+  bar; looted guns are found with a fully drained bar (empty). The HUD
+  text element survives only for weapon-state flags ([LASH] [ZOOM]
+  [SPIN]) and disappears when none apply. Melee durability (blade wear,
+  v1.3.0) rides the same bar unchanged.
 
 - **v1.3.1 (2026-08-29, the Severance)** — a single-use melee weapon:
   200 `fleshy` damage on a landed hit, consumed by that hit (a swing

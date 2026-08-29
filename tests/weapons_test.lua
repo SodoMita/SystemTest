@@ -465,7 +465,8 @@ check(jv.z ~= 0 or jv.x ~= 0 or jv.y ~= 0, "pulse-juggle knockback nudges the ta
 -- the reserve is irrelevant until someone loads it)
 W.get_pool("alpha").cells = 6
 alpha:get_inventory():add_item("main", ItemStack("sl_weapons:lance"))
-local dry_stack = ItemStack("sl_weapons:lance") -- magazine: 0
+local dry_stack = ItemStack("sl_weapons:lance")
+W.mag_set(dry_stack, 0) -- a fresh stack is wear-0 = FULL (CTF semantics)
 minetest.registered_tools["sl_weapons:lance"].on_use(dry_stack, alpha, nil) -- raise
 H.advance(0.35, 0.1)
 local sndd = #H.sounds
@@ -503,17 +504,21 @@ check(sound_played("sl_weapons_pistol_fire", pfire1), "loaded pistol fires")
 H.advance(0.4, 0.1)
 minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil) -- fires
 check(W.mag_get(pst) == pdef.mag - 2, "each shot burns one magazine round")
+check(pst:get_wear() == math.floor(2 * 65535 / pdef.mag + 0.5),
+	"the durability bar drains with firing (wear " .. pst:get_wear() .. " after 2)")
 for _ = 1, pdef.mag do
 	minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil)
 	H.advance(0.4, 0.1)
 end
 check(W.mag_get(pst) == 0, "the magazine empties")
+check(pst:get_wear() == 65535, "empty magazine shows an empty bar (wear 65535)")
 local pdry = #H.sounds
 minetest.registered_tools["sl_weapons:pistol"].on_use(pst, alpha, nil)
 check(sound_played("sl_weapons_dry_click", pdry), "empty magazine dry-clicks (no free pistol)")
 W.get_pool("alpha").bullets = 40
 pst = W.mag_load(alpha, pdef, pst)
 check(W.mag_get(pst) == pdef.mag, "loading fills the pistol to capacity")
+check(pst:get_wear() == 0, "loading restores the bar to full (wear 0)")
 check(W.get_pool("alpha").bullets == 40 - pdef.mag, "and pulls exactly the difference from the reserve")
 local r_before = W.get_pool("alpha").bullets
 W.mag_load(alpha, pdef, pst)
@@ -540,13 +545,10 @@ check(W.get_pool("alpha").cells == 10 + W.AMMO_YIELD.cells - ldef.mag,
 	"cache use fills the reserve and loads the wielded lance")
 check(W.mag_get(alpha:get_wielded_item()) == ldef.mag, "the wielded lance is loaded")
 
--- HUD: loaded/capacity, full shows full, empty shows 0
-local hud_full = W.hud_line("alpha", pdef, pdef.mag)
-local hud_zero = W.hud_line("alpha", pdef, 0)
-check(hud_full:find(pdef.mag .. "/" .. pdef.mag, 1, true) ~= nil,
-	"HUD reads full at capacity (" .. hud_full .. ")")
-check(hud_zero:find("0/" .. pdef.mag, 1, true) ~= nil,
-	"HUD reads 0 at empty (" .. hud_zero .. ")")
+-- Ammo indicator is the durability bar (v1.3.2, CTF-style): wear 0
+-- is a full magazine, 65535 is empty; the HUD text carries no numbers.
+check(W.hud_line("alpha"):find("%d") == nil,
+	"the HUD text carries no ammo digits ('" .. W.hud_line("alpha") .. "')")
 
 -- Loadout: the pistol arrives loaded with starting reserve
 local lp_stack

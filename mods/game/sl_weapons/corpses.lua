@@ -258,6 +258,11 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if not inv then return end
 	for _, it in ipairs(entry.inv) do
 		local stack = ItemStack(it.name .. " " .. it.count)
+		if W.defs_by_item[it.name] then
+			-- Found empty: the magazine died with the owner — the
+			-- durability bar shows nothing left to fire.
+			stack:set_wear(65535)
+		end
 		if it.note then
 			local def = minetest.registered_items[it.name]
 			local meta = stack:get_meta()

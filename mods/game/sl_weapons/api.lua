@@ -60,12 +60,24 @@ end
 -- Magazines (v1.3): rounds live in the weapon stack; the pool is
 -- the reserve a load pulls from. Loading is one right-click.
 -- ----------------------------------------------------------------
+-- Rounds are the durability bar, exactly like CTF's rawf: wear 0 is a
+-- full magazine, 65535 is empty. The engine draws the bar in the
+-- hotbar, the inventory, and over the wield item -- no custom HUD.
+local function mag_cap(stack)
+	local def = W.defs_by_item[stack:get_name()]
+	return def and def.mag or 1
+end
+
 function W.mag_get(stack)
-	return tonumber(stack:get_meta():get_int("sl_mag")) or 0
+	local cap = mag_cap(stack)
+	local used = math.floor(stack:get_wear() * cap / 65535 + 0.5)
+	return math.max(0, cap - used)
 end
 
 function W.mag_set(stack, n)
-	stack:get_meta():set_int("sl_mag", math.max(0, math.floor(n)))
+	local cap = mag_cap(stack)
+	n = math.max(0, math.min(cap, math.floor(n)))
+	stack:set_wear(math.floor((cap - n) * 65535 / cap + 0.5))
 end
 
 -- A weapon granted loaded to capacity (pads, fabricator, loadouts).
