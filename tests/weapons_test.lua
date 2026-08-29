@@ -183,18 +183,11 @@ H.advance(1, 0.5)
 
 alpha._wielded = "sl_weapons:pistol"
 alpha:get_inventory():add_item("main", ItemStack("sl_weapons:pistol"))
--- Sandbox doctrine (MT CTF): outside a match the range is OPEN —
--- weapons fire, and lobby bodies are damageable (fleshy=100).
 local s0 = #H.sounds
-fire("sl_weapons:pistol", alpha) -- draw attempt (raise delay)
-H.advance(0.4, 0.1)
 fire("sl_weapons:pistol", alpha)
-check(sound_played("sl_weapons_pistol_fire", s0), "sandbox: weapons fire outside matches")
-local idle_refusal = false
-for _, l in ipairs(H.chat_player.alpha or {}) do
-	if l:find("idle outside an active match", 1, true) then idle_refusal = true end
-end
-check(not idle_refusal, "no 'range idle' refusal outside matches")
+check(#H.chat_player.alpha > 0 and H.chat_player.alpha[#H.chat_player.alpha]:find("idle outside an active match", 1, true) ~= nil,
+	"lobby fire refused with reason")
+check(not sound_played("sl_weapons_pistol_fire", s0), "no gunshot sound in lobby")
 
 -- ================================================================
 section("PHASE W1b — insertion, loadout, gates inside a match")
@@ -743,6 +736,15 @@ check(sound_played("sl_weapons_fab_hum", hum_from), "machine hums while working"
 H.advance(1.5, 0.5)
 check(finv:contains_item("main", ItemStack("sl_weapons:grapple")), "lash delivered after 10 s")
 
+-- The arsenal line: a Chatter comes off the same machine (end-to-end)
+finv:add_item("main", ItemStack("sl_modebase:metal_ingot 2"))
+finv:add_item("main", ItemStack("sl_modebase:circuit_board 1"))
+finv:add_item("main", ItemStack("sl_modebase:plastic_scrap 1"))
+H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(fpos), { make_chatter = "true" })
+check(W.fab_jobs[W.phash(fpos)] ~= nil, "chatter fabrication job started")
+H.advance(10.5, 0.5)
+check(finv:contains_item("main", ItemStack("sl_weapons:chatter")), "chatter delivered after 10 s")
+
 -- Lash: cost, anchor, reel, detach-on-damage, line severing
 local wall = { x = 700, y = 60, z = 0 }
 H.voxels[H.vhash(wall)] = "default:stone"
@@ -1001,55 +1003,96 @@ end
 check(#missing_jobs == 0, "all seven primaries fabricable (missing: " .. table.concat(missing_jobs, ",") .. ")")
 check(foreign_mats == 0, "arsenal jobs cost only mob-obtainable parts")
 
--- End-to-end: a Chatter comes off the line (post-match: sandbox-open)
-local sbx_inv = alpha:get_inventory()
-sbx_inv:add_item("main", ItemStack("sl_modebase:metal_ingot 2"))
-sbx_inv:add_item("main", ItemStack("sl_modebase:circuit_board 1"))
-sbx_inv:add_item("main", ItemStack("sl_modebase:plastic_scrap 1"))
-H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(fpos), { make_chatter = "true" })
-check(W.fab_jobs[W.phash(fpos)] ~= nil, "chatter job started (sandbox)")
-H.advance(10.5, 0.5)
-check(sbx_inv:contains_item("main", ItemStack("sl_weapons:chatter")),
-	"chatter delivered after 10 s")
-
--- The open range: with no match running, a lobby body takes fire
-local sbx = H.new_player("sbx")
-H.fire_joinplayer(sbx)
-H.advance(0.3, 0.1) -- join spawn settles -> lobby armor fleshy=100
-sbx:set_pos({ x = 970, y = 60, z = 0 }) -- clean air; corpse residue is off-line
-alpha:set_pos({ x = 966, y = 60, z = 0 })
-aim_at(alpha, sbx)
-local sh0 = #H.sounds
-fire("sl_weapons:pistol", alpha)
-H.advance(0.4, 0.1)
-fire("sl_weapons:pistol", alpha)
-check(sound_played("sl_weapons_pistol_fire", sh0), "pistol fires outside a match")
-check(sbx:get_hp() < (sbx:get_properties().hp_max or 20),
-	"and the shot damages a lobby player (open range)")
-
 -- A hook in flight when the match generation turns never anchors
--- (stray lines must not ride into the next match)
-H.voxels[H.vhash({ x = 972, y = 60, z = 0 })] = "default:stone"
-aim_at(alpha, { x = 972, y = 61, z = 0 })
-W.get_pool("alpha").cells = 10
-H.advance(2.1, 0.5) -- lash cooldown clearance
-minetest.registered_tools["sl_weapons:grapple"].on_use(
-	ItemStack("sl_weapons:grapple"), alpha, nil)
-local stray_hooks = 0
-for _, lua in pairs(H.luaentities) do
-	if lua.name == "sl_weapons:lash_hook" then stray_hooks = stray_hooks + 1 end
+-- (stray lines must not ride into the next match). Launched directly:
+-- the range is closed outside a match, by design.
+local hook_obj = minetest.add_entity({ x = 974, y = 60, z = 8 }, "sl_weapons:lash_hook")
+check(hook_obj and not hook_obj._removed, "hook entity in flight")
+do
+	local hl = hook_obj:get_luaentity()
+	hl.shooter = "alpha"
+	hl.sl_weapon_fx = true
+	hl.gen = W.match_gen
 end
-check(stray_hooks >= 1, "hook launched in the open range")
+hook_obj:set_velocity({ x = 0, y = 0, z = 30 }) -- clean air, no anchor
+H.advance(0.15, 0.05)
 W.match_gen = W.match_gen + 1 -- the match-end generation bump
 H.advance(0.6, 0.05)
 check(W.lash["alpha"] == nil, "in-flight hook from a finished match never anchors")
-local live_hooks = 0
-for _, lua in pairs(H.luaentities) do
-	if lua.name == "sl_weapons:lash_hook" then live_hooks = live_hooks + 1 end
-end
-check(live_hooks == 0, "the stray hook entity is gone")
+check(hook_obj._removed, "the stray hook entity is gone")
 
 check(gm.get_player_state("alpha").phase == "alive", "players normalized after match end")
+
+-- ----------------------------------------------------------------
+section("PHASE W3d — match start resets levels & inventories")
+-- ----------------------------------------------------------------
+
+-- Stale state from the finished match: hoarded spoils, a weapon, MM
+-- grip levels, and (simulated) sl_gui progression.
+local progression_reset_calls = {}
+local fake_reset = function(p)
+	table.insert(progression_reset_calls, p:get_player_name())
+end
+reset_player_progression = fake_reset
+alpha:get_inventory():add_item("main", ItemStack("sl_modebase:metal_ingot 50"))
+alpha:get_inventory():add_item("main", ItemStack("sl_weapons:mortar"))
+alpha:get_meta():set_string("sl_mm_hands", minetest.serialize({ grip = 3 }))
+
+-- Creative mode is ON for this start: the reset must be unconditional
+-- (the old skip was exactly how arsenals leaked between matches).
+H.settings.creative_mode = true
+gm.set_monster_master("gamma") -- kit gifted before the reset runs
+state.settings.countdown = 1
+minetest.registered_chatcommands.sl_match_start.func("alpha", "")
+for _, p in ipairs(minetest.get_connected_players()) do
+	minetest.registered_chatcommands.sl_ready.func(p:get_player_name(), "")
+end
+H.advance(4, 0.5)
+check(state.match_active == true, "second match started")
+H.settings.creative_mode = false
+
+local rd_inv = alpha:get_inventory()
+check(not rd_inv:contains_item("main", ItemStack("sl_modebase:metal_ingot 50")),
+	"hoarded spoils cleared at match start (even in creative)")
+check(not rd_inv:contains_item("main", ItemStack("sl_weapons:mortar")),
+	"carried weapons cleared at match start")
+check(rd_inv:contains_item("main", ItemStack("sl_weapons:pistol")),
+	"loadout granted after the clear")
+check(W.get_mm_levels(alpha).grip == 0, "MM grip levels reset at match start")
+local saw_a, saw_b, saw_g = false, false, false
+for _, n in ipairs(progression_reset_calls) do
+	if n == "alpha" then saw_a = true end
+	if n == "beta" then saw_b = true end
+	if n == "gamma" then saw_g = true end
+end
+check(saw_a and saw_b and saw_g, "progression reset hook ran for every player")
+
+-- The MM's kit is role equipment, not loot: re-granted after the clear
+local ginv = gamma:get_inventory()
+check(ginv:contains_item("main", ItemStack("sl_modebase:summon_monster")),
+	"MM summon tool survives the reset (re-granted)")
+check(ginv:contains_item("main", ItemStack("sl_modebase:monster_essence 10")),
+	"MM starter essence survives the reset (re-granted)")
+
+-- The real sl_gui progression reset, when loadable: experience and
+-- abilities go to zero through the exported hook.
+local okB = pcall(dofile, "mods/apis/sl_gui/ability_system.lua")
+if okB and reset_player_progression ~= fake_reset then
+	beta:get_meta():set_string("experience", "450")
+	beta:get_meta():set_string("abilities_v2",
+		minetest.serialize({ unlocked = { anything = 2 }, stat_points = 5 }))
+	reset_player_progression(beta)
+	check(beta:get_meta():get_string("experience") == "0",
+		"experience zeroed by the sl_gui reset hook")
+	local ab = minetest.deserialize(beta:get_meta():get_string("abilities_v2")) or {}
+	check((ab.stat_points or 0) == 0 and (ab.unlocked and next(ab.unlocked)) == nil,
+		"ability levels and stat points zeroed")
+else
+	check(true, "sl_gui ability system not loadable under stub (skipped)")
+end
+
+gm.end_match(nil, "W3d cleanup")
+H.advance(1, 0.5)
 H.advance(2, 0.5)
 check(true, "engine steps still healthy after the full suite")
 

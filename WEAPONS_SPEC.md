@@ -674,21 +674,27 @@ team-aware turrets, and any Monster-Master ranged item or MM-deployable tower
 
 ## 18. Changelog
 
-- **v1.2.3 (2026-08-29, open range & the fabricable arsenal)** — two field
-  reports, both fixed the MT CTF way. (1) *Weapons did not damage players*:
-  three stacked gates — lobby bodies were `immortal`, the punchplayer guard
-  cancelled all PvP outside a match, and `fire_gate` refused to fire at all
-  outside a match. MT CTF keeps unallocated players under full combat rules
-  (only spawn immunity protects, and only temporarily): lobby players are
-  now `fleshy = 100`, the guard vetoes only ghosts/evil ghosts (and creative
-  mode), and the range is open outside matches — weapons fire and damage
-  lobby bodies. In-match rules unchanged (alive-only wielding, ghosts
-  refused, monsters still stand down in the lobby). (2) *No way to craft the
-  weapons*: all seven primaries join the Fabricator catalog (§5.1) at mob-
-  spoil prices; the formspec is data-driven now. Also fixed a race the soak
-  caught: a Lash hook in flight at match end anchored *after* the sweep and
-  rode into the next match — hooks now carry a match-generation stamp and
-  die if the generation turned.
+- **v1.2.4 (2026-08-29, every match starts from zero)** — levels and
+  inventories reset at match start, unconditionally. The inventory clear
+  in `reset_players_for_new_match` no longer skips creative mode (the
+  skip was how whole arsenals leaked from match to match in creative
+  testing) and also empties the craft grid; progression resets through
+  the exported `reset_player_progression` hook (sl_gui zeroes
+  `experience` and `abilities_v2` — levels, stat points, ability
+  levels; sl_weapons zeroes the MM grip meta in its match-start hook);
+  the Monster Master's kit is role equipment, not loot, and is
+  re-granted after the clear (summon tool + starter essence).
+
+- **v1.2.3 (2026-08-29, the fabricable arsenal)** — all seven primaries
+  join the Precision Fabricator catalog (§5.1) at mob-spoil prices; the
+  formspec is data-driven now (catalog grid + bill of materials). Also
+  fixed a race the soak caught: a Lash hook in flight at match end
+  anchored *after* the sweep and rode into the next match — hooks now
+  carry a match-generation stamp and die if the generation turned.
+  *(An "open range outside matches" policy shipped briefly in this
+  revision and was reverted the same day: the 0-damage field report was
+  a creative-mode setting, not a bug — in creative, no PvP is correct,
+  and lobby immortality is the approved design.)*
 
 - **v1.2.2 (2026-08-29, workshops from spoils)** — mapgen places no
   workshops, so both crafting stations are now assembled by hand in the

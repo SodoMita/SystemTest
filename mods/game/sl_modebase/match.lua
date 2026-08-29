@@ -108,11 +108,39 @@ local function reset_players_for_new_match()
 		pl.points = 0
 		pl.ghost_summoned_by = nil
 		pl.last_death_pos = nil
-		
-		-- Clear inventory at start of match too
+
 		local player = minetest.get_player_by_name(name)
-		if player and not minetest.settings:get_bool("creative_mode") then
-			player:get_inventory():set_list("main", {})
+		if player then
+			-- Every match starts from zero: inventories clear
+			-- unconditionally (the old creative-mode skip leaked whole
+			-- arsenals from match to match in creative testing), and
+			-- levels reset through the sl_gui hook when present.
+			local inv = player:get_inventory()
+			inv:set_list("main", {})
+			if inv.set_list and inv:get_list("craft") then
+				inv:set_list("craft", {})
+			end
+			if reset_player_progression then
+				local ok, err = pcall(reset_player_progression, player)
+				if not ok then
+					minetest.log("error", "[game_mode] progression reset for "
+						.. name .. ": " .. tostring(err))
+				end
+			end
+		end
+	end
+
+	-- The Monster Master's kit was gifted at role assignment, BEFORE
+	-- this reset ran — hand it back (it is role equipment, not loot).
+	local mm_name = state.monster_master.player
+	if mm_name then
+		local mm = minetest.get_player_by_name(mm_name)
+		if mm then
+			local inv = mm:get_inventory()
+			inv:add_item("main", game_mode.modname .. ":summon_monster")
+			if game_mode.ESSENCE_ITEM then
+				inv:add_item("main", game_mode.ESSENCE_ITEM .. " 10")
+			end
 		end
 	end
 end
@@ -514,22 +542,15 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 		return true -- No damage in creative mode
 	end
 
-	-- No blanket "no match" cancel: outside a match, players are plain
-	-- damageable bodies so guns and fists can be tested in the open
-	-- (MT CTF doctrine — unallocated players fight under full rules).
-	-- Monsters still stand down outside matches via their own gate, and
-	-- the dead stay dead:
+	if not state.match_active then
+		return true -- Block damage in lobby
+	end
+	
 	if hitter and hitter:is_player() then
 		local hname = hitter:get_player_name()
 		local hpl = game_mode.get_player_state(hname)
 		if hpl and (hpl.phase == "ghost" or hpl.phase == "evil_ghost") then
 			return true -- Ghosts cannot directly attack players
-		end
-	end
-	if player and player.is_player and player:is_player() then
-		local vpl = game_mode.get_player_state(player:get_player_name())
-		if vpl and (vpl.phase == "ghost" or vpl.phase == "evil_ghost") then
-			return true -- the dead cannot be re-killed
 		end
 	end
 end)

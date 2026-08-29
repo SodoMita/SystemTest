@@ -94,16 +94,10 @@ function W.fire_gate(user)
 			if pl.role == "monster_master" then
 				return S("Your hands are the doctrine.")
 			end
-			if game_mode.state and game_mode.state.match_active then
-				if pl.phase ~= "alive" then
-					return S("The dead cannot wield the system's weapons.")
-				end
-			elseif pl.phase == "ghost" or pl.phase == "evil_ghost" then
-				-- Outside a match the range is open (sandbox doctrine,
-				-- MT CTF-style: unallocated players fight under full
-				-- rules). Only the dead and the Monster Master are
-				-- refused; lobby bodies are damageable and may test
-				-- their iron on each other.
+			if not (game_mode.state and game_mode.state.match_active) then
+				return S("Range systems are idle outside an active match.")
+			end
+			if pl.phase ~= "alive" then
 				return S("The dead cannot wield the system's weapons.")
 			end
 		end
@@ -340,6 +334,11 @@ function W.on_match_start()
 	W.last_cause = {}
 	if W.pads_rearm_all then W.pads_rearm_all() end
 	for _, player in ipairs(minetest.get_connected_players()) do
+		-- Hand-evolution levels are per-match too (team directive
+		-- 2026-08-29): the grip starts at zero every match.
+		pcall(function()
+			player:get_meta():set_string("sl_mm_hands", "")
+		end)
 		W.give_loadout(player)
 	end
 end

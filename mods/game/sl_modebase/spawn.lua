@@ -59,11 +59,7 @@ function game_mode.spawn_player(player)
 		})
 		player:set_armor_groups({ fleshy = 100 })
 	elseif not state.match_active then
-		-- Lobby state: neutral, empty inventory — and damageable. A
-		-- blanket immortal lobby made every weapon unfireable at
-		-- players outside a match; MT CTF keeps unallocated players
-		-- under full combat rules, and so do we (ghosts below stay
-		-- untouchable via their own armor).
+		-- Lobby state: immortal, neutral, and empty inventory
 		player_api.set_model(player, "SimpleOutlinedBoxman.glb")
 		player:set_properties({
 			textures = boxman_textures,
@@ -72,7 +68,7 @@ function game_mode.spawn_player(player)
 			collisionbox = { -0.3, 0.0, -0.3, 0.3, 1.75, 0.3 },
 			selectionbox = { -0.3, 0.0, -0.3, 0.3, 1.75, 0.3 },
 		})
-		player:set_armor_groups({ fleshy = 100 })
+		player:set_armor_groups({ immortal = 1 })
 		player:set_physics_override({
 			speed = 1.0,
 			jump = 1.0,
