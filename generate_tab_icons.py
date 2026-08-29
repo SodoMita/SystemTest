@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Generate the inventory tab icons as flat one-colour vector art.
+"""Generate the System / Comms inventory tab icons.
 
-Pipeline, as requested: the shape is described as vector geometry, written out
-as an SVG, and then that same geometry is rendered to a 32x32 PNG. The SVG and
-the PNG cannot drift apart because both come from one polygon list.
+The request was to match the game's existing 16x16 one-bit pixel-art tab icons:
+low resolution, hard edges, a single flat colour on a transparent background,
+no blur and no antialiasing. So this renders each icon as a 16x16 PNG whose
+alpha channel is strictly 0 or 255 (area thresholding of the exact vector
+outline; nothing is blended).
 
-Deliberately dependency-free (stdlib only) -- `create_ui_assets.py` needs PIL,
+The shape is still described as vector geometry and is also written out as an
+SVG master (32-unit design space), but the PNG that ships is deliberately a
+crisp 16x16 raster so it sits next to gui_tab_crafting/abilities/achievements
+(which are the original 16x16 pixel art).
+
+Deliberately dependency-free (stdlib only) -- create_ui_assets.py needs PIL,
 which is not installed on every machine that has to rebuild these assets.
-
-Every icon is one flat colour on a fully transparent background: no gradient,
-no glow, no blur pass. Edge softness comes only from supersampling the exact
-vector outline, which is what "render at 32x32" means.
 
 Usage:  python3 generate_tab_icons.py
 """
@@ -20,15 +23,17 @@ import os
 import struct
 import zlib
 
-SIZE = 32          # output PNG edge, in pixels
-SUPERSAMPLE = 8    # samples per pixel edge; 8x8 = 64 coverage samples
+SIZE = 16          # output PNG edge, in pixels (matches the other tab icons)
+DESIGN = 32.0      # the vector master's coordinate space
+SCALE = DESIGN / SIZE
+SUPERSAMPLE = 8    # coverage samples per pixel edge; output is still 1-bit
 ACCENT = (0xEA, 0x86, 0x38)   # #ea8638, the accent the other tab icons use
 TEXTURES = os.path.join("mods", "apis", "sl_gui", "textures")
 SVG_OUT = os.path.join("tools", "tab_icons")
 
 
 # --------------------------------------------------------------------------
-# vector geometry
+# vector geometry (in the 32-unit design space)
 # --------------------------------------------------------------------------
 
 def circle(cx, cy, r, steps=64):
@@ -45,8 +50,7 @@ def force_ccw(poly):
 
 
 def force_cw(poly):
-    p = force_ccw(poly)
-    return list(reversed(p))
+    return list(reversed(force_ccw(poly)))
 
 
 def rounded_rect(x0, y0, x1, y1, r, steps=8):
@@ -66,14 +70,13 @@ def rounded_rect(x0, y0, x1, y1, r, steps=8):
 def gear(cx, cy, teeth, r_hole, r_body, r_outer):
     """Gear silhouette (outer contour) plus its centre hole."""
     step = 2 * math.pi / teeth
-    base_half = step * 0.30   # tooth half-width where it meets the body
-    tip_half = step * 0.19    # tooth half-width at the tip
-    arc_steps = 3             # subdivisions of the body arc between two teeth
+    base_half = step * 0.34
+    tip_half = step * 0.22
+    arc_steps = 2
 
     outline = []
     for t in range(teeth):
         a = t * step
-        # rise from the body radius out to the tooth tip
         outline.append((cx + r_body * math.cos(a - base_half),
                         cy + r_body * math.sin(a - base_half)))
         outline.append((cx + r_outer * math.cos(a - tip_half),
@@ -82,35 +85,31 @@ def gear(cx, cy, teeth, r_hole, r_body, r_outer):
                         cy + r_outer * math.sin(a + tip_half)))
         outline.append((cx + r_body * math.cos(a + base_half),
                         cy + r_body * math.sin(a + base_half)))
-        # body arc across to the next tooth
         for i in range(1, arc_steps + 1):
             aa = a + base_half + (step - 2 * base_half) * i / arc_steps
             outline.append((cx + r_body * math.cos(aa),
                             cy + r_body * math.sin(aa)))
-    return [force_ccw(outline), force_cw(circle(cx, cy, r_hole, 48))]
+    return [force_ccw(outline), force_cw(circle(cx, cy, r_hole, 32))]
 
 
 def chat_bubble():
     """Speech bubble: rounded body plus a tail pointing down-left."""
-    body = rounded_rect(3.0, 5.5, 29.0, 21.5, 4.0)
-    # The tail shares its top edge with the body's bottom edge, so the union
-    # stays a simple outline even under nonzero winding.
-    tail = [(10.0, 21.5), (17.0, 21.5), (10.5, 28.0)]
+    body = rounded_rect(2.0, 4.0, 30.0, 22.0, 5.0)
+    tail = [(9.0, 22.0), (18.0, 22.0), (10.0, 30.0)]
     return [force_ccw(body), force_ccw(tail)]
 
 
 ICONS = {
-    "gui_tab_system": gear(16.0, 16.0, teeth=8, r_hole=5.0, r_body=10.0, r_outer=14.5),
+    "gui_tab_system": gear(16.0, 16.0, teeth=8, r_hole=4.5, r_body=10.0, r_outer=15.0),
     "gui_tab_comms": chat_bubble(),
 }
 
 
 # --------------------------------------------------------------------------
-# rasteriser: nonzero winding, supersampled
+# rasteriser: nonzero winding, 1-bit output (no antialiasing)
 # --------------------------------------------------------------------------
 
 def winding_number(x, y, poly):
-    """How many times poly winds around (x, y); nonzero means inside."""
     w = 0
     n = len(poly)
     for i in range(n):
@@ -126,26 +125,28 @@ def winding_number(x, y, poly):
 
 
 def coverage(x, y, polys):
-    """Fraction of the pixel (x, y) covered by the union minus the holes."""
+    """Fraction of the output pixel covered, in design coordinates."""
     hits = 0
     total = SUPERSAMPLE * SUPERSAMPLE
-    sub = 1.0 / SUPERSAMPLE
+    sub = SCALE / SUPERSAMPLE
     for sy in range(SUPERSAMPLE):
-        py = y + (sy + 0.5) * sub
+        py = y * SCALE + (sy + 0.5) * sub
         for sx in range(SUPERSAMPLE):
-            px = x + (sx + 0.5) * sub
-            if any(winding_number(px, py, p) != 0 for p in polys):
+            px = x * SCALE + (sx + 0.5) * sub
+            # Nonzero winding over ALL subpaths: the body adds +1 and the
+            # centre hole (wound the other way) subtracts it back to 0.
+            if sum(winding_number(px, py, p) for p in polys) != 0:
                 hits += 1
     return hits / total
 
 
 def render(polys):
-    """Return SIZE*SIZE RGBA bytes: one flat colour, alpha = coverage."""
+    """SIZE*SIZE RGBA bytes: flat colour, alpha strictly 0 or 255 (no AA)."""
     r, g, b = ACCENT
     out = bytearray()
     for y in range(SIZE):
         for x in range(SIZE):
-            a = int(round(coverage(x, y, polys) * 255))
+            a = 255 if coverage(x, y, polys) >= 0.5 else 0
             out += bytes((r, g, b, a))
     return bytes(out)
 
@@ -165,7 +166,7 @@ def write_png(path, rgba, w, h):
 
 
 # --------------------------------------------------------------------------
-# SVG output (same geometry, so the .svg and the .png always agree)
+# SVG master (same geometry; the 32-unit vector the 16x16 raster is cut from)
 # --------------------------------------------------------------------------
 
 def write_svg(path, polys, name):
@@ -183,86 +184,8 @@ def write_svg(path, polys, name):
             'viewBox="0 0 %d %d">\n'
             '  <title>%s</title>\n'
             '  <path d="%s" fill="%s" fill-rule="nonzero"/>\n'
-            '</svg>\n' % (SIZE, SIZE, SIZE, SIZE, name, d, hexcol))
-
-
-# --------------------------------------------------------------------------
-# 2x nearest-neighbour upscale for the pre-existing 16x16 pixel-art tabs, so
-# the whole strip renders at one resolution. Nearest-neighbour doubles each
-# pixel exactly: no resampling, no blur, no change to the artwork.
-# --------------------------------------------------------------------------
-
-def read_png_rgba(path):
-    with open(path, "rb") as f:
-        d = f.read()
-    w, h, depth, ctype = struct.unpack(">IIBB", d[16:26])
-    if depth != 8:
-        raise SystemExit("%s: bit depth %d not supported" % (path, depth))
-    pos, idat, plte = 8, b"", None
-    while pos < len(d):
-        ln = struct.unpack(">I", d[pos:pos + 4])[0]
-        tag, data = d[pos + 4:pos + 8], d[pos + 8:pos + 8 + ln]
-        if tag == b"IDAT":
-            idat += data
-        elif tag == b"PLTE":
-            plte = data
-        pos += 12 + ln
-    raw = zlib.decompress(idat)
-    ch = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[ctype]
-    rows, prev, i = [], bytearray(w * ch), 0
-    for _ in range(h):
-        ft = raw[i]
-        i += 1
-        line = bytearray(raw[i:i + w * ch])
-        i += w * ch
-        if ft == 1:
-            for x in range(ch, len(line)):
-                line[x] = (line[x] + line[x - ch]) & 255
-        elif ft == 2:
-            for x in range(len(line)):
-                line[x] = (line[x] + prev[x]) & 255
-        elif ft == 3:
-            for x in range(len(line)):
-                a = line[x - ch] if x >= ch else 0
-                line[x] = (line[x] + ((a + prev[x]) >> 1)) & 255
-        elif ft == 4:
-            for x in range(len(line)):
-                a = line[x - ch] if x >= ch else 0
-                b = prev[x]
-                c = prev[x - ch] if x >= ch else 0
-                p = a + b - c
-                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
-                pr = a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
-                line[x] = (line[x] + pr) & 255
-        rows.append(bytes(line))
-        prev = line
-    px = b"".join(rows)
-    out = bytearray()
-    for i in range(0, len(px), ch):
-        if ch == 4:
-            out += px[i:i + 4]
-        elif ch == 3:
-            out += px[i:i + 3] + b"\xff"
-        elif ch == 2:
-            out += bytes((px[i], px[i], px[i], px[i + 1]))
-        elif ctype == 3:
-            o = px[i] * 3
-            out += plte[o:o + 3] + b"\xff"
-        else:
-            v = px[i]
-            out += bytes((v, v, v, 255))
-    return w, h, bytes(out)
-
-
-def upscale2x(path):
-    w, h, px = read_png_rgba(path)
-    out = bytearray()
-    for y in range(h * 2):
-        src_row = (y // 2) * w
-        for x in range(w * 2):
-            o = (src_row + x // 2) * 4
-            out += px[o:o + 4]
-    return w * 2, h * 2, bytes(out)
+            '</svg>\n' % (int(DESIGN), int(DESIGN), int(DESIGN), int(DESIGN),
+                          name, d, hexcol))
 
 
 def main():
@@ -270,20 +193,7 @@ def main():
     for name, polys in ICONS.items():
         write_svg(os.path.join(SVG_OUT, name + ".svg"), polys, name)
         write_png(os.path.join(TEXTURES, name + ".png"), render(polys), SIZE, SIZE)
-        print("wrote %s.png + %s.svg" % (name, name))
-
-    for name in ("gui_tab_crafting", "gui_tab_abilities", "gui_tab_achievements"):
-        src = os.path.join(TEXTURES, name + ".png")
-        w, h, px = read_png_rgba(src)
-        if (w, h) == (SIZE, SIZE):
-            print("%s already %dx%d, left alone" % (name, w, h))
-            continue
-        if (w, h) != (SIZE // 2, SIZE // 2):
-            raise SystemExit("%s: expected %dx%d, got %dx%d"
-                             % (name, SIZE // 2, SIZE // 2, w, h))
-        nw, nh, npx = upscale2x(src)
-        write_png(src, npx, nw, nh)
-        print("upscaled %s %dx%d -> %dx%d (nearest neighbour)" % (name, w, h, nw, nh))
+        print("wrote %s.png (%dx%d, 1-bit) + %s.svg" % (name, SIZE, SIZE, name))
 
 
 if __name__ == "__main__":

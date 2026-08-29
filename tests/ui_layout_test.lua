@@ -828,6 +828,96 @@ end
 check(#TAB_ICONS == #TABS, string.format(
 	"found an icon for each of the %d tabs (%d)", #TABS, #TAB_ICONS))
 
+-- Decode an RGBA8 PNG's distinct alpha values (zlib via FFI). Returns nil when
+-- zlib cannot be loaded so the caller can skip the antialiasing check rather
+-- than fake it.
+local function png_alpha_values(path)
+	local f = io.open(path, "rb")
+	if not f then return nil end
+	local d = f:read("*a")
+	f:close()
+	local w = d:byte(17) * 16777216 + d:byte(18) * 65536 + d:byte(19) * 256 + d:byte(20)
+	local h = d:byte(21) * 16777216 + d:byte(22) * 65536 + d:byte(23) * 256 + d:byte(24)
+	if d:byte(25) ~= 8 or d:byte(26) ~= 6 then return nil end
+
+	local ffi = require("ffi")
+	local ok = pcall(ffi.cdef, [[
+		typedef struct { const unsigned char *next_in; unsigned long avail_in, total_in;
+			unsigned char *next_out; unsigned long avail_out, total_out;
+			const char *msg; void *state, *allocfunc, *freefunc, *opaque;
+			int data_type; unsigned long adler, reserved; } z_stream;
+		int inflateInit2_(z_stream*, int, const char*, int);
+		int inflate(z_stream*, int);
+		int inflateEnd(z_stream*);
+	]])
+	local z
+	if ok then
+		ok, z = pcall(ffi.load, "libz.so.1")
+		if not ok then ok, z = pcall(ffi.load, "z") end
+	end
+	if not ok then return nil end
+
+	local idat, pos = {}, 9
+	while pos + 8 <= #d do
+		local len = d:byte(pos) * 16777216 + d:byte(pos + 1) * 65536
+			+ d:byte(pos + 2) * 256 + d:byte(pos + 3)
+		if d:sub(pos + 4, pos + 7) == "IDAT" then
+			idat[#idat + 1] = d:sub(pos + 8, pos + 7 + len)
+		end
+		pos = pos + 8 + len + 4
+	end
+
+	local comp = table.concat(idat)
+	local strm = ffi.new("z_stream")
+	strm.next_in = ffi.cast("const unsigned char*", comp)
+	strm.avail_in = #comp
+	local maxlen = h * (w * 4 + 1)
+	local out = ffi.new("unsigned char[?]", maxlen)
+	strm.next_out = out
+	strm.avail_out = maxlen
+	if z.inflateInit2_(strm, 15, "1.2.11", ffi.sizeof(strm)) ~= 0 then return nil end
+	local r = z.inflate(strm, 4)
+	local total = strm.total_out
+	z.inflateEnd(strm)
+	if r ~= 0 and r ~= 1 then return nil end
+	local raw = ffi.string(out, total)
+
+	local ch, prev, alphas = 4, {}, {}
+	local i = 1
+	for _ = 1, h do
+		local ft = raw:byte(i)
+		i = i + 1
+		local line = {}
+		for x = 1, w * ch do
+			line[x] = raw:byte(i)
+			i = i + 1
+		end
+		if ft == 1 then
+			for x = ch + 1, w * ch do line[x] = (line[x] + line[x - ch]) % 256 end
+		elseif ft == 2 then
+			for x = 1, w * ch do line[x] = (line[x] + (prev[x] or 0)) % 256 end
+		elseif ft == 3 then
+			for x = 1, w * ch do
+				local a = x > ch and line[x - ch] or 0
+				line[x] = (line[x] + math.floor((a + (prev[x] or 0)) / 2)) % 256
+			end
+		elseif ft == 4 then
+			for x = 1, w * ch do
+				local a = x > ch and line[x - ch] or 0
+				local b = prev[x] or 0
+				local c = x > ch and (prev[x - ch] or 0) or 0
+				local pp = a + b - c
+				local pa, pb, pc = math.abs(pp - a), math.abs(pp - b), math.abs(pp - c)
+				local pr = (pa <= pb and pa <= pc) and a or (pb <= pc and b or c)
+				line[x] = (line[x] + pr) % 256
+			end
+		end
+		prev = line
+		for x = 1, w do alphas[line[(x - 1) * ch + 4]] = true end
+	end
+	return alphas
+end
+
 local seen = {}
 for _, t in ipairs(TAB_ICONS) do
 	check(not seen[t.icon], string.format(
@@ -845,8 +935,20 @@ for _, t in ipairs(TAB_ICONS) do
 		+ head:byte(19) * 256 + head:byte(20)
 	local h = head:byte(21) * 16777216 + head:byte(22) * 65536
 		+ head:byte(23) * 256 + head:byte(24)
-	check(w == 32 and h == 32, string.format(
-		"tab '%s': %s is %dx%d", t.id, t.icon, w, h))
+	check(w == 16 and h == 16, string.format(
+		"tab '%s': %s is %dx%d like the other tab icons", t.id, t.icon, w, h))
+
+	local alphas = png_alpha_values(path)
+	if alphas then
+		local one_bit = true
+		for a in pairs(alphas) do
+			if a ~= 0 and a ~= 255 then one_bit = false end
+		end
+		check(one_bit, string.format(
+			"tab '%s': %s is 1-bit (hard edges, no antialiasing)", t.id, t.icon))
+	else
+		print("        (skipping 1-bit check for " .. t.icon .. ": zlib not loadable)")
+	end
 	::continue::
 end
 
