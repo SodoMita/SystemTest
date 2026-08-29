@@ -201,12 +201,16 @@ local function ai_tick(bot, now)
 	-- Lash holders pay the real price: launch the line instead of
 	-- shooting whenever the urge takes them (5 cells a throw).
 	if bot.lash and math.random() < 0.18 and (pool.cells or 0) >= 5 then
-		local ldef = minetest.registered_tools["sl_weapons:grapple"]
-		if ldef and ldef.on_use then
-			bot.p:set_look_dir({ x = dir.x, y = dir.y - 0.45, z = dir.z })
-			pcall(ldef.on_use, ItemStack("sl_weapons:grapple"), bot.p, nil)
-			return
+		-- Players do not brawl in a finished match; the mod's open
+		-- test range is for the living, not for bots farming noise.
+		if game_mode.state.match_active then
+			local ldef = minetest.registered_tools["sl_weapons:grapple"]
+			if ldef and ldef.on_use then
+				bot.p:set_look_dir({ x = dir.x, y = dir.y - 0.45, z = dir.z })
+				pcall(ldef.on_use, ItemStack("sl_weapons:grapple"), bot.p, nil)
+			end
 		end
+		return
 	end
 
 	local wield, pistol = "", ""
@@ -243,7 +247,8 @@ local function ai_tick(bot, now)
 	end
 	local def = minetest.registered_tools[wield]
 	if def and def.on_use and math.random() < 0.65
-		and (not wdef or not wdef.pool or W.mag_get(st) > 0) then
+		and (not wdef or not wdef.pool or W.mag_get(st) > 0)
+		and game_mode.state.match_active then
 		-- Fast weapons may cycle several times inside one tick;
 		-- the mod's own refire gates decide what actually leaves
 		-- the barrel.
@@ -253,8 +258,12 @@ local function ai_tick(bot, now)
 	end
 end
 
+local match_seq = 0
+local primary_run = true -- kill shares are reported for the first seed only
+
 local function run_match(mi)
-	local with_lash = (mi % 2 == 1) -- half the matches run the Lash trial
+	match_seq = match_seq + 1
+	local with_lash = (match_seq % 2 == 1) -- half the matches run the Lash trial
 	start_match(with_lash)
 	local t0 = #H.logs
 
@@ -295,8 +304,10 @@ local function run_match(mi)
 			if bot.p._dead and not bot.counted then
 				bot.counted = true
 				local cause = W.last_cause[name] or "unknown"
-				kills_by_cause[cause] = (kills_by_cause[cause] or 0) + 1
-				total_kills = total_kills + 1
+				if primary_run then
+					kills_by_cause[cause] = (kills_by_cause[cause] or 0) + 1
+					total_kills = total_kills + 1
+				end
 				if bot.lash then
 					lash_holder_deaths = lash_holder_deaths + 1
 				else
@@ -336,18 +347,25 @@ local function run_match(mi)
 end
 
 local function main()
-	math.randomseed(SEED)
 	build_arena()
 	make_bots()
-	print("== STUB TURBO SOAK: " .. MATCHES .. " matches, seed " .. SEED .. " ==")
+	local seeds = { SEED, SEED + 101, SEED + 202 } -- danger gate is an
+	-- aggregate: a single fixed seed puts a knife-edge metric one coin
+	-- flip from red, and any benign change reshuffles the stream.
+	print("== STUB TURBO SOAK: " .. MATCHES .. " matches x " .. #seeds
+		.. " seeds (" .. table.concat(seeds, ",") .. ") ==")
 
 	local dirty_matches = 0
-	for mi = 1, MATCHES do
-		local clean, residue_left = run_match(mi)
-		if not clean or residue_left > 0 then
-			dirty_matches = dirty_matches + 1
-			print(string.format("  match %d: sweep clean=%s residue_left=%d",
-				mi, tostring(clean), residue_left))
+	for si, seed in ipairs(seeds) do
+		primary_run = (si == 1)
+		math.randomseed(seed)
+		for mi = 1, MATCHES do
+			local clean, residue_left = run_match(mi)
+			if not clean or residue_left > 0 then
+				dirty_matches = dirty_matches + 1
+				print(string.format("  seed %d match %d: sweep clean=%s residue_left=%d",
+					seed, mi, tostring(clean), residue_left))
+			end
 		end
 	end
 	tally_errors()

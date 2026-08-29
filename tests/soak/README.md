@@ -115,9 +115,12 @@ registered by the engine builtin itself are only partially covered.
 
 ## Stub turbo soak (no engine required)
 
-`lua51 tests/soak_stub_turbo.lua [matches] [seed]` (default 40 matches) runs the
-Phase W exit gate on the headless stub: real `sl_weapons` logic, simulated bots,
-kill-share gate (no weapon > 30 %), Lash-holder danger gate (holders die at a
-rate >= non-holders), zero-Lua-error gate, and per-match sweep cleanliness. The
+`lua51 tests/soak_stub_turbo.lua [matches] [seed]` (default 40 matches × 3 seeds)
+runs the Phase W exit gate on the headless stub: real `sl_weapons` logic,
+simulated bots, kill-share gate (no weapon > 30 %), Lash-holder danger gate
+(holders die at a rate >= non-holders, evaluated as an aggregate across all
+seeds — the metric is noisy per-seed), zero-Lua-error gate, and per-match
+sweep cleanliness. Bots do not fight outside a live match (the open test
+range is for players). The
 live-engine soak above remains the CI authority; the stub soak is the fast local
 verdict between pushes.
