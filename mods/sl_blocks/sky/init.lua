@@ -76,10 +76,12 @@ local CLOUD_PARTICLE = {
 	["sky:cloud"] = {
 		texture = "cloud_leaf_particle.png",
 		vy = 0.05, vy_max = 0.3, ay = 0.06, vertical = true,
+		sz_min = 3, sz_max = 6,
 	},
 	["sky:cloud_solid"] = {
 		texture = "cloud_particle.png",
 		vy = 0.0, vy_max = 0.15, ay = -0.02, vertical = false,
+		sz_min = 2, sz_max = 4,
 	},
 }
 
@@ -115,8 +117,8 @@ local function emit_for_player(ppos)
 					maxacc = { x = 0.02, y = spec.ay, z = 0.02 },
 					minexptime = 2,
 					maxexptime = 4,
-					minsize = 2,
-					maxsize = 4,
+					minsize = spec.sz_min,
+					maxsize = spec.sz_max,
 					vertical = spec.vertical,
 					texture = spec.texture,
 				})

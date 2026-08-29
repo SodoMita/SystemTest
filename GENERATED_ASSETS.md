@@ -137,9 +137,10 @@ textures remain untouched.
 
 ## Clouds — three types (`mods/sl_blocks/sky/`)
 
-- **`sky:cloud`** — *foliage cloud*: plant-like green leaf-clump texture
-  (`cloud.png`, clip alpha, breakable `choppy=3`, leaf sounds). Aliases
-  `cloud` / `default:cloud` preserved.
+- **`sky:cloud`** — *foliage cloud*: plantlike leaf-clump texture
+  (`cloud.png`, white neon leaf line art on transparent, clip alpha,
+  breakable `choppy=3`, leaf sounds). Aliases `cloud` / `default:cloud`
+  preserved. No green: the cloud is pure white-bloom line art.
 - **`sky:cloud_solid`** — *solid cloud*: opaque, **seamless** (tileable) cloud
   texture, **walkable**, **unbreakable** arena structure.
 - **`sky:cloud_water`** — *cloud water*: transparent white liquid
