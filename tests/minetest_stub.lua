@@ -306,7 +306,11 @@ minetest.registered_items = {}
 minetest.luaentities = M.luaentities
 
 function minetest.get_current_modname() return M.current_modname end
-function minetest.get_modpath(_) return "mods/game/sl_modebase" end
+-- Mod path lookup: each mod's own path when registered by the harness,
+-- falling back to sl_modebase (the original stub behavior, which the
+-- existing smoke test relies on).
+M.modpaths = {}
+function minetest.get_modpath(name) return M.modpaths[name] or "mods/game/sl_modebase" end
 function minetest.get_translator(_)
 	return function(str, ...)
 		local args = { ... }
@@ -403,7 +407,16 @@ function M.run_mods_loaded()
 end
 
 -- Players
-function minetest.get_connected_players() return M.connected end
+-- Engine fidelity note: the real engine returns a FRESH table each
+-- call. The botmatch harness appends its simulated players to the
+-- returned list, so returning the live M.connected here would grow it
+-- without bound (found by the solo test run: an infinite loop in
+-- get_connected_player_names).
+function minetest.get_connected_players()
+	local out = {}
+	for _, p in ipairs(M.connected) do out[#out + 1] = p end
+	return out
+end
 function minetest.get_player_by_name(name) return M.players[name] end
 function minetest.get_player_privs(name)
 	M.player_privs[name] = M.player_privs[name] or {}
@@ -433,6 +446,8 @@ function minetest.explode_textlist_event(_) return { type = "nothing" } end
 minetest.settings = {
 	get_bool = function(_, key) return M.settings[key] == true end,
 	get = function(_, key) return M.settings[key] end,
+	set = function(_, key, value) M.settings[key] = tostring(value) end,
+	set_bool = function(_, key, value) M.settings[key] = value == true end,
 }
 
 -- Time
@@ -440,6 +455,12 @@ function minetest.get_us_time() return M.clock_us end
 function minetest.after(seconds, fn)
 	table.insert(M.afters, { due = M.clock_us + math.floor(seconds * 1000000), fn = fn })
 end
+
+-- Engine metadata (used by the botmatch harness telemetry)
+function minetest.get_version() return { string = "stub-engine" } end
+function minetest.get_worldpath() return M.worldpath or "/tmp" end
+-- Pathfinding (mob-mode bots fall back to straight-line movement)
+function minetest.find_path() return nil end
 
 -- Serialize/deserialize (Lua-source based; enough for spawn tables)
 function minetest.serialize(value)
@@ -520,7 +541,15 @@ function minetest.add_entity(pos, name)
 		end,
 		get_properties = function(self) return self._props end,
 		get_pos = function(self) return self._pos end,
+		set_pos = function(self, p) self._pos = p end,
 		set_velocity = function() end,
+		get_velocity = function(self) return { x = 0, y = 0, z = 0 } end,
+		set_yaw = function() end,
+		set_rotation = function() end,
+		set_animation = function() end,
+		set_acceleration = function() end,
+		set_armor_groups = function() end,
+		punch = function() end,
 		remove = function() end,
 		get_luaentity = function() return { name = name } end,
 	}

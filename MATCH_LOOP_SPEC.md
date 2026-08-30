@@ -54,6 +54,15 @@ Still open (Phase A remainder):
   routes, cover, hand-placed pickups).
 - Direct-message UI polish and reconnect hardening pass.
 
+Singleplayer (August 2026): **`sl_solo` — Solo Protocol** ships as an
+orchestration layer over the mob-mode harness (see
+[`SINGLEPLAYER.md`](SINGLEPLAYER.md)). One operator + identical AI crew
+inserted through the real pipeline; the Simulation plays Monster Master with
+escalating waves; a hidden Echo sabotages CORE A from inside and must be
+purged before the clock runs out. Covered end to end by
+`tests/solo_test.lua` (81 assertions, same stub harness as the smoke suite;
+stub's `get_connected_players` now returns a fresh table like the engine).
+
 Live-engine soak test (August 2026): `tests/soak/run_soak.py` boots a real
 Luanti server where the `aaa_botmatch` harness runs simulated AI players
 through full matches — insertion, PvP, deaths, cloud cage, altar ritual,

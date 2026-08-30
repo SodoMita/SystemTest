@@ -23,3 +23,22 @@ sl_cube_size (Underground cube size) int 8 4 32
 # Total monsters spawned once during mapgen (not per cube / per chunk).
 # They are placed in underground cubes around the origin, then never again.
 sl_cube_monsters (Mapgen monster count) int 12 0 64
+
+# ================================================================
+# SINGLEPLAYER — Solo Protocol (sl_solo)
+# ================================================================
+# One operator + a crew of identical AI salvage units, horde waves
+# commanded by the Simulation, and a hidden traitor to expose.
+# Requires the embodied AI harness (sl_botmatch) — see SINGLEPLAYER.md.
+
+# Difficulty used when /solo_start is run without a parameter.
+sl_solo.difficulty (Solo Protocol default difficulty) enum standard recruit,standard,nightmare
+
+# Right-click a nearby unit body to prox-scan its designation (UNIT-A).
+sl_solo.badge_scan (Solo badge scan) bool true
+
+# AI crew radio chatter (idle lines, deflections, witness reports).
+sl_solo.chatter (Solo crew chatter) bool true
+
+# Dev/testing: force the Echo pick (1-based crew roster index; 0 = random).
+sl_solo.traitor_index (Solo forced Echo index) int 0 0 6

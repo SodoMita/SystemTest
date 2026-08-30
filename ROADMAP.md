@@ -14,6 +14,10 @@ and clean match reset. Crafting is a later system layered onto this stable loop.
   `game.conf`'s `allowed_mapgens = singlenode` is correct on purpose.
 - **Next milestone = a crafting gameplay loop that leads to a final goal / win.**
 - The **"AI council" horror brainstorming** stays as an ongoing idea source.
+- **Singleplayer = `sl_solo` "Solo Protocol"** (August 2026): one operator +
+  identical AI crew via the mob-mode harness, the Simulation playing Monster
+  Master with escalating waves, and a hidden Echo to expose and purge.
+  See [`SINGLEPLAYER.md`](SINGLEPLAYER.md) and `tests/solo_test.lua`.
 - "Done" = stable enough to put in front of testers (multiplayer).
 
 ---
