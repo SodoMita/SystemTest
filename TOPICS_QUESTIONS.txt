@@ -9,3 +9,8 @@ Topics and questions from the singleplayer design session for System Looting (Mi
 8. Discovery drives the horror: archive memos, fuel cell, studio logs, edge of world, quiet room, second cage; dread systems (events, schedule, light, discovery) are the implementation ask.
 9. Open questions: revenge bounds, form choice point, debt economy shape, ending flag combos, per-creature identities, what the unnamed form is.
 10. Done: docs updated (GDD, match loop spec, roadmap) with revival forms, form items, points, bestiary and MiniZinc items; no code changes.
+11. Singleplayer implemented: `mods/game/sl_strand` (Simulacrum Strand) — the "self-haunting
+    roguelike" sketch is now code. Seeded Echo roll (incl. player-as-Echo systemic lie), Trust
+    Meter, crew-bot suspicion graph + tell reads, partial-truth vote resolution, permadeath->
+    phantom-boss chain, night-wave socket defense, Al Dente Core win, cross-run mutations.
+    Verified headless: `luajit tests/strand_test.lua` (45 checks), existing suite still green.

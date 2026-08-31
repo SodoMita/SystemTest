@@ -1,0 +1,15 @@
+title: "strand_intro"
+lines:
+  - id: start
+    speaker: The Pod
+    text: "The Simulacrum hums. Six identical bodies. Six names, none of them yours."
+  - id: core
+    speaker: The Pod
+    text: "Complete the Al Dente Core over seven nights. Trust no one. Especially not the person standing where you are."
+  - id: lie
+    speaker: The Pod
+    text: "One of you is the Echo. They look like everyone. They may even be you - and you might not remember."
+  - id: reveal
+    speaker: The Pod
+    text: "Build your walls. Spend your trust. When the vote comes, the only information that surfaces is partial."
+    next_scene: strand_vote
