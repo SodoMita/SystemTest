@@ -14,3 +14,15 @@ Topics and questions from the singleplayer design session for System Looting (Mi
     Meter, crew-bot suspicion graph + tell reads, partial-truth vote resolution, permadeath->
     phantom-boss chain, night-wave socket defense, Al Dente Core win, cross-run mutations.
     Verified headless: `luajit tests/strand_test.lua` (45 checks), existing suite still green.
+12. Singleplayer economy pass (feat/strand-chain-ledger): the "Chain Ledger" — points now
+    have an earn rule (nights 10, purges 40, wrongful exile -25, banked trust 2, integrity
+    0.5, flawless +30, deception +50); losses burn unearned potential into persistent debt
+    (halved by the clean cut), debt thickens the horde (+0.2/pt) and thins starting trust
+    (-1 per 10, cap -3), victories pay half their score against it; seven named endings
+    (AL DENTE ASCENT, HOLLOW CROWN, CLEAN CUT, DELETED, WITCH TRIAL, STATIC, OVERRUN) with
+    flag combos (flawless/hollow/phantom_seeded) recorded per ending. The documented
+    corruption win for a surviving player-Echo now actually exists (was routed to a
+    generic core-breach defeat). Also: xorshift32 RNG rewritten in portable arithmetic —
+    the old 5.3-only bitop syntax failed stock LuaJIT/5.1 parse AND the CI luajit -bl
+    syntax gate. luajit tests/strand_test.lua: 84 checks green (was 45); smoke suite 126
+    unchanged.

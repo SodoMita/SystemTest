@@ -23,6 +23,8 @@ function strand.start_run(seed)
 	strand.make_sockets(run)
 	strand.roll_mutation(run)
 	strand.apply_mutation(run)
+	-- The Chain Ledger's memory: every earlier loss presses on this run.
+	if strand.apply_debt then strand.apply_debt(run) end
 	return run
 end
 
@@ -81,18 +83,31 @@ function strand.describe_run(run)
 	if run.player_is_echo and run.player_has_learned then
 		status = status .. " · YOU ARE THE ECHO (" .. tostring(run.player_choice or "?") .. ")"
 	end
+	if (run.debt or 0) > 0 then
+		status = status .. " · Debt " .. run.debt
+	end
 	return status
 end
 
 -- Survival summary for the result screen.
 function strand.run_summary(run)
-	return {
+	local s = {
 		seed = run.seed,
 		nights = run.night,
 		outcome = run.phase,
-		reason = run.defeat_reason or "core-complete",
+		reason = run.defeat_reason or run.victory_reason or "core-complete",
 		wrong_votes = run.wrong_votes,
 		phantom_bosses = strand.phantom_boss_count(),
 		mutation = run.mutation and run.mutation.id,
 	}
+	-- Chain Ledger settlement, when the run has closed.
+	if run.ledger_result then
+		s.ending = run.ledger_result.ending.id
+		s.ending_title = run.ledger_result.ending.title
+		s.flags = run.ledger_result.flags
+		s.score = run.ledger_result.score.total
+		s.score_breakdown = run.ledger_result.score
+		s.ledger = strand.ledger_summary()
+	end
+	return s
 end

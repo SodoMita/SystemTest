@@ -1,7 +1,7 @@
 # Simulacrum Strand — Singleplayer Roguelike Deduction Mode
 
 **Status:** implemented as `mods/game/sl_strand` (Luanti/Minestet). Headless-verified:
-`luajit tests/strand_test.lua` (45 assertions) · existing suite still green (`tests/smoke_test.lua`, 126).
+`luajit tests/strand_test.lua` (84 assertions) · existing suite still green (`tests/smoke_test.lua`, 126).
 
 This is the singleplayer translation of the council's "Amogus + Horror + TD + Roguelike"
 brief. It deliberately runs *alone* — the whole game reduces to one prime directive:
@@ -53,19 +53,61 @@ The council insisted this be a real algorithm, not a vibe:
 
 When the player learns they are the Echo, the run forks:
 
-- **PLAY ALONG (survive)** — keep the Core from completing; win by *corruption*.
+- **PLAY ALONG (survive)** — keep the Core from completing; win by *corruption*:
+  a revealed Echo who chose "survive" and brings the Core down **wins the run**
+  (the HOLLOW CROWN ending, +50 deception bonus in the Chain Ledger).
 - **GIVE UP (surrender)** — turn yourself in. A clean end that seeds **no** phantom
-  (the one clean cut).
+  (the one clean cut), and burns debt at half rate in the Chain Ledger.
+
+## The Chain Ledger (the economy)
+
+The score/debt/ending layer the council's open questions asked for (TOPICS_QUESTIONS
+items 3–5). Every run settles exactly once, into a persistent ledger:
+
+**Earn rule** (`strand.score_run`, pure and deterministic):
+
+| Source | Points |
+|--------|--------|
+| Night survived | +10 |
+| Correct Echo purge | +40 |
+| Wrongful exile | −25 |
+| Banked Trust at settlement | +2 each |
+| Remaining Core integrity (victories) | +1 per 2 points |
+| Flawless victory (zero wrongful exiles) | +30 |
+| HOLLOW CROWN (played the Echo to the end) | +50 |
+
+**Debt** ("debt from burned scores") — a losing run burns its unearned potential
+into persistent debt: `remaining_nights × 10 × 0.5 + wrongful_exiles × 5`, halved for
+the CLEAN CUT (the one strategic mercy). Debt presses on every later run: horde
++0.2 per point of debt, starting Trust −1 per 10 debt (capped at −3). Victories pay
+half their score against it. Cap 60.
+
+**Named endings + flag combos** — one per terminal state, recorded with flags:
+
+| Ending | Trigger | Flags (examples) |
+|--------|---------|------------------|
+| AL DENTE ASCENT | Core target reached (crew win) | flawless, phantom_seeded |
+| HOLLOW CROWN | Surviving Echo corrupts the Core | hollow, flawless |
+| CLEAN CUT | Self-surrender; no phantom born | hollow |
+| DELETED | The Echo (you) is exiled | hollow |
+| WITCH TRIAL | The innocent player is exiled | flawless |
+| STATIC | Core breach as innocent crew | phantom_seeded |
+| OVERRUN | Too many wrongful exiles | — |
+
+`/sl_strand_ledger` shows the chain: score, debt, runs/wins, best nights, endings
+seen (×count), flags, phantoms. Settlements print on run close via
+`strand.describe_settlement`.
 
 ## Files
 
 | File | Responsibility |
 |------|----------------|
-| `strand_state.lua` | Config, seeded RNG, run struct, Echo roll, phase machine, persistence |
+| `strand_state.lua` | Config, seeded RNG (portable xorshift32), run struct, Echo roll, phase machine, persistence |
 | `strand_trust.lua` | Trust Meter, suspicion graph, tell read, confide/observe |
 | `strand_vote.lua` | Meeting resolution, partial reveal, permadeath→phantom |
 | `strand_wave.lua` | Night horde, socket defense, mutation set |
 | `strand_core.lua` | High-level run driver (`start_run` / `turn` / summaries) |
+| `strand_ledger.lua` | Chain Ledger: score earn rule, debt, named endings, flags |
 | `strand_nodes.lua` | Defense sockets, turret, barricade, Al Dente Core |
 | `strand_items.lua` | Scrap-defense kit, Trust charge, Void Nomad form item |
 | `init.lua` | Runtime hooks + `/sl_strand_*` commands |

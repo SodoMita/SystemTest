@@ -31,7 +31,11 @@ and clean match reset. Crafting is a later system layered onto this stable loop.
 - `sl_strand` — singleplayer "Simulacrum Strand" roguelike deduction mode (see
   [`docs/STRAND.md`](docs/STRAND.md)). Seeded Echo roll (incl. player-as-Echo), Trust Meter,
   crew-bot suspicion + tell reads, partial-truth votes, permadeath→phantom chain, night waves,
-  Al Dente Core win. Headless-verified: `luajit tests/strand_test.lua` (45 checks).
+  Al Dente Core win, **Chain Ledger** (score earn rule, cross-run debt, seven named endings
+  with flag combos) and the HOLLOW CROWN corruption win for a surviving player-Echo.
+  RNG rewritten in portable arithmetic (stock LuaJIT/5.1 could not even parse the old
+  5.3 bitop syntax — the CI `luajit -bl` syntax gate rejected it). Headless-verified:
+  `luajit tests/strand_test.lua` (84 checks; was 45).
 - Forked MTG `default`, `player_api`, `flowers`, `food`, `give_initial_stuff`, etc.
 
 ### Broken / incomplete (verified)

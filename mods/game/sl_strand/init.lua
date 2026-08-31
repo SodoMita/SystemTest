@@ -17,6 +17,7 @@ dofile(modpath .. "/strand_trust.lua")
 dofile(modpath .. "/strand_vote.lua")
 dofile(modpath .. "/strand_wave.lua")
 dofile(modpath .. "/strand_core.lua")
+dofile(modpath .. "/strand_ledger.lua")
 dofile(modpath .. "/strand_nodes.lua")
 dofile(modpath .. "/strand_items.lua")
 
@@ -102,7 +103,13 @@ minetest.register_chatcommand("sl_strand_act", {
 		local a = minetest.deserialize("return " .. param) or {}
 		local result, extra = strand.do_solo(a)
 		if result == nil then return false, tostring(extra) end
-		return true, strand.describe_result(result)
+		local msg = strand.describe_result(result)
+		-- When the action closed the run, show the Chain Ledger settlement.
+		local run = strand.run
+		if run and not run.active and run.ledger_result then
+			msg = msg .. "\n" .. strand.describe_settlement(run.ledger_result)
+		end
+		return true, msg
 	end,
 })
 
@@ -124,7 +131,34 @@ minetest.register_chatcommand("sl_strand_status", {
 	func = function()
 		local run = strand.run
 		if not run then return false, "no active run" end
-		return true, strand.describe_run(run)
+		local msg = strand.describe_run(run)
+		local l = strand.ledger_summary()
+		msg = msg .. "\n[Chain] score " .. l.score .. " · debt " .. l.debt ..
+			" · runs " .. l.runs .. " (" .. l.wins .. " wins) · phantoms " .. l.phantom_bosses
+		return true, msg
+	end,
+})
+
+minetest.register_chatcommand("sl_strand_ledger", {
+	description = "Show the Chain Ledger (score, debt, named endings, flags)",
+	func = function()
+		local l = strand.ledger_summary()
+		local endings = {}
+		for id, n in pairs(l.endings) do
+			local e = strand.ENDINGS[id]
+			endings[#endings + 1] = (e and e.title or id) .. " x" .. n
+		end
+		table.sort(endings)
+		local flags = {}
+		for f, n in pairs(l.flags) do
+			flags[#flags + 1] = f .. " x" .. n
+		end
+		table.sort(flags)
+		return true, string.format(
+			"CHAIN LEDGER\nScore %d · Debt %d · Runs %d (%d wins) · Best nights %d · Phantoms %d\nEndings: %s\nFlags: %s",
+			l.score, l.debt, l.runs, l.wins, l.best_nights, l.phantom_bosses,
+			#endings > 0 and table.concat(endings, ", ") or "none yet",
+			#flags > 0 and table.concat(flags, ", ") or "none yet")
 	end,
 })
 

@@ -67,7 +67,8 @@ function strand.horde_scale(run)
 	local base = 4 + night * 2
 	local phantom = strand.phantom_boss_count()
 	local wrong = run.wrong_votes
-	return base + phantom + wrong * 2
+	-- Carried debt thickens the horde (the Chain Ledger's long memory).
+	return base + phantom + wrong * 2 + (run.debt_horde or 0)
 end
 
 -- Resolve one night's wave.  Returns a summary table; pure math so the
@@ -95,8 +96,18 @@ function strand.resolve_wave(run)
 	else
 		outcome = "breached"
 		if run.core.integrity <= 0 then
-			strand.run_defeat(run, "core-breach")
-			outcome = "defeat"
+			-- The Core is gone.  For a revealed Echo who chose to play
+			-- along, this IS the win condition: win by corruption
+			-- (HOLLOW CROWN in the Chain Ledger).  For everyone else
+			-- it is the ordinary breach defeat.
+			if run.player_is_echo and run.player_has_learned
+				and run.player_choice == "survive" then
+				strand.run_victory(run, "corruption")
+				outcome = "corruption"
+			else
+				strand.run_defeat(run, "core-breach")
+				outcome = "defeat"
+			end
 		end
 	end
 	return {

@@ -96,16 +96,18 @@ function strand.resolve_vote(run, accused, player_vote)
 			strand.run_defeat(run, "echo-exiled")
 			return { outcome = "defeat", message = "You were the Echo. You are deleted." }
 		end
-		-- remove the exiled crew-bot
-		for _, bot in ipairs(run.crew) do
-			if bot.name == accused then
-				bot.alive = false
-				bot.voted_out = true
-			end
+	-- remove the exiled crew-bot
+	for _, bot in ipairs(run.crew) do
+		if bot.name == accused then
+			bot.alive = false
+			bot.voted_out = true
 		end
-		run.echo_identity = nil -- the Echo is gone this run
-		table.insert(run.exiled, accused)
-		strand.record_phantom_boss({
+	end
+	run.echo_identity = nil -- the Echo is gone this run
+	run.correct_purges = (run.correct_purges or 0) + 1
+	table.insert(run.exiled, accused)
+	table.insert(run.phantom_bosses_this_run, accused)
+	strand.record_phantom_boss({
 			name = accused,
 			seed = run.seed,
 			night = run.night,
@@ -133,6 +135,7 @@ function strand.resolve_vote(run, accused, player_vote)
 		end
 	end
 	table.insert(run.exiled, accused)
+	table.insert(run.phantom_bosses_this_run, accused)
 	-- The wronged bot's data still seeds a phantom: they were innocent,
 	-- so the phantom is an *unwilling* horror (Barnaby's dread).
 	strand.record_phantom_boss({

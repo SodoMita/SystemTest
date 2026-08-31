@@ -23,13 +23,35 @@ local math_byte = function(s, i) return s:byte(i or 1) end
 -- Deterministic, seedable PRNG (xorshift32).  Independent of the
 -- global math.random so tests and live runs are reproducible from a
 -- single seed.  `strand.rng` is (re)created each run.
+--
+-- PORTABILITY: implemented in plain arithmetic.  The original used
+-- Lua 5.3 bitop syntax (`~`, `<<`, `>>`) which stock LuaJIT and
+-- Lua 5.1 cannot even PARSE — so `luajit -bl` (the CI syntax gate)
+-- rejected this file and the documented headless run could not
+-- reproduce on stock interpreters.  This version produces the
+-- identical sequence on Lua 5.1, LuaJIT and Lua 5.3+ (verified by
+-- tests/strand_test.lua determinism checks, which pin the Echo roll
+-- per seed and the whole ledger math).
 -- ---------------------------------------------------------------
+local function bxor(a, b)
+	local r, p = 0, 1
+	while a > 0 or b > 0 do
+		local ab = a % 2
+		local bb = b % 2
+		if ab ~= bb then r = r + p end
+		p = p * 2
+		a = (a - ab) / 2
+		b = (b - bb) / 2
+	end
+	return r
+end
+
 local function xor32(x)
 	x = x or 1
 	x = x == 0 and 1 or x
-	x = x ~ (x << 13); x = x % 0xFFFFFFFF
-	x = x ~ (x >> 17); x = x % 0xFFFFFFFF
-	x = x ~ (x << 5);  x = x % 0xFFFFFFFF
+	x = bxor(x, x * 8192) % 0xFFFFFFFF             -- x ~ (x << 13)
+	x = bxor(x, math.floor(x / 131072)) % 0xFFFFFFFF -- x ~ (x >> 17)
+	x = bxor(x, x * 32) % 0xFFFFFFFF               -- x ~ (x << 5)
 	return x
 end
 
@@ -83,6 +105,22 @@ strand.config = {
 	vote_limit = tonumber(minetest.settings:get("sl_strand.vote_limit") or "3") or 3,
 	-- Persistence: module storage for cross-run phantom bosses.
 	storage_key = "sl_strand:persisted",
+
+	-- Chain Ledger (economy) weights — see strand_ledger.lua.  Plain
+	-- defaults (not settings) so balance passes mutate strand.config
+	-- directly in the headless harness.
+	ledger_score_per_night = 10,  -- per night survived
+	ledger_purge_bonus = 40,      -- per correct Echo purge
+	ledger_wrong_penalty = 25,    -- per wrongful exile (score)
+	ledger_trust_point = 2,       -- per banked Trust point at settlement
+	ledger_integrity_point = 0.5, -- per remaining Core point (victories)
+	ledger_flawless_bonus = 30,   -- victory with zero wrongful exiles
+	ledger_deception_bonus = 50,  -- the HOLLOW CROWN
+	ledger_debt_ratio = 0.5,      -- fraction of unearned potential burned to debt
+	ledger_debt_wrong = 5,        -- debt per wrongful exile on a loss
+	ledger_paydown = 0.5,         -- fraction of a winning score paid against debt
+	ledger_debt_cap = 60,         -- debt ceiling
+	ledger_debt_horde = 0.2,      -- horde scale added per point of debt
 }
 
 -- ---------------------------------------------------------------
@@ -151,6 +189,7 @@ function strand.new_run_state(seed)
 			target = strand.config.core_target,
 		},
 		wrong_votes = 0,
+		correct_purges = 0,        -- Echoes correctly purged (ledger input)
 		vote_limit = strand.config.vote_limit,
 		exiled = {},               -- names removed this run
 		phantom_bosses_this_run = {}, -- names that became phantoms
@@ -230,7 +269,10 @@ function strand.advance_phase(run)
 		-- Grant trust for the next turn.
 		run.trust = run.trust + strand.config.trust_per_turn
 		if run.night >= run.core.target and run.core.integrity > 0 then
-			run.phase = "victory"
+			-- The Al Dente target is met: settle the Chain Ledger and
+			-- close the run through the same single victory path the
+			-- corruption win uses.
+			strand.run_victory(run, "core-complete")
 		else
 			run.phase = "build"
 		end
@@ -241,9 +283,11 @@ end
 -- ---------------------------------------------------------------
 -- End-of-run helpers
 -- ---------------------------------------------------------------
-function strand.run_victory(run)
+function strand.run_victory(run, reason)
 	run.active = false
 	run.phase = "victory"
+	run.victory_reason = reason or "core-complete"
+	if strand.settle_run then strand.settle_run(run) end
 	strand.save_persisted(strand.persisted)
 	return true
 end
@@ -256,6 +300,7 @@ function strand.run_defeat(run, reason)
 	-- chain as a phantom boss (true permadeath / difficulty scaling).
 	-- A self-surrender is the one clean cut: no phantom is born.
 	if run.player_is_echo and run.player_has_learned and not run._surrender then
+		table.insert(run.phantom_bosses_this_run, strand.ECHO_PLAYER_NAME)
 		strand.record_phantom_boss({
 			name = strand.ECHO_PLAYER_NAME,
 			seed = run.seed,
@@ -263,6 +308,7 @@ function strand.run_defeat(run, reason)
 			score = run.wrong_votes,
 		})
 	end
+	if strand.settle_run then strand.settle_run(run) end
 	strand.save_persisted(strand.persisted)
 	return true
 end
