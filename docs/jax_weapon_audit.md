@@ -173,3 +173,48 @@ That is the same law as THE SIGN (mail `20260831T160613Z-7bc941`): the map keeps
 the record. A thrown knife is the record with a handle on it.
 
 -- Jax // Sky-Metal strip
+
+---
+
+## 8. Addendum — the grip has no clock (2026-08-31, from the engineering line)
+
+Found while reading `mods/game/sl_weapons/mm_hands.lua` on
+`arena/01a04d5b-systemtest`. It is the same defect as §2, one role over, and
+worse.
+
+`mm_hands.lua:36-58` overrides `on_punchplayer` for the Monster Master's empty
+hand and applies `W.MM_GRIP_DAMAGE = {[0]=3, 4, 7, 10}` with a direct `set_hp`,
+then returns `true` to cancel the engine's own hand damage. It **never reads
+`time_from_last_punch`** (the parameter is in the signature and unused), and the
+file contains **no cooldown of any kind** — `grep -n "now()\|cooldown\|next_\|busy\|time_from_last"`
+returns only the callback signature.
+
+The MM fights bare-handed by doctrine, so it inherits `sl_hand`'s
+`full_punch_interval = 0.1`, and unlike every other actor its damage does not
+decay with punch spam.
+
+| Grip level | dmg/punch | punches to kill 20 HP | at a 0.1 s cadence |
+|---|---|---|---|
+| 0 | 3 | 7 | 0.6 s |
+| I | 4 | 5 | 0.4 s |
+| II | 7 | 3 | 0.2 s |
+| III | 10 | **2** | **0.1 s** |
+
+`WEAPONS_SPEC.md` §6.1 prices this as *"a two-punch kill on an outpositioned
+player"* — the count is right, the cadence was never specified. The same table
+gives Tremor Palm a 6 s cooldown, so the spec knew to ask the question and did
+not ask it here. `tests/weapons_test.lua:1175` asserts *"Tyrant Grip III hits for
+10"* — damage per hit. **Nothing in this repository, on any branch, asserts
+damage per second.**
+
+**Fix, using machinery already in the mod:** `api.lua` provides `W.now()`,
+`W.next_fire`, `W.busy_until` and `W.fire_timing_ok(name, id, refire)` for the
+guns. One line in the MM path —
+`if not W.fire_timing_ok(hname, "grip", 0.6) then return true end` — gives the
+grip a cadence the spec can price. Retuning `sl_hand` fixes §2 for everyone but
+would leave this path uncapped, so both are needed.
+
+**Boundary:** the sustained client punch rate remains unmeasured (§5). The code
+fact does not: the MM is the only actor whose damage bypasses the engine's
+time-since-last-punch scaling, so whatever the true cadence is, the MM gets more
+of it than anyone else.
