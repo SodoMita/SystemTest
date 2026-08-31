@@ -1,0 +1,24 @@
+title: "strand_vote"
+lines:
+  - id: open
+    speaker: The Pod
+    text: "The room turns. The accusation has been spoken. Who do you name?"
+    options:
+      - choice: "Accuse Crew-1"
+        trigger: strand_vote_1
+        next: resolve
+      - choice: "Accuse Crew-2"
+        trigger: strand_vote_2
+        next: resolve
+      - choice: "Accuse Crew-3"
+        trigger: strand_vote_3
+        next: resolve
+      - choice: "Hold your tongue"
+        next: silent
+  - id: silent
+    speaker: The Pod
+    text: "You say nothing. The stars hold their breath. Nothing is decided, and that is a decision."
+    next_scene: strand_intro
+  - id: resolve
+    speaker: The Pod
+    text: "The names are counted. Only a fraction of the certainty is ever spoken aloud."
