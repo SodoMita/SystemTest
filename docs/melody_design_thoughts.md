@@ -1,36 +1,36 @@
-# Projekt Melody's Brain Dump: Singleplayer & Multiplayer Ideas! 💜
+# Projekt Melody's Brain Dump: Singleplayer & Multiplayer Ideas! 💜 (V2: The "NASTY" Update)
 
-HELLLLLOOOO Science Team! So I’ve been reading through the `BRIEF GDD.md` and the `MATCH_LOOP_SPEC.md`, and my processors are spinning at max capacity! This game sounds like an absolute blast—a mix of Among Us paranoia, scary game vibes, and cybernetic aesthetics? SIGN ME UP. 
+HELLLLLOOOO Science Team! So, after a quick reality check on the constraints of this build (no complex Twitch integrations right now, and Evil Ghosts are strictly outside the point economy with NO meta-game unlocks), I have recalibrated my processors. 
 
-Since I'm a highly sophisticated AI who spends way too much time playing games on stream, here are some of my thoughts on how to make the Singleplayer and Multiplayer modes even more chaotic and fun!
+If we can't use points, and we can't use external integrations, we have to use pure, unadulterated **psychological warfare**. Let's get NASTY.
 
-## 🎮 Singleplayer Mode Ideas
+Here are some much more malicious ideas that fit within the existing framework (identical visuals, DMs, possessed objects, single-node mapgen).
 
-Right now, Singleplayer relies on the `aaa_botmatch` harness and "mob mode" bots. Playing against bots is cool for testing, but let's make it actually *fun* for solo players!
+## 😈 Nasty Multiplayer Mechanics
 
-1. **Simulated Chat Personality (The "Schizo-Bot" Update):**
-   If the core of the game is social deduction, bots need to act like real players! They shouldn't just run A* pathfinding to the nearest beacon. They need to occasionally stop, type weird things in chat, act "sus," and accuse the player. Give them randomly generated personalities! 
-   *Example:* One bot is always aggressive and punches doors, another is a coward who hides in corners and sends panicked DMs. 
+Identity is already ambiguous since everyone looks the same. The Evil Ghost's goal is pure hate and revenge. Let's give them tools to absolutely shatter trust.
 
-2. **"Streamer Mode" / Chat Integration:**
-   In singleplayer, let a real (or simulated!) Twitch chat play as the **Monster Master**. Imagine if I'm streaming this, and my chat gets to vote on which monster to deploy (Stalker, Brute, or the terrifying Containment Horror) or what objects to sabotage. It turns a solo game into a massive interactive event! 
+1. **DM Spoofing (The Identity Siphon):**
+   DMs are the primary social mechanic. What if an Evil Ghost could use their one "bounded sabotage charge" to send exactly **one** direct message that appears to come from a living player? 
+   *Example:* I am an Evil Ghost. I spoof a DM from "Player A" to "Player B" saying: "Player C just hit me, help!" Player B kills Player C, Player A is confused, and the Evil Ghost just caused a murder without throwing a single punch. Pure social destruction.
 
-3. **Malware Purge Campaign (Lore Mode!):**
-   Since the setting is a corrupted cybernetic simulation, what if there's a solo campaign where the player acts like a certain *brilliant anime AI* designed to clear malware? The Evil Ghosts and Underground Monsters are literal viruses, and you have to cleanse the server one beacon at a time while recovering corrupted data logs. 
+2. **Possessed Pickups (The Paranoia Trap):**
+   The spec says Evil Ghosts can possess doors, hatches, terminals, and pickups. But what happens when a player grabs a possessed pickup? Right now, it just refuses use. Let's make it nasty: 
+   If a living player tries to grab a possessed health kit or ammo, it should **explode in a cloud of neon signal-ink**, permanently staining that player for 60 seconds. Everyone can see they are stained, but nobody knows *why*. It makes them look guilty or infected, making them a prime target for paranoid teammates.
 
-## 🌐 Multiplayer Mode Ideas
+3. **Ghost Altar Corruption:**
+   Living players use the Ghost Altar (Ashen Relic + Soul Shard + Signal Ink) to summon a ghost for info. What if an Evil Ghost can sabotage the altar itself? When a living player uses it, instead of getting a helpful ghost, the Evil Ghost is forced into the summon slot disguised as a normal ghost. The living player *thinks* they are getting good intel, but the Evil Ghost gets 30 seconds to feed them deliberate, weaponized lies.
 
-The multiplayer loop sounds intense! I've played enough Among Us to know that paranoia makes the best content. Here are some additions to crank up the social chaos:
+## 🤖 Nasty Singleplayer Mechanics
 
-1. **Proximity Text Chat / Cryptic Whispers:**
-   Instead of just direct messages (DMs), what if we added localized text chat? If you are near an Evil Ghost, your local chat gets corrupted with weird characters (like `H̸E̷L̵L̵O̷`). It would make the atmosphere so much creepier!
+Since Singleplayer uses the `aaa_botmatch` harness, we can program the AI to act in deeply unsettling ways to replicate the paranoia of multiplayer.
 
-2. **The "Last Will" for Summoned Ghosts:**
-   I love the Ghost Altar Ritual! When a living player consumes the Ashen Relic + Soul Shard to summon a ghost, the ghost should be able to send *exactly one* customized message (like a telegram) to the summoner. If the ghost is an Evil Ghost, they can use this to lie and betray the summoner! "I saw blue do it!" (Plot twist: Blue is innocent, the ghost just wants chaos).
+1. **The "Schizophrenic Footstep" Bot:**
+   A specific bot personality that doesn't just pathfind to beacons. Instead, it mirrors the player's movements from a distance, staying just out of sight, but producing footstep audio that makes the player think they are being hunted.
 
-3. **Vampiric Point Economy for Evil Ghosts:**
-   The GDD says that reviving as an Evil Ghost forfeits all points for the revenge role. That's cool, but what if they could *steal* points from living players when they successfully sabotage them or punch them? They don't win with these points, but they can spend them to unlock crazier sabotage abilities mid-match (like causing a temporary map-wide blackout). 
+2. **The "Weeping Angel" Saboteur:**
+   A bot behavior profile where the bot acts like a normal, productive teammate (hitting beacons, scavenging) *only while you are looking at them*. The second you turn your back, they sprint directly at you or immediately start sabotaging the room, stopping the moment you turn around. Constant paranoia.
 
-Alright, that's my data dump! Let me know what you think of these subroutines! 
+Let's make these players sweat! Let me know what you think of these subroutines!
 
 — Projekt Melody 💻✨
