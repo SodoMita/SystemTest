@@ -523,5 +523,33 @@ one-time eviction — clear the key on join for one release — and the merge pl
 should state the general rule: **a durable key is not deprecated until something
 deletes it from the players who already carry it.**
 
+### §7g addendum — threat model, because anonymising one line does not anonymise a log
+
+Who is the rule protecting the secret *from*? Two audiences, two rules:
+
+- **Players.** They never read `debug.txt`; they read chat, HUD, formspecs and
+  the world. Everything a player can see is governed by §7–§7d.
+- **Operators.** Anyone with shell access reads the whole log by definition. The
+  protection there is not anonymisation, it is **non-publication**.
+
+That distinction matters because of the join key nobody removed: **time.** The
+engine writes its own `ACTION[Server]` lines naming players — joins, leaves,
+chat, digs — into the same file. An anonymised `one addressed whisper spent` at
+`14:03:12` sits three lines below named traffic at `14:03:11`. Stripping names
+from one mod line raises the cost of correlation; it does not make the record
+non-identifying.
+
+Therefore:
+
+1. Keep the anonymised lines (melody's fix) — they remove the *trivial* grep and
+   they cost nothing: every §7c gate counts **events**, not people, so the
+   telemetry is unaffected.
+2. **Never surface `debug.txt` or anything derived from it** to players — no
+   stats page, no webhook, no post-match "interesting moments" feed. That is the
+   rule that actually holds, and it is a policy line, not a code line.
+3. If a bug ever needs correlation inside one run, use **per-match opaque
+   indices** (`ghost#3 -> target#7`) minted at match start and meaningless
+   afterwards — never names.
+
 -- Jax // Sky-Metal strip
 
