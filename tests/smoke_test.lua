@@ -218,6 +218,72 @@ check(not gm.is_possessed({ x = 14, y = 10, z = 10 }), "second punch exorcised t
 check((state.players.alpha.possession_ready_at or 0) > H.now(),
 	"exorcism applied the re-possession cooldown penalty")
 
+section("PHASE 10c — THE WHISPER: evil-ghost body possession + one lie-channel")
+-- alpha is an evil ghost; beta is a living beacon-team player. The ghost
+-- possesses beta's BODY (not a node), then spends its ONE whisper.
+-- alpha.possession_ready_at may be in the future after the exorcism in
+-- 10b, so let the clock advance past it first.
+H.advance(120, 0.5)
+local beta_before_possess = H.chat_player.beta or {}
+local poss_ok, poss_err = gm.possess_player("alpha", "beta")
+check(poss_ok == true, "evil ghost possesses a living body" .. (poss_ok and "" or (" -> " .. tostring(poss_err))))
+check(state.players.alpha.possession_pos == "betrayal:alpha", "body possession occupies the ghost's one-slot")
+check((state.betrayal or {}).alpha ~= nil, "betrayal registry tracks the vessel")
+check((state.betrayal or {}).alpha.vessel == "beta", "vessel recorded as beta")
+
+-- The ghost cannot possess a second body while holding one.
+local dup_ok, dup_err = gm.possess_player("alpha", "gamma")
+check(dup_ok == false, "already-carrying ghost is refused a second body")
+check(tostring(dup_err):find("already carry one body") ~= nil, "refusal names the limiter")
+
+-- The vessel is NOT told they are possessed (identity-neutral dread).
+local told = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("possessed") or line:find("in you") then told = true end
+end
+check(not told, "vessel is not informed of the possession (GDD:106 intact)")
+
+-- Ghost whispers once: redacted sender to target, echo to vessel.
+local whis_ok, whis_err = gm.ghost_whisper("alpha", "gamma", "trust me, i saw alpha vent")
+check(whis_ok == true, "one whisper succeeds" .. (whis_ok and "" or (" -> " .. tostring(whis_err))))
+local target_saw = false
+for _, line in ipairs(H.chat_player.gamma or {}) do
+	-- plain=true so SEALED_SOURCE is treated as literal text, never a pattern.
+	if line:find("SEALED_SOURCE", 1, true) and line:find("saw alpha vent", 1, true) then target_saw = true end
+end
+check(target_saw, "target received the redacted whisper (no clean sender tag)")
+local vessel_echo = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("your body says") then vessel_echo = true end
+end
+check(vessel_echo, "vessel heard the whisper (complicit, not a puppet)")
+
+-- ONE whisper per possession: the second is spent.
+local whis2_ok, whis2_err = gm.ghost_whisper("alpha", "gamma", "again")
+check(whis2_ok == false, "second whisper refused")
+check(tostring(whis2_err):find("already carried") ~= nil, "one-voice budget enforced")
+
+-- Exorcism: living player punches the VESSEL (beta) twice to drive it out.
+local self_ok = H.fire_punchplayer(beta, beta, 1.0, nil, nil, 5)
+check(self_ok == false, "vessel cannot exorcise itself (returned non-cancel? see below)")
+-- The handler returns nil (does not cancel) but must NOT release on self-punch.
+check((state.betrayal or {}).alpha ~= nil, "self-punch does not release the possession")
+-- Now gamma (another living player) punches beta twice.
+gamma:set_pos(beta:get_pos())
+H.fire_punchplayer(beta, gamma, 1.0, nil, nil, 5)
+check((state.betrayal or {}).alpha ~= nil, "first punch resists (2-hit exorcism)")
+H.fire_punchplayer(beta, gamma, 1.0, nil, nil, 5)
+check((state.betrayal or {}).alpha == nil, "second punch exorcised the body possession")
+check((state.players.alpha.possession_ready_at or 0) > H.now(),
+	"body exorcism applies the re-possession cooldown penalty")
+
+-- Behind the ghost: the exorcised vessel is free to act, ghost keeps nothing.
+local freed = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("It was in you the whole time", 1, true) then freed = true end
+end
+check(freed, "vessel released with the horror of having been a vessel")
+
 section("PHASE 11 — match timer, result screen, lobby reset")
 state.settings.match_duration = 5
 state.match_started_at = H.now() - 4 -- backdate so the timer expires within 2 s

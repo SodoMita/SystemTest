@@ -28,6 +28,7 @@ include_files(
 	"entities.lua", -- monster entities
 	"nodes.lua",    -- beacon nodes + loot crate
 	"content.lua",  -- craftable items, tools, tactical nodes, interactables
+	"whisper.lua",  -- THE WHISPER: evil-ghost body possession + one lie-channel (Melody)
 	"test_harness.lua", -- headless AI agents and deterministic arena builder
 	"commands.lua", -- chat commands and privileges
 	"hud.lua"       -- persistent match HUD (identity-neutral)
