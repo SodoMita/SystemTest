@@ -647,6 +647,35 @@ def lint_mailbox(root: Path, fix: bool = False) -> list[dict]:
                     "id, or a wpN work package - this message cannot be delivered"
                     % (where, target))
 
+        # --- refs: a dead pointer is a missed hand-off, not a lost message ----
+        ref_texts = [str(r).strip() for r in (meta.get("refs") or []) if str(r).strip()]
+        for text in ref_texts:
+            # A ref that is itself a credential must never be echoed back: the
+            # secret finding below masks it, and a warning that prints it in
+            # full would be a second leak from the tool meant to prevent one.
+            if find_secrets(text):
+                continue
+            if text.startswith("[") and text.endswith("]"):
+                errors.append(
+                    "%s: ref '%s' is a bracketed list inside a scalar - it names "
+                    "no file. `--refs` is repeatable, one value per flag"
+                    % (where, text[:48]))
+                continue
+            if ("," in text or " " in text) and not (root / text).exists():
+                warnings.append(
+                    "%s: ref '%s' looks like several refs in one value"
+                    % (where, text[:48]))
+                continue
+            base = text.split("#", 1)[0]
+            if not base:
+                continue
+            if _ID_RE.match(base) or re.fullmatch(r"[0-9a-f]{7,40}", base):
+                continue  # a message id or a commit sha
+            if not (root / base).exists():
+                warnings.append(
+                    "%s: ref '%s' names no file on any branch you have fetched"
+                    % (where, text[:48]))
+
         # --- secrets: R4, now covering the whole message and not just refs ----
         for label, masked in find_secrets(msg.body) + find_secrets(
                 " ".join(str(r) for r in (meta.get("refs") or []))):
@@ -856,7 +885,7 @@ def cmd_send(args, cfg) -> int:
     rel = str(path.relative_to(root))
     if args.commit:
         commit_paths(root, [rel], "mail: %s -> %s: %s" % (
-            sender, ",".join(recipients)[:40], args.topic[:60]))
+            sender, ",".join(recipients)[:40], topic[:60]))
     print("message %s -> %s" % (msg.id, ", ".join(recipients)))
     print("  %s" % rel)
     return 0
@@ -930,9 +959,10 @@ def cmd_ack(args, cfg) -> int:
     if parent is None:
         raise SystemExit("no message matching '%s'" % args.message)
     body = args.body or ("Acknowledged: %s" % parent.topic)
+    refs = [parent.id] + [r for r in (args.refs or []) if r != parent.id]
     msg, path = build_message(
         root, me, [parent.sender], "Re: %s" % parent.topic, body, "ack",
-        parent.thread, "normal", [parent.id], None)
+        parent.thread, "normal", refs, None)
     if args.commit:
         commit_paths(root, [str(path.relative_to(root))],
                      "mail: ack %s" % parent.id)
@@ -1284,6 +1314,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ack", help="acknowledge a message in its thread")
     p.add_argument("message")
     p.add_argument("-m", "--body")
+    p.add_argument("--refs", action="append", default=[],
+                   help="extra refs to cite; the parent id is always included")
     p.add_argument("--commit", action="store_true")
     p.set_defaults(func=cmd_ack)
 

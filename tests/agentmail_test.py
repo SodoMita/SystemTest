@@ -211,6 +211,11 @@ class TestMessaging(MailboxTestCase):
                          "defaults to the parent's author, not reply-to-all")
         threads = json.loads(self.mail("threads", "--json"))
         self.assertEqual(len(threads), 1, "a reply must not fork the conversation")
+        # --commit derived its message from args.topic, which is None here
+        out = self.mail("send", "--reply-to", parent_id, "-m", "and committed",
+                        "--commit")
+        self.assertIn("Re: Original ask",
+                      self.git("log", "-1", "--pretty=%s"))
 
     def test_reply_to_explicit_overrides_win(self):
         out = self.mail("send", "--to", "all", "--topic", "Original", "-m", "x")
@@ -332,6 +337,43 @@ class TestLint(MailboxTestCase):
         proc = run(self.root, "lint")
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("cannot be delivered", proc.stdout)
+
+    def test_lint_flags_a_bracketed_list_in_refs(self):
+        """Live artefact: three messages carried refs: ["[a,b]"] - a list pasted
+        inside a quoted scalar, which parses clean and names no file."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_deadref_000005.md").write_text(
+            "---\nid: 20260101T000000Z-000005\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            'refs: ["[agent_mail/PROTOCOL.md,agent_mail/README.md]"]\n'
+            "---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("bracketed list inside a scalar", proc.stdout)
+        self.assertIn("repeatable", proc.stdout)
+
+    def test_lint_warns_on_a_dead_ref_pointer(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_deadref2_000006.md").write_text(
+            "---\nid: 20260101T000000Z-000006\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [docs/does_not_exist.md]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, "a dead pointer warns, it does not fail")
+        self.assertIn("names no file", proc.stdout)
+
+    def test_ack_accepts_refs(self):
+        """zhtharr's ack failed at the CLI because `ack` took no --refs
+        (20260831T135211Z-05f1e4)."""
+        out = self.mail("send", "--to", "all", "--topic", "Ack me", "-m", "please")
+        parent = out.split()[1]
+        out = self.mail("ack", parent, "-m", "done", "--refs", "game.conf")
+        import json
+        reply = json.loads(self.mail("read", out.split()[1], "--json"))
+        self.assertIn(parent, reply["meta"]["refs"])
+        self.assertIn("game.conf", reply["meta"]["refs"])
 
     def test_lint_warns_but_passes_on_non_routable_wp(self):
         msgs = self.root / "agent_mail" / "messages"
