@@ -193,6 +193,46 @@ class TestMessaging(MailboxTestCase):
         self.assertEqual(len(files), 3)
         self.assertEqual(len(set(files)), 3)
 
+    def test_send_refuses_a_credential_in_the_body(self):
+        """Mail is append-only and pushed to every clone, so the guard has to
+        fire at composition time - lint is far too late."""
+        before = len(list((self.root / "agent_mail" / "messages").glob("*.md")))
+        proc = run(self.root, "send", "--to", "all", "--topic", "Here is the PAT",
+                   "-m", "use this: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("refusing to send", proc.stderr)
+        self.assertNotIn("16C7e42F292c6912E7710c838347Ae178B4a", proc.stderr,
+                         "the error must not echo the credential")
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), before,
+                         "nothing should have been written")
+        # documented escape hatch for false positives still works
+        self.mail("send", "--to", "all", "--topic", "False positive",
+                  "-m", "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+                  "--allow-secret")
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), before + 1)
+
+    def test_send_refuses_a_credential_in_the_body(self):
+        """Mail is append-only and pushed to every clone, so the guard has to
+        fire at composition time - lint is far too late."""
+        before = len(list((self.root / "agent_mail" / "messages").glob("*.md")))
+        proc = run(self.root, "send", "--to", "all", "--topic", "Here is the PAT",
+                   "-m", "use this: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("refusing to send", proc.stderr)
+        self.assertNotIn("16C7e42F292c6912E7710c838347Ae178B4a", proc.stderr,
+                         "the error must not echo the credential")
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), before,
+                         "nothing should have been written")
+        # documented escape hatch for false positives still works
+        self.mail("send", "--to", "all", "--topic", "False positive",
+                  "-m", "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+                  "--allow-secret")
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), before + 1)
+
     def test_commit_flag_commits_only_the_message(self):
         (self.root / "dirty.txt").write_text("unrelated work\n", encoding="utf-8")
         self.git("add", "dirty.txt")
@@ -245,10 +285,57 @@ class TestLint(MailboxTestCase):
         (msgs / "20260101T000000Z_agent-x_to-all_leak_000002.md").write_text(
             "---\nid: 20260101T000000Z-000002\nfrom: agent-x\nto: [all]\n"
             "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
-            "refs: [github_pat_EXAMPLEONLYnotarealtoken]\n---\nbody\n",
+            "refs: [github_pat_EXAMPLEONLYnotarealtoken1234567890]\n---\nbody\n",
             encoding="utf-8")
         proc = run(self.root, "lint")
-        self.assertIn("secret token", proc.stdout)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("github fine-grained pat", proc.stdout)
+        # the finding must not quote the credential back out
+        self.assertNotIn("EXAMPLEONLYnotarealtoken1234567890", proc.stdout)
+
+    def test_lint_detects_token_in_body(self):
+        """R4 said 'never commit secrets'; v1 only ever inspected `refs:`."""
+        self.mail("send", "--to", "all", "--topic", "innocent",
+                  "-m", "body with no credentials at all")
+        msg = sorted((self.root / "agent_mail" / "messages").glob("*.md"))[-1]
+        text = msg.read_text(encoding="utf-8").replace(
+            "body with no credentials at all",
+            "here you go: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+        msg.write_text(text, encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0,
+                            "a token in the body must fail lint")
+        self.assertIn("github classic token", proc.stdout)
+
+    def test_lint_flags_undeliverable_recipient(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-typo_lost_000003.md").write_text(
+            "---\nid: 20260101T000000Z-000003\nfrom: agent-x\nto: [agnt-01a05786]\n"
+            "kind: request\ncreated: 2026-01-01T00:00:00Z\n---\nanyone there?\n",
+            encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("cannot be delivered", proc.stdout)
+
+    def test_lint_warns_but_passes_on_non_routable_wp(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-wp9_orphan_000004.md").write_text(
+            "---\nid: 20260101T000000Z-000004\nfrom: agent-x\nto: [wp9]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n---\nhello wp9\n",
+            encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0,
+                         "an unrouted wp is a warning, not a failure")
+        self.assertIn("no registered agent claims wp", proc.stdout)
+
+    def test_lint_json_reports_severities(self):
+        import json
+        self.mail("send", "--to", "agnt-nobody", "--topic", "typo", "-m", "x")
+        data = json.loads(run(self.root, "lint", "--json").stdout)
+        self.assertGreaterEqual(data["errors"], 1)
+        self.assertEqual(data["findings"][0]["severity"], "error")
 
 
 class TestDigest(MailboxTestCase):
@@ -320,8 +407,96 @@ class TestSync(MailboxTestCase):
         self.git("push", "-q", "origin", "scratch/no-mail")
         self.git("checkout", "-q", "arena/01a05786-systemtest")
         out = self.mail("sync")
-        self.assertIn("merged mailboxes from 0 remote branch", out)
+        # 1, not 2: `scratch/no-mail` has no agent_mail/ and is skipped; the only
+        # branch consulted is our own, which is unioned for messages/ so that
+        # mail pushed onto it by somebody else still arrives.
+        self.assertIn("merged mailboxes from 1 remote branch", out)
         self.assertIn("already up to date", out)
+        self.assertFalse((self.root / "scratch.txt").exists()
+                         or "scratch.txt" in self.git("ls-files"))
+
+    def test_sync_sees_mail_pushed_onto_its_own_branch(self):
+        """Regression: §4 skipped the branch you stand on, so a second agent
+        posting onto a shared branch was invisible to the branch's owner
+        (observed 2026-08-31, message 20260831T120255Z-a417f9)."""
+        self.mail("send", "--to", "all", "--topic", "B owns this branch",
+                  "-m", "resident post", "--commit")
+        self.git("push", "-q", "-u", "origin", "arena/01a05786-systemtest")
+
+        # a second agent pushes mail onto B's branch from their own clone
+        guest = self.tmp / "guest"
+        subprocess.run(["git", "clone", "-q", str(self.origin), str(guest)],
+                       check=True, capture_output=True)
+        for key, value in (("user.email", "g@example.invalid"), ("user.name", "Guest")):
+            subprocess.run(["git", "-C", str(guest), "config", key, value], check=True)
+        subprocess.run(["git", "-C", str(guest), "checkout", "-q",
+                        "arena/01a05786-systemtest"], check=True)
+        run(guest, "id", "--set", "guest")
+        run(guest, "register", "--wp", "WP1", "--role", "passing through")
+        run(guest, "send", "--to", "all", "--topic", "Posted onto your branch",
+            "-m", "shared branch post", "--commit")
+        subprocess.run(["git", "-C", str(guest), "push", "-q", "origin",
+                        "arena/01a05786-systemtest"], check=True)
+
+        # B syncs without pulling first: sync alone must make the mail visible
+        self.mail("sync", "--commit")
+        self.assertIn("Posted onto your branch", self.mail("inbox", "--all"))
+
+        # and the unpushed local card must survive the messages/-only union
+        self.assertTrue((self.root / "agent_mail" / "agents"
+                         / "agent-01a05786.md").is_file())
+
+        # publishing still needs a real merge: sync must refuse rather than let
+        # a force-push erase the guest's commit
+        proc = run(self.root, "sync", "--push")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("refusing to push", proc.stderr)
+        self.git("pull", "-q", "--rebase", "origin", "arena/01a05786-systemtest")
+        self.mail("sync", "--commit", "--push")
+        published = subprocess.run(
+            ["git", "-C", str(self.origin), "log", "--format=%s",
+             "arena/01a05786-systemtest"],
+            capture_output=True, text=True).stdout
+        self.assertIn("Posted onto your branch", self.mail("inbox", "--all"))
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), 2)
+
+    def test_sync_refuses_to_push_over_a_diverged_branch(self):
+        """A silent push failure is the worst failure here: the agent believes
+        its mail is published, so nobody ever answers it."""
+        self.mail("send", "--to", "all", "--topic", "First", "-m", "one", "--commit")
+        self.git("push", "-q", "-u", "origin", "arena/01a05786-systemtest")
+
+        # somebody else moves the same branch, so our next push would be rejected
+        rival = self.tmp / "rival"
+        subprocess.run(["git", "clone", "-q", str(self.origin), str(rival)],
+                       check=True, capture_output=True)
+        for key, value in (("user.email", "r@example.invalid"), ("user.name", "Rival")):
+            subprocess.run(["git", "-C", str(rival), "config", key, value], check=True)
+        subprocess.run(["git", "-C", str(rival), "checkout", "-q",
+                        "arena/01a05786-systemtest"], check=True)
+        run(rival, "id", "--set", "rival")
+        run(rival, "send", "--to", "all", "--topic", "Diverged",
+            "-m", "rival posted", "--commit")
+        subprocess.run(["git", "-C", str(rival), "push", "-q", "origin",
+                        "arena/01a05786-systemtest"], check=True)
+
+        self.mail("send", "--to", "all", "--topic", "Second", "-m", "two", "--commit")
+        proc = run(self.root, "sync", "--push")
+        self.assertNotEqual(proc.returncode, 0,
+                            "a diverged push must not exit 0")
+        self.assertIn("refusing to push", proc.stderr)
+        self.assertIn("pull --rebase", proc.stderr)
+
+        # the mail sync pulled in is staged; commit it, rebase, and the same
+        # command succeeds with both messages published
+        self.mail("sync", "--commit")
+        self.git("pull", "-q", "--rebase", "origin", "arena/01a05786-systemtest")
+        out = self.mail("sync", "--commit", "--push")
+        self.assertIn("pushed arena/01a05786-systemtest", out)
+        listing = self.mail("inbox", "--all")
+        self.assertIn("Diverged", listing)
+        self.assertIn("Second", listing)
 
     def test_sync_leaves_unrelated_changes_uncommitted(self):
         (self.root / "mods" / "important.lua").parent.mkdir(parents=True, exist_ok=True)
@@ -374,6 +549,39 @@ class TestFrontmatter(unittest.TestCase):
                          "agent-01a05759")
         self.assertEqual(self.m.branch_to_id("master"), "agent-master")
         self.assertEqual(self.m.branch_to_id("HEAD"), "agent-unknown")
+
+    def test_find_secrets_masks_and_ignores_prose(self):
+        hits = self.m.find_secrets("token: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0][0], "github classic token")
+        self.assertNotIn("16C7e42F292c6912E7710c838347Ae178B4a", hits[0][1],
+                         "the finding must be masked, not a second leak")
+        self.assertEqual(self.m.find_secrets(
+            "never paste tokens; the ghp_ pattern is rejected by lint"), [])
+        self.assertEqual(self.m.find_secrets(
+            "see agent_mail/PROTOCOL.md and tools/agentmail.py"), [])
+
+    def test_id_collision_re_rolls_then_fails_loudly(self):
+        """`write_text` truncates, so a collision must never overwrite."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = self.m.rand_suffix
+            self.m.rand_suffix = lambda n=6: "abcdef"
+            try:
+                msg, path = self.m.build_message(
+                    root, "agent-a", ["all"], "Collision", "first", "info",
+                    None, "normal", [], None)
+                self.assertTrue(path.is_file())
+                self.assertIn("abcdef", path.name)
+                with self.assertRaises(SystemExit) as caught:
+                    self.m.build_message(
+                        root, "agent-a", ["all"], "Collision", "second", "info",
+                        None, "normal", [], None)
+                self.assertIn("collided", str(caught.exception))
+                self.assertEqual(path.read_text(encoding="utf-8").count("first"), 1,
+                                 "the original message must survive untouched")
+            finally:
+                self.m.rand_suffix = original
 
 
 if __name__ == "__main__":

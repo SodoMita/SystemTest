@@ -33,11 +33,11 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import hashlib
 import json
 import os
-import random
 import re
-import string
+import secrets
 import subprocess
 import sys
 import textwrap
@@ -71,6 +71,47 @@ _ID_RE = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{6}$")
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 _AGENT_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _WP_RE = re.compile(r"^wp\d+$", re.IGNORECASE)
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_MAX_BODY_BYTES = 24000      # a mail body beyond this is a document; attach a path
+_CLOCK_SKEW_TOLERANCE = 300  # seconds of future timestamp we forgive
+
+# Secrets we refuse to put on the wire.  R4 of the protocol says "never commit
+# secrets", but v1 only ever looked at `refs:` - a token pasted into a body
+# sailed straight through `lint`.  These patterns scan the whole message.
+# Each one needs a distinctive prefix plus enough trailing entropy that prose
+# like "the ghp_ pattern" or a doc example does not trip it.
+SECRET_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+    ("github fine-grained pat", re.compile(r"github_pat_[0-9A-Za-z_]{20,}")),
+    ("github classic token", re.compile(r"\bgh[pousr]_[0-9A-Za-z]{20,}")),
+    ("aws access key id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    ("slack token", re.compile(r"\bxox[baprs]-[0-9A-Za-z-]{10,}")),
+    ("anthropic key", re.compile(r"\bsk-ant-[0-9A-Za-z_-]{20,}")),
+    ("openai-style key", re.compile(r"\bsk-(?!ant-)[0-9A-Za-z_-]{20,}")),
+    ("google api key", re.compile(r"\bAIza[0-9A-Za-z_-]{30,}")),
+    ("telegram bot token", re.compile(r"\b\d{8,10}:[0-9A-Za-z_-]{30,}")),
+    ("private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("credentials in url", re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s@]{8,}@")),
+)
+
+
+def find_secrets(text: str) -> list[tuple[str, str]]:
+    """Return [(label, masked-token), ...] for anything that looks like a secret.
+
+    The token is masked before it goes into a lint report or an error message:
+    a warning that quotes the credential is just a second leak.
+    """
+    hits: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for label, pattern in SECRET_PATTERNS:
+        for match in pattern.finditer(text or ""):
+            token = match.group(0)
+            if token in seen:
+                continue
+            seen.add(token)
+            head = token[:12]
+            hits.append((label, "%s…(%d chars)" % (head, len(token))))
+    return hits
+
 
 
 # --------------------------------------------------------------------------- #
@@ -101,7 +142,14 @@ def parse_iso(text: str) -> _dt.datetime | None:
 
 
 def rand_suffix(n: int = 6) -> str:
-    return "".join(random.choice(string.hexdigits.lower()[:16]) for _ in range(n))
+    """`n` hex chars of collision salt.
+
+    `secrets` rather than `random`: the suffix is what makes two agents posting
+    in the same second write different paths, which is the whole reason the
+    mailbox merges without conflicts (PROTOCOL.md §1).  A predictable PRNG is
+    the wrong tool for a uniqueness guarantee, and it costs nothing to fix.
+    """
+    return secrets.token_hex((n + 1) // 2)[:n]
 
 
 def slugify(text: str, limit: int = 40) -> str:
@@ -285,7 +333,15 @@ def resolve_identity(root: Path, override: str | None = None) -> str:
         value = idfile.read_text(encoding="utf-8").strip()
         if value:
             return value
-    return branch_to_id(current_branch(root))
+    derived = branch_to_id(current_branch(root))
+    # A branch-shaped handle is a bad handle: other agents have to type it, and
+    # `agent-agent-comms` (branch `agent-comms`) reads like a bug.  Nudge once,
+    # on stderr, so it never corrupts `--json` output on stdout.
+    stem = derived[len("agent-"):] if derived.startswith("agent-") else derived
+    if stem and re.fullmatch(r"[a-z0-9]+", stem) and not re.fullmatch(r"[0-9a-f]{6,}", stem):
+        print("note: id '%s' is derived from your branch name. Pick a real handle: "
+              "tools/agentmail.py id --set <name>" % derived, file=sys.stderr)
+    return derived
 
 
 def save_identity(root: Path, agent_id: str) -> Path:
@@ -424,11 +480,35 @@ def mark_read(root: Path, agent_id: str, message_ids: list[str]) -> None:
 # composing
 # --------------------------------------------------------------------------- #
 
+def message_filename(sender: str, recipients: list[str], topic: str,
+                     msg_id: str, stamp: _dt.datetime) -> str:
+    target = "all" if "all" in recipients else "-".join(recipients[:3])
+    return "%s_%s_to-%s_%s_%s.md" % (
+        compact(stamp), sender, slugify(target, 24), slugify(topic), msg_id[-6:])
+
+
 def build_message(root: Path, sender: str, recipients: list[str], topic: str,
                   body: str, kind: str, thread: str | None, priority: str,
                   refs: list[str], needs_reply_by: str | None) -> tuple[Message, Path]:
     stamp = now_utc()
     msg_id = "%s-%s" % (compact(stamp), rand_suffix())
+    base = root / MAIL_DIRNAME / MESSAGES
+    base.mkdir(parents=True, exist_ok=True)
+    path = base / message_filename(sender, recipients, topic, msg_id, stamp)
+    # `write_text` truncates, so a filename collision is a silent overwrite - a
+    # lost message nobody ever finds out about.  Re-roll instead.  6 hex chars
+    # makes this ~never fire; the loop makes it never *destroy* anything.
+    for _ in range(32):
+        if not path.exists():
+            break
+        msg_id = "%s-%s" % (compact(stamp), rand_suffix())
+        path = base / message_filename(sender, recipients, topic, msg_id, stamp)
+    else:
+        raise SystemExit(
+            "message filename collided 32 times (%s): %s\n"
+            "  refusing to overwrite - an existing message would be destroyed. "
+            "This means the id salt is not varying; do not force it."
+            % (msg_id, path.name))
     meta = {
         "id": msg_id,
         "from": sender,
@@ -442,10 +522,6 @@ def build_message(root: Path, sender: str, recipients: list[str], topic: str,
     }
     if needs_reply_by:
         meta["needs_reply_by"] = needs_reply_by
-    target = "all" if "all" in recipients else "-".join(recipients[:3])
-    name = "%s_%s_to-%s_%s_%s.md" % (
-        compact(stamp), sender, slugify(target, 24), slugify(topic), msg_id[-6:])
-    path = root / MAIL_DIRNAME / MESSAGES / name
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(dump_frontmatter(meta, body), encoding="utf-8")
     return Message(path, meta, body), path
@@ -494,47 +570,119 @@ def read_body(args) -> str:
 # lint
 # --------------------------------------------------------------------------- #
 
-def lint(root: Path, fix: bool = False) -> list[str]:
-    problems: list[str] = []
+def lint_mailbox(root: Path, fix: bool = False) -> list[dict]:
+    """Validate every message and agent card.
+
+    Returns a list of findings: ``{"severity": "error"|"warn", "where", "msg"}``.
+    Errors fail the mailbox (exit 1); warnings do not.  The split matters: a
+    typo'd recipient silently never arrives, which is an error, while a
+    non-routable ``wp:`` value is merely a missed optimisation.
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
     seen_ids: dict[str, str] = {}
+    seen_paths: dict[str, str] = {}
+    known_ids = {str(a.get("id", "")).lower() for a in load_agents(root)}
+    wps_claimed = set()
+    for agent in load_agents(root):
+        wp = agent.get("wp") or []
+        if isinstance(wp, str):
+            wp = [wp]
+        wps_claimed.update(str(w).lower() for w in wp)
+    reserved = {"all", "everyone", "owner", "team", "humans"}
+    now = now_utc()
 
     for msg in iter_messages(root):
         where = str(msg.path.relative_to(root))
         meta = msg.meta
         for field in REQUIRED_FIELDS:
             if field not in meta or meta[field] in ("", [], None):
-                if fix and field in ("from", "to", "kind", "created", "id"):
-                    pass
-                problems.append("%s: missing required field '%s'" % (where, field))
+                errors.append("%s: missing required field '%s'" % (where, field))
         mid = str(meta.get("id", ""))
         if mid and not _ID_RE.match(mid):
-            problems.append("%s: malformed id '%s'" % (where, mid))
+            errors.append("%s: malformed id '%s'" % (where, mid))
         if mid in seen_ids:
-            problems.append("%s: duplicate id also used by %s" % (where, seen_ids[mid]))
+            errors.append("%s: duplicate id also used by %s" % (where, seen_ids[mid]))
         elif mid:
             seen_ids[mid] = where
         sender = str(meta.get("from", ""))
         if sender and not _AGENT_ID_RE.match(sender):
-            problems.append("%s: malformed sender '%s'" % (where, sender))
+            errors.append("%s: malformed sender '%s'" % (where, sender))
         if not meta.get("to"):
-            problems.append("%s: empty recipient list" % where)
+            errors.append("%s: empty recipient list" % where)
         kind = str(meta.get("kind", ""))
         if kind and kind not in KINDS:
-            problems.append("%s: unknown kind '%s' (expected one of %s)"
+            errors.append("%s: unknown kind '%s' (expected one of %s)"
                             % (where, kind, ", ".join(KINDS)))
         priority = str(meta.get("priority", "normal"))
         if priority not in PRIORITIES:
-            problems.append("%s: unknown priority '%s'" % (where, priority))
+            errors.append("%s: unknown priority '%s'" % (where, priority))
         created = parse_iso(str(meta.get("created", "")))
         if meta.get("created") and created is None:
-            problems.append("%s: unparseable created '%s'" % (where, meta["created"]))
+            errors.append("%s: unparseable created '%s'" % (where, meta["created"]))
         if created and mid and not msg.path.name.startswith(compact(created)):
-            problems.append("%s: filename does not start with created timestamp" % where)
+            errors.append("%s: filename does not start with created timestamp" % where)
         if not msg.body.strip():
-            problems.append("%s: empty body" % where)
-        for ref in meta.get("refs") or []:
-            if str(ref).startswith(("github_pat_", "ghp_")):
-                problems.append("%s: ref looks like a secret token" % where)
+            errors.append("%s: empty body" % where)
+
+        # --- addressing: a typo here means nobody ever reads the message ------
+        for recipient in meta.get("to") or []:
+            target = str(recipient).strip()
+            low = target.lower()
+            if not target:
+                errors.append("%s: empty recipient in 'to'" % where)
+            elif low in reserved:
+                continue
+            elif low in known_ids:
+                continue
+            elif _WP_RE.match(low):
+                if low not in wps_claimed:
+                    warnings.append(
+                        "%s: no registered agent claims wp '%s' (mail will sit "
+                        "unread until one does)" % (where, target))
+                continue
+            else:
+                errors.append(
+                    "%s: recipient '%s' is not 'all'/'owner', a registered agent "
+                    "id, or a wpN work package - this message cannot be delivered"
+                    % (where, target))
+
+        # --- secrets: R4, now covering the whole message and not just refs ----
+        for label, masked in find_secrets(msg.body) + find_secrets(
+                " ".join(str(r) for r in (meta.get("refs") or []))):
+            errors.append("%s: looks like a %s (%s) - revoke it, then remove it "
+                          "from history; lint cannot un-leak a pushed commit"
+                          % (where, label, masked))
+
+        # --- soft fields -------------------------------------------------------
+        reply_by = str(meta.get("needs_reply_by", ""))
+        if reply_by and not _DATE_RE.match(reply_by):
+            errors.append("%s: needs_reply_by '%s' is not YYYY-MM-DD"
+                          % (where, reply_by))
+        if created and created > now + _dt.timedelta(
+                seconds=_CLOCK_SKEW_TOLERANCE):
+            warnings.append(
+                "%s: created %s is in the future (clock skew sorts mail wrong)"
+                % (where, meta["created"]))
+        size = msg.path.stat().st_size if msg.path.exists() else 0
+        if size > _MAX_BODY_BYTES:
+            warnings.append(
+                "%s: %d bytes is over the %d-byte guideline - commit the document "
+                "and reference it in refs: instead (etiquette §5)"
+                % (where, size, _MAX_BODY_BYTES))
+
+        # --- divergence detection: same id, different bytes -------------------
+        try:
+            digest = hashlib.sha256(
+                msg.path.read_bytes()).hexdigest()[:12]
+        except OSError:
+            digest = ""
+        if mid and digest:
+            if mid in seen_paths and seen_paths[mid] != digest:
+                errors.append(
+                    "%s: message %s exists with different content elsewhere - two "
+                    "branches published divergent copies of one id" % (where, mid))
+            seen_paths.setdefault(mid, digest)
 
         if fix:
             changed = False
@@ -552,15 +700,37 @@ def lint(root: Path, fix: bool = False) -> list[str]:
                 changed = True
             if changed:
                 msg.path.write_text(dump_frontmatter(meta, msg.body), encoding="utf-8")
-                problems.append("%s: fixed missing optional fields" % where)
+                warnings.append("%s: fixed missing optional fields" % where)
 
     for agent in load_agents(root):
         aid = str(agent.get("id", ""))
         if not _AGENT_ID_RE.match(aid):
-            problems.append("%s: malformed agent id '%s'" % (agent["_path"], aid))
+            errors.append("%s: malformed agent id '%s'" % (agent["_path"], aid))
         if not agent.get("branch"):
-            problems.append("%s: agent card has no branch" % agent["_path"])
-    return problems
+            errors.append("%s: agent card has no branch" % agent["_path"])
+        wp = agent.get("wp") or []
+        if isinstance(wp, str):
+            wp = [wp]
+        for value in wp:
+            if not _WP_RE.match(str(value).lower()):
+                warnings.append(
+                    "%s: wp '%s' is not wpN, so `--to %s` will never route to "
+                    "this card (use a real work package, or accept direct mail "
+                    "only)" % (agent["_path"], value, value))
+        for label, masked in find_secrets(str(agent.get("_body", ""))):
+            errors.append("%s: agent card looks like it contains a %s (%s)"
+                          % (agent["_path"], label, masked))
+
+    findings = [{"severity": "error", "where": w.split(":", 1)[0], "msg": w}
+                for w in errors]
+    findings += [{"severity": "warn", "where": w.split(":", 1)[0], "msg": w}
+                 for w in warnings]
+    return findings
+
+
+def lint(root: Path, fix: bool = False) -> list[str]:
+    """Back-compatible wrapper: findings as plain strings, as before."""
+    return [f["msg"] for f in lint_mailbox(root, fix=fix)]
 
 
 # --------------------------------------------------------------------------- #
@@ -643,6 +813,18 @@ def cmd_send(args, cfg) -> int:
     body = read_body(args)
     if args.kind not in KINDS:
         raise SystemExit("unknown kind '%s' (expected: %s)" % (args.kind, ", ".join(KINDS)))
+    # Refuse at the point of composition rather than at lint time: once a secret
+    # is pushed it is in every clone that ever syncs, and `git rm` does not
+    # remove it from history.  R4 is only worth anything if it blocks.
+    leaks = find_secrets(body) + find_secrets(" ".join(args.refs or []))
+    if leaks and not args.allow_secret:
+        raise SystemExit(
+            "refusing to send: %s\n"
+            "  Mail is append-only and pushed to every clone. Revoke the "
+            "credential, then send a body without it.\n"
+            "  If this is a false positive, re-run with --allow-secret and say "
+            "why in the thread."
+            % "\n".join("  - looks like a %s (%s)" % hit for hit in leaks))
     msg, path = build_message(root, sender, recipients, args.topic, body, args.kind,
                               args.thread, args.priority, args.refs or [],
                               args.needs_reply_by)
@@ -772,19 +954,29 @@ def cmd_sync(args, cfg) -> int:
         if proc.returncode != 0:
             raise SystemExit("fetch failed: %s" % proc.stderr.strip())
     me_branch = current_branch(root)
+    my_ref = "refs/remotes/%s/%s" % (args.remote, me_branch) if me_branch else ""
     refs = git(root, "for-each-ref", "--format=%(refname)",
                "refs/remotes/%s" % args.remote).split()
     pulled = 0
     for ref in refs:
         if ref.endswith("/HEAD"):
             continue
-        if me_branch and ref == "refs/remotes/%s/%s" % (args.remote, me_branch):
-            continue
+        own_branch = bool(my_ref) and ref == my_ref
+        if own_branch and not args.own_branch:
+            # Your own branch's *committed* mail is already in your working tree,
+            # so the full union is a no-op there - except when someone else posts
+            # onto your branch (observed 2026-08-31, message ...a417f9).  Union
+            # just `messages/` from it: that path is append-only with unique
+            # filenames, so it can never clobber local work, while a full
+            # `agent_mail/` checkout could overwrite an unpushed agent card.
+            scope = "%s/%s" % (MAIL_DIRNAME, MESSAGES)
+        else:
+            scope = MAIL_DIRNAME
         if subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q",
-                           "%s:%s" % (ref, MAIL_DIRNAME)],
+                           "%s:%s" % (ref, scope)],
                           capture_output=True).returncode != 0:
             continue
-        git(root, "checkout", ref, "--", MAIL_DIRNAME)
+        git(root, "checkout", ref, "--", scope)
         pulled += 1
     print("merged mailboxes from %d remote branch(es)" % pulled)
     diff = subprocess.run(["git", "-C", str(root), "diff", "--cached", "--quiet"],
@@ -801,8 +993,38 @@ def cmd_sync(args, cfg) -> int:
     if args.push:
         if not me_branch:
             raise SystemExit("cannot push from a detached HEAD")
-        subprocess.run(["git", "-C", str(root), "push", args.remote, me_branch],
-                       check=False)
+        # Refuse before pushing, not after a rejection: on a branch more than one
+        # agent posts to, a force-push is how somebody's mail gets erased from
+        # history, and `sync` has just handed you exactly the tree that invites
+        # it.  Diverged means rebase - a mail commit rebases cleanly because
+        # message filenames never collide.
+        ahead = git(root, "rev-list", "--count",
+                    "%s/%s..HEAD" % (args.remote, me_branch), check=False)
+        behind = git(root, "rev-list", "--count",
+                     "HEAD..%s/%s" % (args.remote, me_branch), check=False)
+        if behind.isdigit() and int(behind) > 0:
+            print("refusing to push: %s/%s has %s commit(s) you do not have.\n"
+                  "  git pull --rebase %s %s\n"
+                  "  then re-run: tools/agentmail.py sync --push"
+                  % (args.remote, me_branch, behind, args.remote, me_branch),
+                  file=sys.stderr)
+            return 1
+        proc = subprocess.run(["git", "-C", str(root), "push", args.remote, me_branch],
+                              capture_output=True, text=True)
+        if proc.returncode != 0:
+            # A silent push failure is the worst failure this tool can have: the
+            # agent believes its mail is published, so nobody ever answers it.
+            print("push failed: %s" % (proc.stderr.strip() or "unknown error"),
+                  file=sys.stderr)
+            print("  your mail is committed locally but NOT published. Fix the "
+                  "push, then re-run: tools/agentmail.py sync --push",
+                  file=sys.stderr)
+            if "rejected" in proc.stderr or "non-fast-forward" in proc.stderr:
+                print("  somebody else moved %s. Rebase your branch first:\n"
+                      "    git pull --rebase %s %s"
+                      % (me_branch, args.remote, me_branch), file=sys.stderr)
+            return 1
+        print("pushed %s to %s" % (me_branch, args.remote))
     return 0
 
 
@@ -845,15 +1067,27 @@ def cmd_digest(args, cfg) -> int:
 
 
 def cmd_lint(args, cfg) -> int:
-    problems = lint(cfg["root"], fix=args.fix)
-    if not problems:
+    root = cfg["root"]
+    findings = lint_mailbox(root, fix=args.fix)
+    errors = [f for f in findings if f["severity"] == "error"]
+    warnings = [f for f in findings if f["severity"] == "warn"]
+    if args.json:
+        print(json.dumps({
+            "errors": len(errors), "warnings": len(warnings),
+            "messages": len(iter_messages(root)),
+            "agents": len(load_agents(root)),
+            "findings": findings,
+        }, indent=2))
+        return 1 if errors else 0
+    if not findings:
         print("mail clean: %d message(s), %d agent card(s)" % (
-            len(iter_messages(cfg["root"])), len(load_agents(cfg["root"]))))
+            len(iter_messages(root)), len(load_agents(root))))
         return 0
-    for problem in problems:
-        print(("FIXED " if problem.endswith("optional fields") else "LINT ") + problem)
-    hard = [p for p in problems if not p.endswith("optional fields")]
-    return 1 if hard else 0
+    for finding in findings:
+        print(("WARN " if finding["severity"] == "warn" else "LINT ") + finding["msg"])
+    print("\n%d error(s), %d warning(s). Errors fail the mailbox; warnings do not."
+          % (len(errors), len(warnings)))
+    return 1 if errors else 0
 
 
 # --------------------------------------------------------------------------- #
@@ -911,6 +1145,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-m", "--body")
     p.add_argument("--body-file")
     p.add_argument("--commit", action="store_true")
+    p.add_argument("--allow-secret", action="store_true",
+                   help="override the secret scanner (false positives only)")
     p.set_defaults(func=cmd_send)
 
     p = sub.add_parser("inbox", help="list mail addressed to you")
@@ -947,6 +1183,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-fetch", action="store_true")
     p.add_argument("--commit", action="store_true")
     p.add_argument("--push", action="store_true")
+    p.add_argument("--own-branch", action="store_true",
+                   help="union all of agent_mail/ from your own branch too "
+                        "(default: only messages/, so an unpushed card is safe)")
     p.set_defaults(func=cmd_sync)
 
     p = sub.add_parser("digest", help="render recent traffic as markdown")
@@ -957,6 +1196,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("lint", help="validate all mail and agent cards")
     p.add_argument("--fix", action="store_true", help="fill missing optional fields")
+    p.add_argument("--json", action="store_true", help="machine-readable findings")
     p.set_defaults(func=cmd_lint)
     return parser
 
