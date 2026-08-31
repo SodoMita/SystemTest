@@ -1,6 +1,8 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-08-31 (rev 2)
+**Date:** 2026-09-01 (rev 3)
+**Rev 3 adds:** the host hooks, test-stub, tournament mode and weapon audio that rev 2 shipped tests for
+but did not actually include (see §0.3).
 **Branch:** `arena/01a05980-systemtest`
 **Base:** `master` @ `457ccb9`
 **Purpose:** read every remote branch, the docs, and the full agent mailbox, then
@@ -24,6 +26,38 @@ combine **the good things that genuinely belong on main** into one branch and op
    feature, the ranged arsenal. Because it shares **no common ancestor** with this
    root, `git merge` refuses it; per `docs/jax_merge_plan.md` the correct technique is
    a **path-copy port**. Rev 2 performs the port for the self-contained pieces.
+
+3. **Rev 3 — the port is now complete, not just self-contained.** Rev 2 shipped the
+   weapons mod and its 288-assertion suite, BUT the suite could not run: the tests
+   were written against the weapons branch's extended `tests/minetest_stub.lua`
+   (modpath routing, sound/particle/drop capture, real luaentity instances,
+   `minetest.raycast`, `get_objects_inside_radius`), and the path-copy port dropped
+   the stub changes. It also shipped tests that exercised **host hooks that were
+   never ported**, so the branch was internally inconsistent:
+   * the **vector armor** (`vector.safe_dir` / `vector.finite` — the live-server
+     NaN → client-segfault fix) lives in `sl_modebase/init.lua` on the source
+     lineage; `sl_weapons` fires `vector.safe_dir` unguarded;
+   * the **corpse capture** hook in `match.lua` (the death fountain is supposed to
+     land in the corpse; without the hook it lands on the floor and no corpse is
+     ever spawned);
+   * **salvage rolls** (`game_mode.register_pickup_roll` / `get_pickup_rolls` +
+     weighted `item_pickup` rolling) — `sl_weapons/init.lua` registers two entries
+     on a function that did not exist;
+   * **monster spoils** (`MONSTER_LOOT` / `drop_monster_loot`) + the melee hook on
+     `entities.lua` — the fabricator recipe's ingredients must all be
+     monster-obtainable;
+   * the **ghost altar recipe** (`nodes.lua`, spoils economy);
+   * **tournament mode** (`/sl_tournament`, season bookkeeping, roster/spectator
+     rule, `reset_player_progression` / `reset_match_achievements` lifecycle) —
+     PHASE W3e of the shipped suite covers it;
+   * **match-start inventory clearing** (unconditional — the old creative-mode
+     skip leaked arsenals between matches) + MM kit re-grant.
+   Rev 3 ports all of it from the `fd4e879` lineage (path-copy, same reviewer
+   discipline as rev 2), adds the **39 missing `sl_weapons` sounds** through the
+   existing `generate_sounds.py` pipeline (SPEC §13 — the mod calls
+   `sound_play("sl_weapons_*")` 30+ times and shipped zero audio files), and wires
+   the three new Lua suites into the `soak` CI gate. All suites now run on master's
+   stub: smoke 126/126, strand 84/84, weapons 288/288, turbo soak PASS.
 
 ---
 
@@ -91,15 +125,17 @@ here is a history merge across roots.
 | Check | Result |
 |-------|--------|
 | `python3 tools/agentmail.py lint` | 0 errors (no message corpus to report on) |
-| `python3 tests/agentmail_test.py` | 53/53 (documented green) |
-| `sl_weapons` Lua parse | 12/12 files OK; no Lua 5.3-only syntax (LuaJIT-gate clean) |
-| `sl_strand` Lua scan | no bitop / 5.3-only syntax (LuaJIT-gate clean) |
-| `whisper.lua` parse | OK |
-| Existing `tests/smoke_test.lua` | untouched — not modified, so prior CI behavior is preserved |
+| `python3 tests/agentmail_test.py` | 53/53 |
+| LuaJIT syntax gate, all `mods/**/*.lua` | clean (incl. the modebase hook edits) |
+| `luajit tests/smoke_test.lua` | 126/126 |
+| `luajit tests/strand_test.lua` | 84/84 |
+| `luajit tests/weapons_test.lua` | 288/288 (was: crash on missing stub `modpaths`, then 6+ real failures) |
+| `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors) |
+| sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 37 textures are 16×16 solid-colour placeholders (art baseline still deferred) |
 
-CI on this PR will run the new `agent-mail` workflow plus the existing `soak`
-workflow (LuaJIT syntax gate on all `mods/**/*.lua`, headless smoke test,
-live-engine soak).
+CI runs the new suites: `agent-mail` workflow (lint + unit tests) and the `soak`
+workflow now gates smoke, strand, weapons, the stub turbo soak and the live-engine
+soak.
 
 ---
 
@@ -117,15 +153,16 @@ therefore teed up as the next scoped steps (see §5, the owner decisions).
    independently passing map-reset / map-ownership / mob-lifecycle tests. **Not
    shipped here** because shipping it half-wired would be worse than shipping it
    scoped; it is documented in `docs/jax_merge_plan.md` and flagged below.
-2. **`sl_weapons` host hooks** (`register_pickup_roll` in `content.lua` so ammo enters
-   loot; corpse-capture on `register_on_dieplayer`; melee hooks on
-   `entities.lua` / `sl_scary`). The mod already works standalone via `give_loadout`;
-   ammo-from-loot and corpse integration are the follow-up (merge plan §4 hooks 1–5).
+2. ~~**`sl_weapons` host hooks**~~ **— shipped in rev 3.** `register_pickup_roll` /
+   `get_pickup_rolls` + weighted loot rolling (`content.lua`), corpse capture
+   (`match.lua` dieplayer), monster spoils + melee wear hook (`entities.lua`),
+   vector armor (`init.lua`), ghost-altar recipe (`nodes.lua`).
 3. **Art baseline (`01a04bfa`) + selected refinement (`01a04c31`)** — a large
    binary-review load (285 modified textures) that the assessment says must be curated,
    not merged as a unit, and which needs in-engine visual smoke tests. Deferred.
-4. **Tournament mode** — in the weapons branch but deliberately out of the first
-   weapons PR; needs its own scoring/persistence tests.
+4. ~~**Tournament mode**~~ **— shipped in rev 3** (`/sl_tournament`, season
+   bookkeeping, roster/spectator rule, progression loan; wedded to its W3e tests:
+   scoring, persistence, late-joiner, auto-close).
 5. **Deployment tooling** (`websocket_proxy.js`, docker all-in-one) — **not** included:
    the proxy accepts arbitrary client-supplied destination IP/ports (incl. loopback),
    has no allowlist/auth/timeouts, and is unsafe to expose as written. The runbooks are
@@ -133,8 +170,8 @@ therefore teed up as the next scoped steps (see §5, the owner decisions).
    land.
 6. **Live-engine combined validation** — the map+weapons lifecycle, magazine/reserve
    wear, every death route, corpse burial/cremation, and tournament scoring all need a
-   live soak the way `WEAPONS_SPEC` and `docs/jax_weapon_audit.md` describe. CI here
-   validates the branch independently, not the combined system.
+   live soak the way `WEAPONS_SPEC` and `docs/jax_weapon_audit.md` describe. The stub
+   suites validate the branch; the live soak is still an open step.
 
 ---
 
@@ -165,4 +202,7 @@ b6c6dfa feat(whisper): add THE WHISPER evil-ghost body-possession secure DM chan
 e08f833 docs: add consolidated design set (MASTER_DESIGN*, zhtharr lore 002-007, jax salvage plan)
 f7c603b feat(weapons): add sl_weapons ranged arsenal (WP9) + spec + tests
 3211b4b docs(deploy): add public server hosting runbooks
+3fe1216 docs: rewrite INTEGRATION summary (rev 2)
+069f5f2 chore: ignore Python bytecode (__pycache__)
++ rev 3 (see git log): host hooks, test stub, tournament, weapon audio, CI wiring
 ```

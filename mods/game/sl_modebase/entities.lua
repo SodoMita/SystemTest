@@ -75,6 +75,40 @@ game_mode.MONSTER_TYPES = {
 
 game_mode.MONSTER_TYPE_ORDER = { "stalker", "scout", "brute", "dredger", "wraith", "containment" }
 
+-- ================================================================
+-- Monster spoils — the workshop economy
+-- ================================================================
+-- Mapgen places no workshops, so the stations are assembled by hand:
+-- every ingredient of a station recipe is torn out of a monster
+-- (team directive 2026-08-29; sl_weapons' Precision Fabricator is
+-- built entirely from these). The table is deterministic and
+-- published — a kill is worth exactly what it is worth, no rolls.
+game_mode.MONSTER_LOOT = {
+	stalker     = { { "metal_ingot", 1 }, { "plastic_scrap", 1 } },
+	scout       = { { "circuit_board", 1 }, { "plastic_scrap", 1 } },
+	brute       = { { "metal_ingot", 2 }, { "energy_crystal", 1 } },
+	dredger     = { { "energy_crystal", 1 }, { "circuit_board", 1 } },
+	wraith      = { { "circuit_board", 1 } },
+	containment = { { "metal_ingot", 2 }, { "circuit_board", 2 }, { "energy_crystal", 1 } },
+}
+
+function game_mode.drop_monster_loot(pos, variant)
+	local loot = game_mode.MONSTER_LOOT[variant]
+	if not loot or not pos then return end
+	for _, e in ipairs(loot) do
+		local obj = minetest.add_item(pos, ItemStack(modname .. ":" .. e[1] .. " " .. e[2]))
+		if obj and obj.set_velocity then
+			-- A public fountain: the spoils land beside the wreck and
+			-- belong to whoever survives the scramble.
+			obj:set_velocity({
+				x = (math.random() - 0.5) * 3,
+				y = 2.5 + math.random() * 1.5,
+				z = (math.random() - 0.5) * 3,
+			})
+		end
+	end
+end
+
 -- Spawn one monster of the given variant at pos, owned by owner_name.
 -- Unknown variants fall back to "stalker". Returns the object or nil.
 function game_mode.spawn_monster(pos, variant, owner_name)
@@ -209,7 +243,9 @@ minetest.register_entity(MONSTER_NAME, {
 			
 			if tpos then
 				local dist = vector.distance(pos, tpos)
-				local dir = vector.normalize(vector.subtract(tpos, pos))
+				-- A monster standing exactly on its target must stand
+				-- still, not sprint toward NaN.
+				local dir = vector.safe_dir(vector.subtract(tpos, pos))
 				
 			-- Add slight jitter to movement
 			local jitter = {x=(math.random()-0.5)*0.5, y=0, z=(math.random()-0.5)*0.5}
@@ -258,12 +294,22 @@ minetest.register_entity(MONSTER_NAME, {
 
 	on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
 		minetest.sound_play("hit", { pos = self.object:get_pos(), gain = 0.6, max_hear_distance = 10 })
+		-- Consumable melee (Severance) and blade wear apply to monsters
+		-- too, through the shared sl_weapons hook when present.
+		if sl_weapons and sl_weapons.melee_entity_hit then
+			sl_weapons.melee_entity_hit(hitter)
+		end
 	end,
 
 	on_death = function(self, killer)
 		local pos = self.object:get_pos()
 		minetest.sound_play("monster_chase", { pos = pos, gain = 0.8, max_hear_distance = 14 })
 		minetest.add_entity(pos, modname .. ":death_particle")
+		-- The wreck pays out its parts wherever it falls (catalog
+		-- spawns only — ambient monsters carry nothing).
+		if self.monster_variant then
+			game_mode.drop_monster_loot(pos, self.monster_variant)
+		end
 	end,
 })
 
