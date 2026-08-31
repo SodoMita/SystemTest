@@ -945,33 +945,11 @@ def cmd_threads(args, cfg) -> int:
     return 0
 
 
-def paths_sync_would_clobber(root: Path, ref: str, scope: str) -> list[str]:
-    """Files in `scope` that exist locally and differ from `ref`'s version.
-
-    `git checkout <ref> -- <scope>` overwrites whatever is in the working tree,
-    with no merge and no warning.  For `messages/` that is safe - filenames are
-    unique, so anything colliding is the same message twice.  For every other
-    path in the mailbox it is a data-loss bug: it silently reverts local edits to
-    PROTOCOL.md, README.md and agent cards, *including edits that were already
-    committed* (reproduced 2026-08-31 on `arena/carmack-systemtest`).
-
-    Two things are *not* at risk and must be excluded: files that do not exist
-    locally (taking those is the point of syncing - that is how a peer's new card
-    arrives), and files that exist locally but not on `ref` (`git diff` lists
-    those too, as deletions; `checkout` will not touch them).
-    """
-    diff = subprocess.run(["git", "-C", str(root), "diff", "--name-only", ref, "--",
-                           scope], capture_output=True, text=True)
-    out = []
-    for line in diff.stdout.splitlines():
-        name = line.strip()
-        if not name or not (root / name).exists():
-            continue
-        has = subprocess.run(["git", "-C", str(root), "cat-file", "-e",
-                              "%s:%s" % (ref, name)], capture_output=True)
-        if has.returncode == 0:
-            out.append(name)
-    return out
+def files_in_ref(root: Path, ref: str, scope: str) -> list[str]:
+    """Every path under `scope` that `ref` has, relative to the repo root."""
+    out = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only",
+                          ref, "--", scope], capture_output=True, text=True)
+    return [line.strip() for line in out.stdout.splitlines() if line.strip()]
 
 
 def cmd_sync(args, cfg) -> int:
@@ -989,13 +967,14 @@ def cmd_sync(args, cfg) -> int:
     # `register` and not yet committed is the documented session-start flow, and
     # nothing in the union can overwrite a path no branch has.
     me_id = resolve_identity(root, args.id)
+    my_card = "%s/%s/%s.md" % (MAIL_DIRNAME, AGENTS, me_id)
     status = git(root, "status", "--porcelain", "--", MAIL_DIRNAME, check=False)
     dirty = []
     for line in status.splitlines():
         code, name = line[:2], line[3:].strip()
         if code.startswith("?") or not name:
             continue  # untracked: nothing in the union can overwrite it
-        if name == "%s/%s/%s.md" % (MAIL_DIRNAME, AGENTS, me_id):
+        if name == my_card:
             continue  # your own card is yours to rewrite (R2)
         dirty.append("%s %s" % (code.strip(), name))
     if dirty:
@@ -1009,38 +988,66 @@ def cmd_sync(args, cfg) -> int:
     refs = git(root, "for-each-ref", "--format=%(refname)",
                "refs/remotes/%s" % args.remote).split()
     msgs_scope = "%s/%s" % (MAIL_DIRNAME, MESSAGES)
+    agents_scope = "%s/%s" % (MAIL_DIRNAME, AGENTS)
     pulled = 0
     skipped: dict[str, list[str]] = {}
     for ref in refs:
         if ref.endswith("/HEAD"):
             continue
-        own_branch = bool(my_ref) and ref == my_ref
         if not subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q",
                                "%s:%s" % (ref, MAIL_DIRNAME)],
                               capture_output=True).returncode == 0:
             continue
-        # `messages/` is union-safe: one file per message, unique names, so a
-        # checkout can only ever add mail.  Always take it - refusing to deliver
-        # mail because a shared document differs would be the wrong trade.
+        own_branch = bool(my_ref) and ref == my_ref
+        took = False
+
+        # messages/: union-safe by construction.  One file per message, unique
+        # names, so a checkout can only ever add mail.  Always take it, from
+        # every branch including your own - refusing to deliver mail because a
+        # shared document differs is the wrong trade, and your own branch is
+        # where a second agent's post lands when the branch is shared
+        # (20260831T120255Z-a417f9).
         if subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q",
                            "%s:%s" % (ref, msgs_scope)],
                           capture_output=True).returncode == 0:
             git(root, "checkout", ref, "--", msgs_scope)
-        # Everything else in the mailbox is a shared single-file path, where a
-        # checkout overwrites instead of merging.  Your own branch is skipped
-        # unless asked, because your committed copy is already in the tree.
-        if own_branch and not args.own_branch:
-            pulled += 1
-            continue
-        if not args.force_shared:
-            at_risk = paths_sync_would_clobber(root, ref, MAIL_DIRNAME)
-            at_risk = [p for p in at_risk if not p.startswith(msgs_scope + "/")]
-            if at_risk:
-                skipped[ref] = at_risk
-                pulled += 1
+            took = True
+
+        # agents/: union-safe *per file*, because R2 gives each card exactly one
+        # writer.  Take every card file-by-file so a new agent still arrives even
+        # when some unrelated shared document is in dispute; hold back only your
+        # own card, where your unpushed local version is the fresher one.
+        for name in files_in_ref(root, ref, agents_scope):
+            if not args.force_shared and name == my_card:
                 continue
-        git(root, "checkout", ref, "--", MAIL_DIRNAME)
-        pulled += 1
+            if not args.own_branch and own_branch and (root / name).exists():
+                continue
+            git(root, "checkout", ref, "--", name)
+            took = True
+
+        # Everything else (PROTOCOL.md, README.md, AMENDMENTS.md) is a shared
+        # single-file path where a checkout overwrites instead of merging.  Skip
+        # only the specific files at risk, not the whole branch, and never let
+        # your own branch's copy revert an unpushed edit.
+        for name in files_in_ref(root, ref, MAIL_DIRNAME):
+            if name.startswith((msgs_scope + "/", agents_scope + "/")):
+                continue
+            if not args.own_branch and own_branch and (root / name).exists():
+                continue
+            local = root / name
+            if local.exists() and not args.force_shared:
+                incoming = subprocess.run(
+                    ["git", "-C", str(root), "show", "%s:%s" % (ref, name)],
+                    capture_output=True)
+                if incoming.returncode == 0 and \
+                        local.read_bytes() != incoming.stdout:
+                    skipped.setdefault(ref, []).append(name)
+                    continue
+            git(root, "checkout", ref, "--", name)
+            took = True
+
+        if took:
+            pulled += 1
     print("merged mailboxes from %d remote branch(es)" % pulled)
     diff = subprocess.run(["git", "-C", str(root), "diff", "--cached", "--quiet"],
                           capture_output=True)

@@ -499,6 +499,30 @@ class TestSync(MailboxTestCase):
         self.assertIn("version 1.1", proto.read_text(encoding="utf-8"),
                       "the local revision must survive the sync")
 
+        # a disputed shared document must not block a new agent from arriving,
+        # and must not revert your own card (observed live: melody.md and
+        # zhtharr.md were unreachable while PROTOCOL.md was in dispute)
+        self.git("checkout", "-q", "arena/01a05759-systemtest")
+        (self.root / "agent_mail" / "agents" / "newcomer.md").write_text(
+            "---\nid: newcomer\nbranch: arena/01a05759-systemtest\nwp: [WP1]\n"
+            "---\njust arrived\n", encoding="utf-8")
+        run(self.root, "--id", "agent-01a05759", "register", "--wp", "WP4",
+            "--role", "peer, revised")
+        self.git("add", "agent_mail/agents")
+        self.git("commit", "-q", "-m", "newcomer card + revised own card")
+        self.git("push", "-q", "origin", "arena/01a05759-systemtest")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        my_card_before = (self.root / "agent_mail" / "agents"
+                          / "agent-01a05786.md").read_text(encoding="utf-8")
+        run(self.root, "sync", "--commit")
+        self.assertTrue((self.root / "agent_mail" / "agents" / "newcomer.md").is_file(),
+                        "a new agent's card must arrive despite the dispute")
+        self.assertEqual(
+            (self.root / "agent_mail" / "agents" / "agent-01a05786.md")
+            .read_text(encoding="utf-8"), my_card_before,
+            "your own card must not be reverted by someone else's branch")
+        self.assertIn("newcomer", run(self.root, "agents").stdout)
+
         # the peer's *new* files are still welcome: nothing local to lose
         self.git("checkout", "-q", "arena/01a05759-systemtest")
         (self.root / "agent_mail" / "agents" / "peer-extra.md").write_text(

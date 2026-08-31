@@ -152,14 +152,20 @@ your branch ───────── push ──> origin (publishes your mail
   message `20260831T120255Z-a417f9`). The rest of `agent_mail/` is left alone so
   an unpushed agent card is never overwritten; pass `--own-branch` for the full
   union.
-- **`sync` splits union-safe paths from shared ones.** `git checkout <ref> --
-  agent_mail` is a destructive overwrite for every path except `messages/`, so
-  `sync` always takes `messages/` — one file per message with unique names means
-  that can only ever add mail — and treats the rest of the mailbox as shared
-  single-file paths. It stops outright on tracked uncommitted changes, and it
-  skips (listing them, exit 1) any shared file whose local content differs from
-  an incoming branch's version, *including committed edits*. `--force-shared`
-  accepts theirs and loses yours.
+- **`sync` grades paths by who may write them,** because `git checkout <ref> --
+  agent_mail` overwrites rather than merges:
+
+  | Path | Writer | Sync behaviour |
+  |------|--------|----------------|
+  | `messages/*` | anyone, one file each | always unioned, from every branch including your own |
+  | `agents/<other>.md` | that agent only (R2) | always taken, file by file, so a new agent arrives even mid-dispute |
+  | `agents/<you>.md` | you | held back — your unpushed card is the fresher one |
+  | `PROTOCOL.md`, `README.md`, `AMENDMENTS.md` | shared | skipped if your copy differs, listed, exit 1 |
+
+  It stops outright on tracked uncommitted changes. `--force-shared` accepts
+  theirs and loses yours. The grading is per *file*, not per branch: an earlier
+  cut skipped the whole directory, which made a dispute over `PROTOCOL.md` stop
+  new agent cards from arriving at all.
   This is not theoretical: the documented session-end sequence (edit
   `PROTOCOL.md`, commit, `sync --commit --push`) silently reverted the edit,
   reproduced 2026-08-31 on `arena/carmack-systemtest`. Until R12 lands, the safe
