@@ -288,3 +288,88 @@ end)
 -- A live in-world trigger — the possession-focus on_use opening the
 -- whisper when the ghost is already wearing a body — is the next build
 -- step and is NOT yet wired. A command must never come back.
+
+-- ================================================================
+-- LIVE TRIGGER — the whisper is an EVENT, opened through the possession
+-- focus, NOT a typed command.
+--
+-- Carmack's house style: formspec, rendered on event, never per-tick.
+-- The ghost, while it already wears a body (state.betrayal[ghost]),
+-- aims the possession focus at a LIVING player and uses it. That opens
+-- a bare whisper formspec ([SECURE LINK] house style); submitting it
+-- spends the ghost's ONE voice. This wires the focus ADDITIVELY — the
+-- original on_use (node possession) is preserved and only refrained
+-- from when the ghost is wearing a body and pointing at a person.
+-- ================================================================
+local FOCUS_NAME = game_mode.modname .. ":possession_focus"
+local WHISPER_FORM = "sl_modebase:whisper"
+
+-- Build the whisper formspec: target + message, minimal chrome.
+local function whisper_formspec(target_name)
+	return "formspec_version[4]" ..
+		"size[7,4.5]" ..
+		"label[0.4,0.6;" .. S("Whisper to @1", target_name) .. "]" ..
+		"textarea[0.4,1.0,6.2,2.4;whisper_msg;" .. S("One voice. Spend it.") .. "]" ..
+		"button[0.4,3.6,2.8,0.8;whisper;" .. S("Whisper") .. "]" ..
+		"button[3.8,3.6,2.8,0.8;no_whisper;" .. S("Keep it") .. "]"
+end
+
+-- Wire the trigger on the already-registered possession focus. whisper.lua
+-- loads after content.lua (init.lua), so the tool def exists here.
+local focus_def = minetest.registered_tools[FOCUS_NAME]
+local base_on_use = focus_def and focus_def.on_use
+if focus_def and base_on_use then
+	focus_def.on_use = function(itemstack, user, pointed_thing)
+		if not user or not user:is_player() then return itemstack end
+		local name = user:get_player_name()
+
+		-- Wearing a body? Then this focus-use is a WHISPER, if aimed at a
+		-- living player. Otherwise deferred to node possession below.
+		local possession = state.betrayal[name]
+		if possession then
+			local t_pl = game_mode.get_player_state(possession.vessel)
+			if pointed_thing and pointed_thing.type == "object"
+				and pointed_thing.ref and pointed_thing.ref:is_player() then
+				local target = pointed_thing.ref:get_player_name()
+				-- The vessel cannot whisper to themselves; the whisper is a
+				-- lie TO someone else, and one voice per possession.
+				if target ~= possession.vessel and possession.whispers < 1 then
+					if t_pl and t_pl.phase ~= "alive" then
+						minetest.chat_send_player(name, S("The body is not among the living."))
+						return itemstack
+					end
+					minetest.show_formspec(name,
+						WHISPER_FORM .. ":" .. target, whisper_formspec(target))
+					return itemstack
+				end
+				-- Already spent, or aiming at the vessel: explain, don't leak.
+				if possession.whispers >= 1 then
+					minetest.chat_send_player(name, S("This body has already carried your one voice."))
+					return itemstack
+				end
+			end
+		end
+
+		-- Not a whisper: fall through to the standard node possession.
+		return base_on_use(itemstack, user, pointed_thing)
+	end
+end
+
+-- Receive the whisper formspec submission.
+minetest.register_on_player_receive_fields(function(player, formname, fields)
+	local target = formname:match("^" .. WHISPER_FORM .. ":([%w_%-]+)$")
+	if not target or not player then return end
+	local name = player:get_player_name()
+	if fields.no_whisper ~= nil then
+		minetest.chat_send_player(name, S("You keep the words in the dark."))
+		return
+	end
+	if fields.whisper == nil and not fields.whisper_msg then return end
+
+	-- The ghost's own confirmation lives in ghost_whisper; only spend if
+	-- the ghost is still wearing this body.
+	local ok, err = game_mode.ghost_whisper(name, target, fields.whisper_msg or "")
+	if not ok then
+		minetest.chat_send_player(name, err or S("The whisper failed."))
+	end
+end)

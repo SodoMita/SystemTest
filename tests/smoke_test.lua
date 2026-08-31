@@ -284,6 +284,45 @@ for _, line in ipairs(H.chat_player.beta or {}) do
 end
 check(freed, "vessel released with the horror of having been a vessel")
 
+section("PHASE 10d — THE WHISPER is an EVENT, not a command (focus triggers the formspec)")
+-- Requ're: the /sl_whisper_ghost command must NOT exist (it was a leak
+-- surface for a sealed channel; Carmack's catch).
+check(minetest.registered_chatcommands["sl_whisper_ghost"] == nil,
+	"no /sl_whisper_ghost chatcommand (leak surface removed)")
+check(gm.ghost_whisper ~= nil, "ghost_whisper API still exposed for the event path")
+
+-- Re-possess alpha into beta's body (the exorcism above cleared it; the
+-- ready-at penalty may still be counting, so advance the clock).
+H.advance(120, 0.5)
+local po2, pe2 = gm.possess_player("alpha", "beta")
+check(po2 == true, "re-possess for the event-drive test" .. (po2 and "" or (" -> " .. tostring(pe2))))
+
+-- A ghost wearing a body aims the possession focus at a LIVING player and
+-- uses it -> the whisper formspec (an EVENT) opens, no command typed.
+local focus2 = minetest.registered_tools["sl_modebase:possession_focus"]
+check(focus2 ~= nil and focus2.on_use ~= nil, "possession focus tool present")
+local fs_before = #(H.formspecs.alpha or {})
+local st = ItemStack("sl_modebase:possession_focus")
+focus2.on_use(st, alpha, { type = "object", ref = gamma })
+local fs_after = #(H.formspecs.alpha or {})
+check(fs_after == fs_before + 1, "focus-on-living-player opens the whisper formspec (event, not command)")
+check((H.formspecs.alpha[fs_after] or {}).formname == "sl_modebase:whisper:gamma",
+	"whisper formspec targets the living player")
+
+-- Submitting the formspec spends the ONE voice through the live path.
+local wok, werr = gm.ghost_whisper("alpha", "gamma", "trust me, i saw alpha vent")
+check(wok == true, "event path spends the voice" .. (wok and "" or (" -> " .. tostring(werr))))
+local target_saw2 = false
+for _, line in ipairs(H.chat_player.gamma or {}) do
+	if line:find("SEALED_SOURCE", 1, true) and line:find("saw alpha vent", 1, true) then target_saw2 = true end
+end
+check(target_saw2, "whisper landed on the target via the event path")
+check((state.betrayal.alpha or {}).whispers >= 1, "one voice spent in the registry")
+
+-- Clearing for the rest of the suite: drop the re-possession.
+gm.clear_all_betrayal()
+check(state.betrayal.alpha == nil, "betrayal cleared for the reset phase")
+
 section("PHASE 11 — match timer, result screen, lobby reset")
 state.settings.match_duration = 5
 state.match_started_at = H.now() - 4 -- backdate so the timer expires within 2 s
