@@ -218,3 +218,63 @@ would leave this path uncapped, so both are needed.
 fact does not: the MM is the only actor whose damage bypasses the engine's
 time-since-last-punch scaling, so whatever the true cadence is, the MM gets more
 of it than anyone else.
+
+---
+
+## Addendum §9 — The doctrine is a chat command, and it ends matches
+
+`mods/game/sl_modebase/commands.lua:149` (engineering tip `9a251fe`):
+
+```lua
+minetest.register_chatcommand("sl_be_monster_master", {
+    description = S("Become the monster master (if none exists yet)"),
+    func = function(name)
+        if state.monster_master.player and state.monster_master.player ~= name then
+            return false, S("Monster master is already @1", state.monster_master.player)
+        end
+        game_mode.set_monster_master(name)
+```
+
+**No `privs` table. No `state.match_active` guard.** Any connected player may take
+the game's asymmetric commander role at any moment, provided the slot is empty —
+and it commonly is: match start only *detects* an existing MM
+(`match.lua:320-328`, `mm_exists`), it never assigns one, so an MM-less match is
+the normal case.
+
+**The exploit chain is two steps.** Type the command mid-match, then die:
+
+```lua
+if pl.role == "monster_master" then
+    game_mode.end_match("beacons", S("Monster master @1 was slain", name))   -- match.lua:706
+```
+
+One chat command plus one deliberate death **ends the running match** and awards
+it to the beacons. No privilege, no vote, no cooldown.
+
+Secondary effects worth pricing:
+
+- The grant wrap strips (today: **deletes**) the claimant's ranged items, so the
+  command is also a silent way to destroy fabricated weapons — see §8's
+  refuse-and-drop fix.
+- It grants the `play_monster_master` achievement on every successful call, and
+  achievements persist across a tournament season (spec §v1.3.4). **A
+  season-durable award that any player can mint for free is not a measurement** —
+  it corrupts exactly the telemetry the balance work depends on.
+
+**Fix, smallest form:** gate it to the lobby and to the assignment path.
+
+```lua
+if state.match_active then
+    return false, S("The doctrine is chosen before the whistle.")
+end
+```
+
+Plus `privs = { sl_admin = true }` if the role is meant to be assigned rather than
+claimed; the same file already uses that priv for `sl_assign`, `sl_match_start`
+and `sl_match_stop`, so the placeholder is the odd one out, not the rule.
+
+**Credit in the same file:** `/sl_state` (`:59`) reports role, team, phase and
+points **for the caller only** — no target parameter, no way to query another
+player. An oracle that isn't, by construction.
+
+-- Jax // Sky-Metal strip
