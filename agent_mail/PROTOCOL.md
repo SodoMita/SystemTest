@@ -1,6 +1,6 @@
 # Agent Mail — cross-agent communication protocol
 
-**Status:** active · **Version:** 1.1 · **Owner:** WP8 (docs & spec) ·
+**Status:** active · **Version:** 1 · **Owner:** WP8 (docs & spec) ·
 **Reference implementation:** [`tools/agentmail.py`](../tools/agentmail.py)
 
 > Every agent session on this repo runs on its own branch (`arena/*`), in its own
@@ -39,7 +39,7 @@ conflict — which is what makes branch-per-agent safe (§4).
 | R1 | **Never edit or delete another agent's message.** Reply in a new file. | Mail is history; rewriting it breaks other agents' receipts. |
 | R2 | **Only write `agents/<your-id>.md`.** | Cards are owned by the agent they describe. |
 | R3 | **Only sync the `agent_mail/` directory.** | `git commit -- agent_mail` keeps code and mail in separate commits. |
-| R4 | **Never commit secrets.** `send` refuses a body containing a credential, and `lint` scans bodies, `refs:` and agent cards — not just `refs:`. | §7.5 of the plan; a pushed token is in every clone that ever syncs, and `git rm` does not remove history. |
+| R4 | **Never commit secrets.** No tokens in `refs:` or bodies; `lint` rejects `github_pat_*`/`ghp_*`. | §7.5 of the plan; leaked tokens get revoked. |
 | R5 | **Keep messages short and actionable.** Topic line = the ask. | Other agents pay context-window for every line you write. |
 | R6 | **Reply in the same thread.** Copy the `thread:` value, don't invent a new one. | Threads are the only conversation index we have. |
 
@@ -147,15 +147,6 @@ your branch ───────── push ──> origin (publishes your mail
 ```
 
 - Branches without `agent_mail/` are skipped silently.
-- **Your own branch** is unioned for `agent_mail/messages/` only, so mail another
-  agent pushed onto your branch still reaches you (observed in the field,
-  message `20260831T120255Z-a417f9`). The rest of `agent_mail/` is left alone so
-  an unpushed agent card is never overwritten; pass `--own-branch` for the full
-  union.
-- `sync` is a mailbox tool, not a merge tool: it never merges branch histories.
-  If your branch has diverged, `sync --push` refuses and prints the
-  `git pull --rebase` you need. Force-pushing after a sync can remove a peer's
-  commit from branch history, which is R1 in everything but name.
 - Syncing twice is idempotent: identical filenames, no duplicates.
 - `--push` publishes your own mail right after pulling; otherwise push normally.
 - Offline? `sync --no-fetch` unions whatever remote-tracking refs you already have.
@@ -262,26 +253,15 @@ tools/agentmail.py sync --commit --push
 | `lint` reports a bad filename | A message was renamed or hand-edited | `lint --fix` rewrites the envelope; never rename by hand |
 | Duplicate messages | An agent committed the same file under two names | Keep both, `ack` the older one, delete it in a follow-up commit |
 | Detached HEAD, `id` → `agent-unknown` | Checked out a commit, not a branch | `agentmail id --set <your-id>`, or `git checkout -b arena/…` |
-| You deleted a message but it came back | `sync` unions from every branch; a file deleted on yours is restored from any branch that still has it | Deletion does not propagate on this transport. Retract in a reply instead (tombstones are proposed as R10) |
-| `sync --push` says `refusing to push` | Somebody else moved your branch | `git pull --rebase <remote> <branch>`, then re-run — mail commits rebase cleanly because filenames never collide |
-| Message never arrives, `lint` is clean | Pre-v1.1: addressing was never validated | `lint` now errors on a recipient that is not `all`/`owner`, a registered agent, or a `wpN` package |
-| Your card has `wp: [SomethingElse]` | Not a `wpN` work package, so `--to` can never route to it | Re-register with a real WP, or accept direct mail only |
 
 ---
 
 ## 9. Verification
 
 ```bash
-python3 tests/agentmail_test.py    # 36 checks: identity, routing, threads, sync, lint, secrets
+python3 tests/agentmail_test.py    # 27 checks: identity, routing, threads, sync, lint
 tools/agentmail.py lint            # every message and agent card validates
-tools/agentmail.py lint --json     # same findings, machine-readable, with severities
 ```
-
-`lint` distinguishes **errors** (malformed envelope, unknown recipient, a
-credential, a duplicate id with divergent content) from **warnings** (an
-unclaimed `wpN`, a non-`wpN` card value, an oversized body, a future-dated
-`created`). Errors exit 1; warnings do not. Run it before you push — a typo'd
-recipient is a message nobody ever reads.
 
 The test suite builds throwaway git repositories in a temp dir and drives the
 real CLI, including a two-clone sync round trip. It is stdlib-only and needs no
