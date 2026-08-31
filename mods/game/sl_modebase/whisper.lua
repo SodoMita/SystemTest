@@ -128,13 +128,11 @@ local function ghost_whisper(ghost_name, target_name, message)
 	-- static. A ghost that whispers should sound like one.
 	minetest.sound_play("A_A", { to_player = target_name, gain = 0.6 }, true)
 
-	-- Log the EVENT, never the people. minetest.log writes to debug.txt on
-	-- disk, which survives restart and is already parsed by the soak harness
-	-- (run_soak.py parse_debug_txt) — so any player name here becomes a
-	-- permanent, named record of who possessed whom. A whisper is an
-	-- addressed secret the ledger is forbidden to keep (SEALED_SOURCE, the
-	-- recipient its only witness). This log names no one: diagnosis, not
-	-- document.
+	-- Log the EVENT, never the people. The action log persists on disk and
+	-- survives server restart — so any player name here becomes a permanent,
+	-- named record of who possessed whom. A whisper is an addressed secret
+	-- the ledger is forbidden to keep (SEALED_SOURCE, the recipient its only
+	-- witness). This log names no one: diagnosis, not document.
 	minetest.log("action", "[game_mode][WHISPER] one addressed whisper spent")
 	return true
 end
