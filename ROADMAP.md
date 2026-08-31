@@ -139,6 +139,16 @@ match ends correctly and announces the winner.
    (keeps the game playable throughout).
 3. Flesh out the death → ghost → monster → monster-master cascade from the GDD.
 4. Add the other win modes (point-based, defense) once the objective mode proves fun.
+5. **Monster bestiary pass — imagine better monsters:** the current roster
+   (Stalker, Scout, Brute, Dredger, Signal Wraith, Containment Horror) is
+   behaviorally thin. Design each creature's identity: movement signature,
+   tells, abilities, counterplay, lore documents (per `EVENT IDEAS.md`:
+   lore = text files, logs = simple tables), audio, and role in the horde.
+   **Keep names deliberately generic** — a generic name is an asset for AI
+   generation (textures, models, audio, lore text): a plain name stays a
+   clean prompt, while the character lives in behavior, sound, and
+   documents, not in the label. The bestiary feeds both the MM Spawner Unit
+   list and the revival-form roster (Phase 5).
 
 ---
 
@@ -164,3 +174,29 @@ match ends correctly and announces the winner.
     - [ ] Implement income system based on damage dealt by monsters.
 - [ ] Lore Integration:
     - [ ] Add readable data pads/terminals with AI-generated horror logs.
+
+## Phase 5 — Points & Revival Forms (challenge layer)
+- [ ] Points economy: define and implement earn rules (kills, repairs, beacon
+      pressure, objective actions); keep the existing result-screen and
+      `/sl_state` display; tune via soak telemetry (per-match point deltas).
+      Points are the challenge layer — see GDD "Points (Challenge)".
+- [ ] Points balance model (MiniZinc or equivalent CP/optimizer): encode the
+      economy as a constraint/optimization model — variables are the point
+      values per action class plus role asymmetries (MM income, Evil Ghost
+      forfeiture); constraints are the targets (win-rate band, side bias,
+      K/D band, per-role point ceilings, no negative-value sinks). Solve for
+      parameter sets and enumerate **many unrelated** feasible/optimal
+      regimes (different objective weights and constraint relaxations) so the
+      balance *space* is mapped, not a single fitted point. Validate top
+      candidates against soak telemetry (turbo sweeps, per-match point
+      deltas) before adopting.
+- [ ] Point-based win mode (after the economy is stable) — see Phase 3.
+- [ ] Revival forms: multiple ghost options on revival — underground monster
+      forms (sl_scary lineage) plus the Evil Ghost. Evil Ghost is the
+      pure-hate/revenge role: forfeits points and the ability to win on
+      points. Define revenge focus and bounded revenge abilities within the
+      existing cooldown/counterplay framework.
+- [ ] Form items: personal-inventory craft items (non-placeable) gating each
+      non-default form; crafted while alive, consumed on revival.
+- [ ] Re-home the deprecated `ghost_mutator` node as the revival-form choice
+      point (or fold the choice into the Ghost Altar flow).

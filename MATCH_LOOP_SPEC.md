@@ -54,6 +54,17 @@ Still open (Phase A remainder):
   routes, cover, hand-placed pickups).
 - Direct-message UI polish and reconnect hardening pass.
 
+Known design gaps vs. the GDD (not yet implemented):
+
+- Points: the per-player points state, the result-screen point column, and the
+  evil-ghost forfeit already exist in code, but no earn rule is implemented;
+  all scores currently read 0. See GDD "Points (Challenge)".
+- Revival forms: only the base Evil Ghost form exists (the `reincarnate`
+  item). The GDD specifies multiple revival options — underground monster
+  forms plus the Evil Ghost (pure-hate/revenge role), unlocked by crafted
+  form items. The deprecated `ghost_mutator` node keeps the
+  neutral-monster-mutation hook for this.
+
 Live-engine soak test (August 2026): `tests/soak/run_soak.py` boots a real
 Luanti server where the `aaa_botmatch` harness runs simulated AI players
 through full matches — insertion, PvP, deaths, cloud cage, altar ritual,

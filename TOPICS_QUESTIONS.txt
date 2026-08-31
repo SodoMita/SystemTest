@@ -1,0 +1,11 @@
+Topics and questions from the singleplayer design session for System Looting (Minetest/Luanti repo).
+1. Singleplayer mode: the bot-lobby mix already works by config (low-hanging fruit), so it stays as a standalone arcade option.
+2. True singleplayer = story + tutorial: one-time guided run, scripted twist (the instructor is dead), two endings, no cutscenes, data-driven scenes.
+3. Better singleplayer = self-haunting roguelike: past runs revive as ghosts of you, seeded run chain, behavioral drift, debt from burned scores, empty-cage win.
+4. Ghost revival options: underground monster forms + evil ghost (pure-hate/revenge role that sacrifices the ability to win by points), unlocked by crafted form items consumed on revival.
+5. Points = challenge layer, not implemented yet (state, display and forfeit exist, no earn rule); balance the economy with MiniZinc or another optimizer across many unrelated regimes.
+6. Bestiary pass: imagine better monsters (movement, tells, abilities, counterplay, lore, audio); names deliberately generic because generic is good for AI generation.
+7. Story route: generated Nethack/Terraria-style descent instead of hand-built cages (too time-consuming); multiple endings by what the player does; winning a match is just one option.
+8. Discovery drives the horror: archive memos, fuel cell, studio logs, edge of world, quiet room, second cage; dread systems (events, schedule, light, discovery) are the implementation ask.
+9. Open questions: revenge bounds, form choice point, debt economy shape, ending flag combos, per-creature identities, what the unnamed form is.
+10. Done: docs updated (GDD, match loop spec, roadmap) with revival forms, form items, points, bestiary and MiniZinc items; no code changes.

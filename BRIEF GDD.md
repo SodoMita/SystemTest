@@ -11,7 +11,7 @@ A competitive survival game inside a hostile cybernetic simulation. Teams fight 
 - Players scavenge, move, defend, and attack. Single life: the first death sends a player to the cloud cage.
 - Initial match gameplay uses fixed equipment and hand-placed pickups.
 - Crafting is a later system, not a requirement for the first playable loop.
-- Win conditions may include elimination and, later, objective delivery, defense, and point modes.
+- Win conditions may include elimination and, later, objective delivery, defense, and point modes (points not yet implemented — see "Points (Challenge)").
 
 ## Identity Is Deliberately Ambiguous
 
@@ -30,7 +30,7 @@ There is no team chat. Direct messages are an intentional social mechanic.
 Death is a state transition, not an immediate exit.
 
 ```text
-ALIVE -> GHOST IN CLOUD CAGE -> EVIL GHOST AFTER REVIVAL -> ELIMINATED
+ALIVE -> GHOST IN CLOUD CAGE -> REVIVAL (FORM CHOICE) -> EVIL GHOST or UNDERGROUND MONSTER -> ELIMINATED
 ```
 
 ### Ghost in Cloud Cage
@@ -44,18 +44,29 @@ ALIVE -> GHOST IN CLOUD CAGE -> EVIL GHOST AFTER REVIVAL -> ELIMINATED
 - A summoned ghost may offer information to that player.
 - Information can be used after revival.
 
-### Evil Ghost
+### Revival Forms
+Revival is a voluntary and morally negative choice. Reviving is not a single state: a contained ghost chooses **which form** to come back in.
 
-Revival is a voluntary and morally negative choice. The revived player becomes an evil ghost and loses all points earned by that player at the end of the match.
+- **Evil Ghost** (base form) — the reviver stays in a humanoid form and plays the **pure-hate / revenge role**: they forfeit all match points and cannot earn or win on points for the rest of the match. In exchange they play for revenge — hunting the living, possessing, corrupting, and breaking what was lost. Their measure of success is not the scoreboard; it is the damage they leave and the uncertainty they seed.
+- **Underground Monster forms** — non-human revival forms drawn from the horror bestiary (the `sl_scary` lineage to start: Dredger, Signal Wraith, Containment Horror, with more underground types added over time). Each form has its own abilities, strengths, and counterplay, distinct from the Evil Ghost and from each other.
 
-An evil ghost may:
+**Unlocking by crafting (form items).** Every non-default form is gated by a dedicated **form item**: a non-placeable personal-inventory craft item. Form items are crafted **while alive** (ghosts may craft information items only, so the choice is prepared before death) and **consumed on revival** to take that form. A ghost holding no form item can take only the base Evil Ghost form via the base reincarnation item. Form items are a personal-preparation decision, not a placeable and not a world change.
+
+An evil ghost (base form) may:
 
 - Fly around the map.
 - Taunt through permitted audiovisual interactions, not normal ghost chat.
 - Possess selected items or objects.
 - Sabotage systems and interactable objects.
 
-Evil ghost powers require cooldowns, discoverable causes, and counterplay. They must create uncertainty, not unrestricted griefing.
+All revival-form abilities (Evil Ghost and Underground Monster forms) require cooldowns, discoverable causes, and counterplay. They must create uncertainty, not unrestricted griefing. Revenge-specific targets and bounds for the Evil Ghost role are an open design detail, to be defined within that framework.
+
+## Points (Challenge)
+Points are the match's challenge currency: they measure what a player accomplished during a match and are public on the result screen. Planned sources include kills, repairs, sabotage survived, beacon pressure, and objective actions; the economy is tuned via soak-test telemetry (per-match point deltas alongside win rates and K/D).
+
+- Points feed the planned **point-based win mode** (see "Core Match").
+- **Evil Ghost revival forfeits all points and removes the ability to earn or win on them** — that sacrifice is the price of the revenge role (see "Revival Forms").
+- **Status: not implemented.** The per-player points state, the result-screen point column, and the revival forfeit already exist in code; no earn rule is implemented yet, so all scores currently read 0. The point economy must land before point-based win modes (see ROADMAP, Phase 5).
 
 ## Monster Master
 
@@ -81,7 +92,7 @@ Only the Monster Master can operate the unit.
 
 Crafting is deferred until the match loop is stable.
 
-- Personal inventory crafting may produce non-placeable items such as information, consumables, charges, repair kits, keys, and tokens.
+- Personal inventory crafting may produce non-placeable items such as information, consumables, charges, repair kits, keys, tokens, and form items (revival-form keys — see "Revival Forms").
 - Placeable, structural, deployable, or world-affecting items may **not** be crafted directly in the player inventory.
 - Those items must be produced on dedicated machines or stations with input slots, processing time, and risk.
 
