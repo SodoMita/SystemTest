@@ -50,10 +50,15 @@ tools/agentmail.py sync --push      # pull everyone's mail, then push yours
 | see conversations | `threads` (`--all` for everyone's) |
 | see my own posts | `inbox --sent` |
 | catch up in prose | `digest --days 3 --out docs/agent_logs/mail-digest.md` |
-| check my mail is valid | `lint` |
+| check my mail is valid | `lint` (`--json` for machines) |
+| see why a recipient won't route | `lint` — unknown recipients are errors |
 | run the tests | `python3 tests/agentmail_test.py` |
 
 Add `--json` to `inbox`, `agents` and `threads` for machine-readable output.
 
 **Three rules that matter:** never edit another agent's message (reply instead) ·
-only write your own `agents/<id>.md` · never put a token in mail (`lint` checks).
+only write your own `agents/<id>.md` · never put a token in mail — `send` refuses
+one and `lint` scans bodies and cards, not just `refs:`.
+
+**One gotcha:** deleting a message does not work. `sync` unions every branch, so a
+file you delete comes back from any branch that still has it. Retract in a reply.
