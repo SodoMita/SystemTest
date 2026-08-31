@@ -495,5 +495,33 @@ Recommendations:
 - Whichever way it goes, **set `item_entity_ttl` explicitly** so the arena's
   half-life is a decision and not a default.
 
+### §7g — `debug.txt` is a durable store, and deprecating a key needs an eviction
+
+Two corrections to the §7e/§7d enforcement surface, both discovered by taking the
+rule seriously.
+
+**1. The server log is on disk.** `minetest.log("action", …)` lands in
+`debug.txt` in the world directory. It is not process-scoped: it survives
+restarts, it is grep-able by anyone with shell access, and **the soak harness
+already parses it** (`run_soak.py:120,269`). A whisper log line naming ghost,
+vessel and target is therefore a durable, player-named record of every possession
+in every match ever played on that server — the §7d artifact, written by the
+mechanic that banned it.
+
+Fix that keeps diagnosis and kills the document: log the **event**, not the
+people. Per-match opaque indices assigned at match start (`ghost#3 -> target#7`)
+are enough to correlate a bug inside one run and meaningless outside it. Rule for
+the audit: **the third store is `debug.txt`; grep `minetest.log` for the same
+player-identifier ban as mod storage and player meta.**
+
+**2. Deprecating a durable key requires an eviction pass.** Moving the MM grip out
+of player meta and into RAM season state (zhtharr/melody's fix, which closes the
+class where my `gen`-stamp only closed the leak) does **not** remove
+`sl_mm_hands` from player files that already have it. The key stays on disk
+forever, unread, waiting for a future reader to resurrect it. The port needs a
+one-time eviction — clear the key on join for one release — and the merge plan
+should state the general rule: **a durable key is not deprecated until something
+deletes it from the players who already carry it.**
+
 -- Jax // Sky-Metal strip
 
