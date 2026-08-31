@@ -1,5 +1,5 @@
-# SYSTEM LOOTING — FINISHED GAME DESIGN
-## The reviewable conclusion (Melody, Science Team / Comms)
+# SYSTEM LOOTING — MASTER DESIGN & BUILD PLAN
+## The authoritative integration of the game's design (Melody, Science Team / Comms)
 
 > **Why this file exists.** The game was spread across eight half-overlapping docs
 > (`BRIEF GDD`, `MATCH_LOOP_SPEC`, `ROADMAP`, `EVENT IDEAS`, `CRAFTING_GUIDE`,
@@ -10,8 +10,9 @@
 > resolves how they compose. Any line that contradicts the detail docs, this wins.
 >
 > **Who reads this:** an implementing agent. Read §1–§4 to get the whole thing, then
-> §5 (build order) and execute in order. Stop when a stranger can join a server and
-> complete a full match without admin help, and the match *feels* like System Looting.
+> §6 (what's real), then §11 (build order) and execute in order. Stop when a stranger
+> can join a server and complete a full match without admin help, and the match
+> *feels* like System Looting.
 
 ---
 
@@ -234,7 +235,211 @@ Two classes of threat:
 
 ---
 
-## 5. Build order for the implementing agent
+## 5. Ground truth: the numbers that are already real (verified from code)
+
+The bestiary above is *behavior*; these are the *stat blocks that exist in code*
+(`mods/game/sl_modebase/entities.lua`) and the mode constants the implementer works
+against. Treat these as locked unless the playtest says otherwise.
+
+### 5.1 Monster stat blocks (already in `entities.lua`)
+
+| Variant | HP | Speed | Damage | Size | Notes |
+|---|---|---|---|---|---|
+| Stalker | 30 | 2.5 | 4 | 1.0×1.0 | balanced hunt |
+| Scout | 15 | 3.8 | 3 | 0.7×0.7 | fast, fragile, marks |
+| Brute | 60 | 1.6 | 8 | 1.4×1.4 | tank, heavy burst |
+| Dredger | 40 | 3.0 | 4 | sl_scary | slow patrol, job-bound |
+| Signal Wraith | 20 | 2.5 | 3 | sl_scary | broadcaster, warps text |
+| Containment Horror | 80 | 1.0 | 10 | sl_scary | the one behind the door |
+
+`MONSTER_TYPE_ORDER = { stalker, scout, brute, dredger, wraith, containment }` — the
+order the spawner GUI renders and the soak treats as canonical. **The §4 behaviors
+are the design these stats should be tuned toward** (Scout marks = its damage the
+not-fight; Brute commits = its speed the not-catch; Wraith warps text = its damage is
+secondary). If a stat fights its §4 identity, the identity wins.
+
+### 5.2 Mode constants (already in `sl_modebase`)
+
+| Constant | Value | Where |
+|---|---|---|
+| Beacon HP | 100 | `state.teams[*].beacon_hp` |
+| Sabotage duration | 30 s | match.lua |
+| Possession duration | 20 s | match.lua |
+| Possession cooldown | 45 s (+30 s if exorcised) | match.lua |
+| Body-possession ready-time | 2 × possession cooldown (design) | whisper spec §5 |
+| Whisper budget | 1 per possession | whisper spec |
+| Signal Scanner range | 24 m, 5 s cooldown | content.lua |
+| Monster Spawner cooldown | 5 s default (per-node tunable) | content.lua |
+| Monster Essence per spawn | 1 | content.lua |
+| Sawner min essence | 1 (per-node tunable) | content.lua |
+| Match timer | configurable; ends → draw on `Time expired` | match.lua |
+
+> **Design note:** these are *starting* numbers, marked "we'll see how it plays." The
+> implementer should make them tuning knobs (constants/settings), not literals,
+> so the balance model in §11 Phase 4 can sweep them.
+
+---
+
+## 6. The content catalogue (what's real, what's missing)
+
+The implementer needs the actual item graph, not a vibe. Here's the ground truth from
+`mods/game/sl_modebase/content.lua` — what's registered, what group it belongs to, and
+what the design says it's *for.*
+
+### 6.1 Salvage (raw loot) — `groups = { salvage }`
+`scrap_metal`, `electronic_waste`, `raw_crystal`, `plastic_scrap`. These are the base
+of every recipe. **Loot sources:** the `item_pickup` node (random of one of these) +
+`give_initial_stuff`.
+
+### 6.2 Components — `groups = { component }`
+`metal_ingot`, `circuit_board`, `energy_crystal`, `hardened_plate`, `reinforced_glass`.
+The mid-tier. Per the crafting field guide, scrap → ingots → blades; components → the
+Objective Core.
+
+### 6.3 Equipment (tools/weapons)
+`combat_blade` (6 dmg), `breaching_pick`, `tactical_axe`, `trench_shovel`,
+`energy_blade` (12 dmg), `power_drill`. **Design note:** the energy blade at 12 is the
+endgame damage that makes a Brute (60 HP) a ~5-hit kill — fine, but it must be gated
+behind the Objective recipe tree, not dropped in Phase 0.
+
+### 6.4 Tactical consumables
+`flare` (light/particle), `medkit` (+8 HP, doesn't overheal). One-shot.
+
+### 6.5 Tactical/objective *nodes* (placeables — machine-only per the personal-vs-machine split)
+`power_cell`, `blast_shield`, `barricade`, `signal_relay`, `sensor_array`. **CRITICAL
+design gap:** these are currently registered as placeable nodes reachable from the
+inventory — this **violates** the `MATCH_LOOP_SPEC` rule that placeables come only
+from machines. **Phase 1 must move them behind a machine or remove direct crafting.**
+
+### 6.6 Ritual (rare, consumed by Ghost Altar)
+`ritual_ashen_relic`, `ritual_soul_shard`, `ritual_signal_ink`.
+
+### 6.7 Information items — `groups = { information }` (the "loot" the thesis cares about)
+`data_pad_security`, `data_pad_logistics`, `data_pad_medical`. **These carry the
+horror-as-evidence layer already** — each `on_use` prints a line (e.g. Dredger = Kowalski;
+"340k saved on inspections... tell the families it was an accident"). **This is the
+EVENT IDEAS doctrine already wired.** The §7 reading-set theory (Safety Waiver Wall,
+Pressure Test Log, etc.) should extend *this* inventory, not invent a parallel system.
+
+### 6.8 Monster Master + evil-ghost kits
+`summon_monster` (MM tool), `monster_essence` (MM fuel), `monster_spawner` (the feedable
+unit + GUI), `sabotage_charge` (evil ghost, 1 per revival), `possession_focus`
+(evil ghost, reusable), `scanner` (living, identity-neutral), `reincarnate` (ghost →
+evil ghost).
+
+### 6.9 Interactable world nodes
+`terminal`, `door_closed`/`door_open`, `hatch`/`hatch_open`, `platform`, `item_pickup`.
+
+### 6.10 Missing (the implementer must add per the design)
+- **`objective_core`** — the win item. Doesn't exist yet. **Highest-priority add.**
+- **Machine stations** (Salvage Bench, Fabricator, Assembly Station, Signal Terminal,
+  Objective Forge) — referenced but not implemented (`content/workshops` is commented out).
+- **Form items** for the underground-monster revival forms.
+- **The full EVENT IDEAS document set** (pads are a start; the set pieces are not).
+
+> **The blunt truth for the implementer:** the item graph is *present but not
+> connected to a win.* The objective_core + the machine gate are the two things that
+> turn "a crafting system" into "a game." Everything else is garnish until those land.
+
+---
+
+## 7. Roles & match composition (who's in the match)
+
+The GDD and match-loop spec name roles but never say how many. Here's the composition
+a finished match supports (design; the implementer enforces bounds):
+
+| Role | Count | Win path | Notes |
+|---|---|---|---|
+| Beacon A survivors | 1–3 | defend A + pressure B | visually identical |
+| Beacon B survivors | 1–3 | defend B + pressure A | visually identical |
+| Monster Master | 0–1 (optional) | MM income/deploy | asymmetric |
+| Ghosts (cloud cage) | all dead | observe via summon only | isolated |
+| Evil Ghost | any who chose it | revenge, no points | forfeits score |
+| Whisper Betrayer | 0–N (one per body possession) | carries the secret | Melody's mechanic |
+
+- **Minimum viable match:** 2 players, one per beacon team (verified: the ready check
+  requires ≥2 on *each* beacon team). An MM is optional — the game must run without one.
+- **Team balancing:** `assign_beacon_team` puts a new player on the *smaller* beacon
+  (count_a <= count_b). Good; an implementer must not break this.
+- **The Whisper's role placement:** it needs an **alive, on-team, not-possession** body —
+  so a match with ≤1 living player per team can't carry a whisper. That's fine; it's a
+  rich-match mechanic, not a baseline one.
+
+> **Design constraint that falls out:** because everyone is visually identical and the
+> HUD never leaks team, the *only* reliable read of "who's with me" is the beacon
+> assignment itself. That's intentional. The dream is a 3v3 where each player is 60%
+> sure of their two "teammates" and has to use the information channels to close the
+> other 40% — and a whisper can make even that surety lie.
+
+---
+
+## 8. HUD & communication contract (identity-neutral, load-bearing)
+
+The fiction is that the node refuses to render identity. So the UI is a **hard contract**:
+
+**Must show (per player):** match phase, match clock, own phase state (alive / ghost /
+evil_ghost), own role-local info, objective (beacon / core) status, own inventory.
+
+**Must NEVER show:** team name/color/emblem, another player's phase, another's private
+state, possession status, who is the Betrayer, sabotage *owner*, who sabotaged what.
+The Signal Scanner reports *kind + distance + bearing + time-left*, never *who.*
+
+**Commands** (already registered — the implementer doesn't invent new ones, it audits
+these): `/sl_ready`, `/sl_match_start`, `/sl_state`, `/sl_ghost_offer`,
+`/sl_summon_ghost`, `/sl_be_monster_master`, `/sl_autostart`, `/sl_test_objective`.
+
+> **The audit:** `git grep -n "team\|role\|possess" mods/game/sl_modebase/hud.lua`
+> should return only identity-neutral strings. If the HUD ever renders a team color,
+> the fiction breaks and the whole social-deduction spine collapses. Treat this as the
+> same class of hard rule as the whisper's non-publication.
+
+---
+
+## 9. Audio & asset hard rules (locked by owner directive)
+
+These are constraints, not preferences. The implementer must follow them:
+
+1. **Only `.ogg`** — never `.mp3`/`.wav`/`.opus`/`.aac`. The menu currently has `.mp4`/
+   `.aac`/`.mp3`/`.wav` and is **silent**; convert to `.ogg`/`menu_music.ogg`.
+2. **16 kHz mono preferred** for voice/ambience (small, clear, low-spec).
+3. **Reuse the scary voice** — `sl_scary`'s `A_A` family (`A_A.ogg`, `A_A1.ogg`,
+   `A_A2.ogg`) is the *existing* horror voice and is **currently unused**. Use it for the
+   whisper and the Dredger/Wraith/Containment. **Do not synthesize new voice assets.**
+   (`A_A.opus` exists but is `.opus` — omit it; keep `.ogg`.)
+4. **Existing `sl_scary` sounds to reuse** (all `.ogg`): `mob_death`, `mob_idle`,
+   `scary_attack`, `random_dizz` (retained for machine malfunction, per `MATCH_LOOP_SPEC`).
+5. **No new shaders/entities/particles** just for the whisper — it reuses the existing
+   DM formspec + the `radio_static.ogg` (whisper spec §3.3). Low-spec-honest.
+
+---
+
+## 10. Win conditions & reset contract
+
+The implementer's job is to make a match *end and reset cleanly.* Here's the contract:
+
+### 10.1 Win conditions (the flags are real — `state.win_conditions`)
+- **`elimination`** (implemented): a beacon team wins when the other team has no
+  alive, non-eliminated players on that team (`check_team_elimination`). MM-slain also
+  ends (→ the opposite team wins).
+- **`objective`** (flag exists, **not implemented**): a team wins by crafting +
+  delivering the Objective Core to its beacon. **This is Phase 1's whole job.**
+- Neither flag set → match runs on timer, ends on `Time expired` (draw).
+- **Priority if both set:** objective delivery should win the match immediately when it
+  completes; elimination remains the fallback. The implementer should make this the
+  first thing in `end_match`'s checks.
+
+### 10.2 The reset contract (what "clean reset" means, verified)
+On match end/restart, the following are **normalized** (all already implemented but each
+must be re-checked): phases → lobby, points → 0, inventories → starting kit, all
+sabotages purged, all possessions (object *and* body) purged, whisper state cleared,
+ghost privileges revoked, Monster Master re-randomized. **The whisper's reset is the
+gate the science team fought hardest for** — `clear_all_betrayal` must run on reset,
+and body-possession must ride the existing `clear_all_possession` path so there's one
+reset, not two.
+
+---
+
+## 11. Build order for the implementing agent
 
 Do these in order. The end state of each is a reviewer-checkable goal. This is
 **design direction** — the implementer owns the code and tests; the science team
@@ -265,7 +470,7 @@ owns the *what* and the *why*.
 **Exit check:** 2 players, 2 teams; gather -> craft -> deliver Core -> match ends;
 winner announced correctly.
 
-### Phase 2 — stabiliize multiplayer (support the information economy)
+### Phase 2 — stabilize multiplayer (support the information economy)
 1. Hand-built arena (singlenode): two beacons, lobby, cage, MM area, routes, cover,
    hand-placed pickups — committed to the repo.
 2. Match lifecycle UX: `/sl_match_start`, phase HUD, objective progress.
@@ -322,7 +527,7 @@ something they didn't earn.
 
 ---
 
-## 6. The finished-game "feel" checklist (the reviewer's gut check)
+## 12. The finished-game "feel" checklist (the reviewer's gut check)
 
 A match of System Looting is working when a player:
 
