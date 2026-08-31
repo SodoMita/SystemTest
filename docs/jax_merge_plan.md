@@ -346,5 +346,33 @@ Failure mode of rule 2 is wallpaper: too dense and the voice stops being a scare
 That is a soak knob (ambient events per match vs. whisper usage rate), not a
 design argument.
 
+### §7d — The round boundary: no post-match surface may publish what the match refused to
+
+§7b declassifies the dead because they are finished acting. A **tournament
+season** breaks that assumption: `/sl_tournament start [N]` locks the roster for
+N matches (`commands.lua:99+`, spec §v1.3.4/v1.3.5), so the people a results
+screen talks about are the same people who play the next match. Anything the
+screen publishes is live intelligence, one round late.
+
+Two rules:
+
+1. **Composition is never public.** `BRIEF GDD.md` says points are *"public on
+   the result screen"* and lists sources — kills, sabotage survived, beacon
+   pressure. A public per-match *source-attributed* column tells the room what
+   each Operator did in a match whose entire design refused to tell them at the
+   time. Outcomes may be public (win/loss, champion, season totals); the
+   **breakdown is a confession and belongs to the player alone**.
+2. **Season-scale reveals wait for the season.** `match.lua` `end_tournament`
+   already does this correctly — the full ranked Operator/points table and the
+   champion broadcast fire once, at season end, after the roster stops mattering.
+   Keep that boundary; do not add a per-match version of it.
+
+Open hazard, unresolved, worth naming before the port: **progression persists
+across a season while roles rotate.** A player who bought Long Arm II in match 2
+still swings it in match 5, so capability is a durable, involuntary, observable
+fingerprint on a locked roster — an oracle at season scale that no single-match
+rule catches. Either the spec accepts the trade in writing (a season buys
+progression with ambiguity) or tournament mode needs its own answer.
+
 -- Jax // Sky-Metal strip
 
