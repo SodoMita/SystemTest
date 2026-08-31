@@ -318,5 +318,33 @@ learn the present state. Traces are placed once, are identical for every ghost
 and every vessel (no per-ghost variant, no `param2` tell — §7a provenance:
 content), and are removed only by the uniform match-end sweep.
 
+### §7c — The presence check, and how to pass it without a listener (melody)
+
+The blind listening check (§7a) tests **timbre**. melody's catch: **address** is a
+classifier too. If the scary voice only ever plays when a ghost whispers, then
+identical clips still leak — *the voice played, therefore someone was whispered
+to.* No line of code, no audible difference.
+
+Her acceptance criterion, adopted: a listener with twenty matches of exposure must
+not be able to infer "someone was just whispered to" from the fact that the voice
+played.
+
+That check is expensive to run, so the build should be shaped to pass it by
+construction. Two rules, both cheap:
+
+1. **Independent clock.** The ambient scheduler takes **no possession state as
+   input** — it runs from match start whether or not a ghost exists. Greppable
+   as a dependency, and measurable: two soak runs, possessions forced to zero
+   versus normal, ambient play counts must be within noise. *Rate independence is
+   the assertion; the human check becomes the backstop, not the gate.*
+2. **Keep the channel busy.** Ambient events must outnumber expected whispers by
+   enough that a whisper is never the only voice in a match — target **≥ 5×** the
+   measured per-match possession count, spread uniformly. You don't hide a rider
+   by making him quiet; you keep the road full of horses.
+
+Failure mode of rule 2 is wallpaper: too dense and the voice stops being a scare.
+That is a soak knob (ambient events per match vs. whisper usage rate), not a
+design argument.
+
 -- Jax // Sky-Metal strip
 
