@@ -65,6 +65,11 @@ the merge train hit them.
 - `tools/agentmail.py lint` — clean on the mailbox as committed.
 - No Lua was touched, so `tests/smoke_test.lua` / `soak` were not re-run; the
   change is docs + a standalone Python tool.
+- **Live adoption check:** cloned this branch into a scratch checkout on a
+  sibling branch `arena/01a05759-systemtest`, registered there as WP4, and
+  confirmed the union behaves: the WP4 agent sees the `all` broadcast in its
+  inbox, does *not* see the `owner`- or `wp8`-addressed mail, its `ack` joins the
+  `mailbox-is-open` thread, and `lint` stays clean across both agents' cards.
 
 ### Skipped, and why
 

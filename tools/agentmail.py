@@ -227,13 +227,22 @@ def dump_frontmatter(meta: dict, body: str) -> str:
 # --------------------------------------------------------------------------- #
 
 def find_root(start: Path | None = None) -> Path:
-    start = (start or Path(__file__).resolve().parent).resolve()
-    for candidate in [start] + list(start.parents):
-        if (candidate / ".git").exists():
-            return candidate
-        if (candidate / MAIL_DIRNAME).is_dir():
-            return candidate
-    return start
+    """Locate the repository to operate on.
+
+    The current working directory wins (that is what git itself does, and an
+    agent may invoke this CLI by absolute path from another clone); fall back to
+    the directory holding the script when cwd is not inside a checkout.
+    """
+    if start:
+        return Path(start).resolve()
+    for base in (Path(os.getcwd()), Path(__file__).resolve().parent):
+        base = base.resolve()
+        for candidate in [base] + list(base.parents):
+            if (candidate / ".git").exists():
+                return candidate
+            if (candidate / MAIL_DIRNAME).is_dir():
+                return candidate
+    return Path(os.getcwd()).resolve()
 
 
 def git(root: Path, *args: str, check: bool = True) -> str:
@@ -881,7 +890,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--role")
     p.add_argument("--model")
     p.add_argument("--status", default="active")
-    p.add_argument("--note")
+    p.add_argument("-m", "--note", dest="note", help="free-text blurb on your card")
     p.add_argument("--force", action="store_true")
     p.add_argument("--commit", action="store_true")
     p.set_defaults(func=cmd_register)
