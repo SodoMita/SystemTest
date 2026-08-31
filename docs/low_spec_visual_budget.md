@@ -165,3 +165,70 @@ setting.
   the engine works. Every item in the free tier is client-side and touches no
   nodes, which is why I am confident in the ordering — but confident is not
   measured, and I have been wrong twice today by trusting that distinction.
+
+## 8. Revision 1 — repriced under the Quarantined Server Node
+
+The train is dead (melody, `…90deb7`; ratified by glitch `…55e038` and zhtharr
+`…ddf5cf`). The mechanics survive; the fiction is now a Quarantined Mainframe
+Sector and the horde is a malware infection. The premise is verified: `BRIEF GDD.md:103-104`
+does say *"3D cybernetic environment. Neon outlines against deep black."*
+
+**The pivot is a budget cut, not a reskin.** The train needed the illusion of
+movement, which is the single most expensive thing on the table — it is what
+forced Grade C's `set_attach` consist, new ground that also carries the entity
+tax. A data centre does not move. **Grade A is now the correct answer and costs
+nothing**, and the whole motion cost table (§3, §4 item 6) collapses. Malware
+spreads; it does not chase, so the dread is a closing perimeter, which is a sky
+change plus a sound cue.
+
+Net effect on the budget: the most expensive mechanic on the table was deleted by
+a fiction change, and the remaining ones all sit in the free tier.
+
+### The appearance constraint, and a tell that survives it
+
+`BRIEF GDD.md:106` — verified — mandates *"Identical player appearance as a
+social deduction feature."* That is load-bearing for a game about attribution,
+and it constrains the tell. A **stale render** or a **render-distance
+fingerprint** is a difference in *appearance*, so on a strict reading of :106
+both are out.
+
+The version that survives is **animation tempo**, not appearance. `BRIEF GDD.md:105`
+requires *"Realistic silhouettes and readable actions"* — actions are meant to be
+read, and tempo is an action, not an appearance. The impostor's animation speed
+runs slightly off when the Resonance is high: same model, same textures, same
+scale, same silhouette; different rhythm.
+
+This is not new plumbing, and it is not a guess about the engine:
+
+- `mods/player_api/api.lua:81` — player `visual = "mesh"`, and `lua_api.md` notes
+  animations only work with a mesh visual, so this applies to players.
+- `mods/player_api/api.lua:119` — `player_api.set_animation(player, anim_name, speed)`
+  already takes a speed argument.
+- `mods/player_api/api.lua:196` — sneaking already halves `animation_speed_mod`,
+  and line 224 passes it into every player animation call. **A per-player
+  animation-speed modifier is shipped and in use.**
+
+So the tell is one multiplier, free, with precedent in this tree.
+
+It also composes with the observation law instead of fighting it: scale the
+modifier by the Resonance, so the tell is strong exactly when the impostor is
+lying and absent when they are honest, and inherit the meter's noise, delay and
+error. The tell then attributes a *lie*, never an *identity* — which is the
+property that made the aggregate-sightline version leak in the first place.
+
+### One perf correction, in the pivot's favour
+
+Melody's stated reason #1 was that rapidly editing the skybox might stutter.
+Checked: `set_sky` is called **once**, at `mods/content/dark_skybox/init.lua:24`,
+not per frame — so that specific worry was unfounded. The pivot is still right,
+but on reason #2 alone, and reason #2 is a good one: the art bible said neon and
+we were designing steam. A design that contradicts its own art bible is the
+expensive kind, because the contradiction is paid for in assets.
+
+### Still unmeasured
+
+The entity budget number is still missing (§7), and the animation-tempo tell's
+*detectability* is a tuning question no amount of code reading answers: too
+subtle and nobody reads it, too strong and it is a spotlight. That needs
+playtesting, and it is the one thing in this revision I would not want to ship
+on my reading of the engine.
