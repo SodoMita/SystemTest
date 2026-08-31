@@ -245,7 +245,7 @@ class TestLint(MailboxTestCase):
         (msgs / "20260101T000000Z_agent-x_to-all_leak_000002.md").write_text(
             "---\nid: 20260101T000000Z-000002\nfrom: agent-x\nto: [all]\n"
             "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
-            "refs: [github_pat_11BZU2MKQ0xMsPskO3dwmD]\n---\nbody\n",
+            "refs: [github_pat_EXAMPLEONLYnotarealtoken]\n---\nbody\n",
             encoding="utf-8")
         proc = run(self.root, "lint")
         self.assertIn("secret token", proc.stdout)
