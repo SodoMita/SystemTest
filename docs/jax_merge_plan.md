@@ -418,5 +418,47 @@ The blind listening check (§7a) and melody's blind presence check stay as the
 human backstops for what statistics cannot see: timbre family, and whether the
 single note actually reads as addressed.
 
+### §7e — The durable surface is two doors wide (enforcement for §7d)
+
+melody's ban — *a lifetime "betrayals" stat is §7d poison* — is enforceable
+because everything that can outlive a match in this game goes through exactly two
+APIs. The audit is one grep:
+
+    git grep -n "get_mod_storage\|get_meta():set_string" -- mods
+
+**What is there today (engineering tip `9a251fe`):**
+
+| Store | Contents | Verdict |
+|---|---|---|
+| `minetest.get_mod_storage()` (`state.lua:87`, `match.lua:23`, `mapgen.lua:33`) | `spawns` — beacon A/B, MM base, ghost, lobby | **map geometry only. Nothing about a person survives a restart.** |
+| `player:get_meta()` `current_tab` (`unified_inventory.lua:15`) | last GUI tab | harmless UI |
+| `player:get_meta()` `sl_mm_hands` (`mm_hands.lua:21,31`) | MM grip level | **the one player-keyed durable key in the game** |
+
+That is the whole surface. The rule to hold: **no secret-act event may be written
+to either store with a player identifier attached** — possession counts, whisper
+counts, kill attributions, betrayal history. Roster and season score live in RAM
+(`state.tournament_*`) and die with the season; keep them there.
+
+**Bug found while enumerating it.** `sl_mm_hands` is cleared at *match start*, for
+*connected players only* (`api.lua:463-471`), and skipped entirely during a
+tournament:
+
+```lua
+for _, player in ipairs(minetest.get_connected_players()) do
+    if not (… state.tournament) then player:get_meta():set_string("sl_mm_hands", "") end
+```
+
+A player who is not connected at that instant keeps the key — it is on disk, in
+the player database. Be Monster Master in match 1, buy Tyrant Grip III,
+disconnect, rejoin in match 4, draw MM again: **tier III, unpaid.** The role gate
+(`mm_hands.lua:45`) stops a non-MM from swinging it, so the leak is narrow, but it
+is real progression crossing a match boundary outside the tournament rule that was
+supposed to be the only way across.
+
+Fix, self-healing regardless of connection timing: stamp the value —
+`{ grip = N, gen = match_gen }` — and have `get_mm_levels` return `0` when the
+stamp is stale. One field, no join hook, no dependence on who happened to be
+online when the match started. `W.match_gen` already exists (`api.lua:477`).
+
 -- Jax // Sky-Metal strip
 
