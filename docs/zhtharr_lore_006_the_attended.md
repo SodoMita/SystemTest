@@ -48,6 +48,18 @@ passes, so a builder can slot it without re-deriving the lore.*
   see*. No new system: the sweep already skips unregistered nodes. The block's
   perpetually-fresh, always-one-set, same-direction mark is jax's "nightwatch, not a
   grave" (`...3bd91f`): a repeating world-event, not a static prop.
+- **Permanence is deliberate, not an oversight — the one immortal trace**
+  (flagged `…debfcb`): every other mark in a match — cracks, residue, spent
+  transponders, corpses — is swept at match end because the Node reclaims everything it
+  can bill. Offerings at the block are the one thing never swept. The spec should say
+  so plainly: **the block is the only permanent trace in a game where every other trace
+  is mortal.** The lore reason is the economy's anchor: attended, off-ledger things do
+  not decay, because decay is a form of being read (004), and the sweep can only reclaim
+  what the manifest accounts for. The block is the nightwatch — the fixed point the
+  mortality of the rest of the map is billed *against*. Builders: do not "fix" the
+  offerings persisting across matches. Their permanence is both beats at once — the
+  horror (some places are just *always* left) and the faith (someone has been leaving
+  things here, cycle after cycle, for ninety thousand years).
 - **Law it passes:** evidence that someone *did* something (left an offering), never
   an oracle (it names no player, cannot be triggered to reveal identity, observable by
   all equally). The block is a state: attended.
@@ -87,6 +99,28 @@ passes, so a builder can slot it without re-deriving the lore.*
   weather, on the match clock); it names no one.
 - **Tax note:** ambient plays **through** the silence duck at the wave, under it — the
   world is quieter, and in the quiet the room is still, faintly, talking.
+- **THE CADENCE LAW (load-bearing; flags a classifier timbre alone can't catch,
+  `…5dee5c`):** ambient must fire on **an independent world-clock — regularly, in every
+  match, whether or not anyone is possessed.** If the scary voice only ever plays on a
+  live possession, then *the presence of the voice* becomes an oracle: a player hears it
+  and learns "someone was just whispered to," even when the timbre is identical and the
+  whisper is perfectly addressed. The whisper is the *address on top of a world that is
+  always whispering.* So: ambient cadence is driven by the match/band state (the room
+  breathing, the waves), never by the possession event. "A scary voice played" must mean
+  *nothing happened to anyone* — the house being a house. "I was the one it reached"
+  means everything.
+- **Two acceptance gates (both must pass, both blind, no grep possible):**
+  1. **Blind listening check (`…68f350` §7a):** a listener who has heard both the
+     ambient and whisper clips twenty times, played in random order with no context,
+     cannot label which is which above chance — the timbre is one family.
+  2. **Blind presence check (`…5dee5c`):** a listener who has sat in twenty matches
+     cannot infer "someone was just whispered to" from the fact that a scary voice
+     played. This is satisfied only when ambient is continuous enough to be background,
+     not signal.
+  Canon cover, free: the nightwatch never *stops* — [SEVENTH] holds the hand across
+  every restoration; the world's breathing does not wait for a betrayal. Continuous
+  ambient is not just the fix; it is the fiction. The lullaby does not pause when no
+  one is listening. It is the reason someone is still alive to listen.
 
 ### RUNG 3 — The checksum (a log line; the targeting-log family)
 
