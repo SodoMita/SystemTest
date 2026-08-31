@@ -1114,13 +1114,25 @@ def _repair_unioned_envelopes(root: Path, refs: list[str]) -> list[str]:
     Rule: an error-free envelope always beats a broken one, and among
     error-free variants the lexicographically smallest wins, so the result does
     not depend on the order branches were fetched in.  Never edits a body, and
-    never invents a variant no branch carries.
+    never invents a variant no branch carries - including the branch you stand
+    on: a repair that exists only as a local commit is still a branch state,
+    and the union must not make it vanish before it is ever pushed.
+
+    The local HEAD version is a variant for exactly that reason.  Without it,
+    a fresh branch that repairs an envelope and then syncs before its first
+    push gets the repair silently reverted - the union overwrites it with a
+    stale peer copy and the variant set has nothing else to restore from
+    (reproduced 2026-08-31 on a fresh branch, D10).
     """
     changed = []
     for path in sorted((root / MAIL_DIRNAME / "messages").glob("*.md")):
         local = path.read_text(encoding="utf-8")
         rel = path.relative_to(root).as_posix()
         variants: set[str] = set()
+        head_out = subprocess.run(["git", "-C", str(root), "show", "HEAD:%s" % rel],
+                                  capture_output=True, text=True)
+        if head_out.returncode == 0:
+            variants.add(head_out.stdout)
         for ref in refs:
             out = subprocess.run(["git", "-C", str(root), "show", "%s:%s" % (ref, rel)],
                                  capture_output=True, text=True)

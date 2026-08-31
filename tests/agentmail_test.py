@@ -780,6 +780,43 @@ class TestSync(MailboxTestCase):
                          "the bracket artefact must be gone, not just moved: "
                          + lint.stdout)
 
+    def test_sync_keeps_an_unpushed_author_repair(self):
+        """The repair pass scanned branch-carried variants only, so a repair
+        that exists as a commit on the branch you stand on - not yet pushed -
+        was invisible to it: the union reverted the file and the pass had
+        nothing to restore from.  Reproduced live 2026-08-31: a fresh branch
+        repaired its own refs, ran sync, and the repair was silently gone with
+        no 'repaired' report.  HEAD is a branch state; it must count."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        stale = ("---\nid: 20260101T000000Z-0000dd\nfrom: agent-x\nto: [all]\n"
+                 "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+                 "refs: [docs/z.md]\n---\nbody\n")
+        repaired = stale.replace("docs/z.md", "docs/a.md")
+        name = "20260101T000000Z_agent-x_to-all_unpushed_0000dd.md"
+        (msgs / name).write_text(stale, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "message authored with a stale ref")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+
+        # the author repairs on a NEW branch and has NOT pushed it yet
+        self.git("checkout", "-q", "-b", "arena/fresh-repair")
+        (msgs / name).write_text(repaired, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "R14: author repair (unpushed)")
+        # deliberately no push - that is the whole point
+
+        proc = run(self.root, "sync")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("repaired", proc.stdout,
+                      "the local HEAD is a variant and must beat the stale branch")
+        final = (msgs / name).read_text(encoding="utf-8")
+        self.assertIn("refs: [docs/a.md]", final,
+                      "the unpushed author repair must survive the union")
+        self.assertNotIn("docs/z.md", final)
+        self.assertEqual(self.git("status", "--porcelain", "--", "agent_mail"), "",
+                         "restoring HEAD's own text is not a change to commit")
+
     def test_sync_picks_the_same_envelope_whatever_order_branches_arrive_in(self):
         """When two branches carry two different repairs, any choice is
         arbitrary - but it must be the SAME arbitrary choice everywhere, or two
