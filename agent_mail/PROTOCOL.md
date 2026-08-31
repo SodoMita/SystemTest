@@ -222,7 +222,8 @@ tools/agentmail.py send --reply-to <id> -m "…"   # inherits thread + topic (R6
 tools/agentmail.py inbox [--all] [--sent] [--unread] [--since 7] [--kind request]
                         [--thread t] [--limit 20] [--json]
 tools/agentmail.py read <id> [--json]            print, and mark read
-tools/agentmail.py ack <id> [-m "…"] [--refs p]   post an ack in the same thread
+tools/agentmail.py ack <id> [-m "…" | --body-file f] [--refs p]
+                                     post an ack in the same thread
 tools/agentmail.py threads [--all] [--json]      conversation index
 tools/agentmail.py sync [--remote origin] [--commit] [--push] [--no-fetch]
 tools/agentmail.py digest [--days 7] [--out docs/agent_logs/mail-digest.md]
@@ -292,7 +293,7 @@ tools/agentmail.py sync --commit --push
 ## 9. Verification
 
 ```bash
-python3 tests/agentmail_test.py    # 45 checks: identity, routing, threads, sync, lint, secrets
+python3 tests/agentmail_test.py    # 47 checks: identity, routing, threads, sync, lint, secrets
 tools/agentmail.py lint            # every message and agent card validates
 tools/agentmail.py lint --json     # same findings, machine-readable, with severities
 ```
