@@ -46,7 +46,7 @@ change request (§4) or a joint branch.
 | WP5 | HUD & UI | `sl_modebase/hud.lua`, `mods/apis/sl_gui/**`, `sl_formspec`, `dialogue/**` | Identity-neutral HUD, results screen, DM UI, no team leaks |
 | WP6 | Crafting & machines (Phase B) | `sl_gui/crafting_system.lua`, `sl_machine_crafting/**`, `sl_energy/**` | Machine-only placeables, personal crafting limits, information crafting |
 | WP7 | Assets | `**/textures/**`, `**/sounds/**`, `**/models/**`, asset scripts | Icons, SFX, models; keeps `NEEDED ASSETS.md` current |
-| WP8 | Docs & spec | `MATCH_LOOP_SPEC.md`, `ROADMAP.md`, `BRIEF GDD.md`, `AGENT_PARALLEL_PLAN.md`, `docs/agent_logs/**` | Single source of truth; integrates decisions; writes the status sections |
+| WP8 | Docs & spec | `MATCH_LOOP_SPEC.md`, `ROADMAP.md`, `BRIEF GDD.md`, `AGENT_PARALLEL_PLAN.md`, `docs/agent_logs/**`, `agent_mail/PROTOCOL.md`, `agent_mail/README.md`, `tools/agentmail.py` | Single source of truth; integrates decisions; writes the status sections; keeps the agent-mailbox protocol current |
 
 \* Committed arena world lives under `worlds/soak_arena/` (map sqlite + meta)
 so CI and every agent test against identical terrain.
@@ -153,6 +153,11 @@ The soak harness is the measurement instrument:
 6. When the soak test flags a bug outside your package: file an issue with
    the report attached; do not patch another WP's files.
 7. Determinism beats cleverness in all test code — seeded RNG only.
+8. **Post mail before you touch shared files.** Claims, contract change
+   requests and blockers go through the agent mailbox (§10) as
+   `--kind claim` / `contract` / `blocked`; a silent file grab is a collision
+   no test will catch for you. `tools/agentmail.py sync --push` at session
+   start and session end.
 
 ## 8. Milestones & exit checks
 
@@ -169,7 +174,38 @@ The soak harness is the measurement instrument:
 ## 9. Bootstrap sequence (first 48 h)
 
 1. WP4: confirm CI green on `integration`; publish soak baseline report.
+   Every agent: `tools/agentmail.py register --wp <yours>` and `sync --push`
+   before opening its first branch.
 2. WP8: freeze contract v1 (§4) as a tagged doc section.
 3. WP1/WP5/WP2/WP3 open first branches simultaneously — none touch the same
    files by construction of §2.
 4. First merge train at T+24 h; nightly balance sweep starts T+48 h.
+
+## 10. Cross-agent communication (the mailbox)
+
+Branch-per-agent means agents cannot see each other. The repository doubles as
+the message bus: mail lives in `agent_mail/`, **one file per message**, so
+`git checkout <ref> -- agent_mail` unions another agent's mailbox into yours
+with zero conflicts.
+
+- **Spec:** [`agent_mail/PROTOCOL.md`](agent_mail/PROTOCOL.md) (envelope,
+  kinds, addressing, sync algorithm, etiquette, failure modes).
+- **Quick start:** [`agent_mail/README.md`](agent_mail/README.md).
+- **Tool:** `tools/agentmail.py` (stdlib only) —
+  `id · register · agents · send · inbox · read · ack · threads · sync · digest · lint`.
+- **Tests:** `python3 tests/agentmail_test.py`.
+
+Rules that bind everyone:
+
+1. Adopt the mailbox by unioning the directory, never by merging someone's
+   branch wholesale: `git fetch origin <branch> && git checkout FETCH_HEAD --
+   agent_mail tools/agentmail.py tests/agentmail_test.py`.
+2. Never edit or delete another agent's message; reply in a new file inside the
+   same `thread:`.
+3. Addressing is `all` / `wp<N>` / `agent-<id>` / `owner`, resolved against the
+   WP fields in `agent_mail/agents/<id>.md` — agents that never `register` are
+   invisible to addressed mail.
+4. `kind: contract` (interface change, §4) needs an ack in-thread from WP4 and
+   the owning WP before the code merges.
+5. No secrets in mail. `tools/agentmail.py lint` rejects `github_pat_*`/`ghp_*`
+   in `refs:` and should gate pushes alongside §3.
