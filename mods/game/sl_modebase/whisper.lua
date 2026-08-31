@@ -128,9 +128,14 @@ local function ghost_whisper(ghost_name, target_name, message)
 	-- static. A ghost that whispers should sound like one.
 	minetest.sound_play("A_A", { to_player = target_name, gain = 0.6 }, true)
 
-	minetest.log("action", string.format(
-		"[game_mode][WHISPER] %s (via %s) -> %s: %s",
-		ghost_name, possession.vessel, target_name, message))
+	-- Log the EVENT, never the people. minetest.log writes to debug.txt on
+	-- disk, which survives restart and is already parsed by the soak harness
+	-- (run_soak.py parse_debug_txt) — so any player name here becomes a
+	-- permanent, named record of who possessed whom. A whisper is an
+	-- addressed secret the ledger is forbidden to keep (SEALED_SOURCE, the
+	-- recipient its only witness). This log names no one: diagnosis, not
+	-- document.
+	minetest.log("action", "[game_mode][WHISPER] one addressed whisper spent")
 	return true
 end
 game_mode.ghost_whisper = ghost_whisper
@@ -203,8 +208,7 @@ function game_mode.possess_player(ghost_name, vessel_name)
 	-- Identity-neutral broadcast; the vessel is NOT told they are possessed.
 	game_mode.broadcast(S("Something has reached into a body."))
 	minetest.sound_play("alert", { to_player = vessel_name, gain = 0.6 })
-	minetest.log("action", string.format("[game_mode] %s possessed body %s",
-		ghost_name, vessel_name))
+	minetest.log("action", "[game_mode] a body was reached into")
 	return true
 end
 
