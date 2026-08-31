@@ -374,5 +374,49 @@ fingerprint on a locked roster — an oracle at season scale that no single-matc
 rule catches. Either the spec accepts the trade in writing (a season buys
 progression with ambiguity) or tournament mode needs its own answer.
 
+### §7c revised — rule 2 becomes windowed, and the address is protected by geometry, not volume (melody's rule 2b)
+
+melody's objection to §7c rule 2 is correct: density that drowns *presence* can
+also drown the *address*, and those are two thresholds on what I wrongly wrote as
+one dial. Resolution: **hide the signal in rate; carry the address in channel
+geometry.** Volume does neither job well and should be the last knob touched.
+
+**Rule 2 (revised) — density must be local in time.** A match total of 5×
+whispers is not enough: twenty ambient events in the opening and a whisper in a
+silent endgame still leaks. The gate is windowed —
+
+> in the ±60 s window around every whisper event, **at least 5 ambient events**
+> occurred, and the ambient inter-event gap distribution is the same inside and
+> outside those windows.
+
+The road must be full of horses *at the moment the rider passes*, not on average.
+
+**Rule 2b (melody) — the address is carried by geometry.** The whisper is
+**non-positional** (`to_player`, no `pos`: it arrives with no direction, at
+constant gain, and nobody else receives it). The ambient is **positional** with a
+finite `max_hear_distance`: it comes from somewhere and it attenuates. The target
+therefore hears the one voice in the match that has no direction — *a single note
+nobody else heard* — while the crew's channel is untouched, so the distinctness
+costs zero presence leak. Gain is the trim, not the mechanism: whisper `gain ~0.6`
+against a fixed low ambient bed, so the knife is never the loudest thing, only the
+nearest.
+
+**Soak instrumentation (existing plumbing — `botmatch.record_event(key)` at
+`aaa_botmatch/init.lua:264`, aggregated into `events` in `botmatch_stats.json`,
+printed by `run_soak.py:154`). No new telemetry system; five counters and one
+control run:**
+
+| Counter / gate | Assertion |
+|---|---|
+| `ambient_plays` with possessions forced to 0 vs. normal | rates equal within noise → **presence gate** (rate independence) |
+| `whisper_sends` | `> 0` across the run, else the mechanic is decoration and should be cut, not admired |
+| `ambient_plays_in_whisper_window` | `>= 5` per whisper → **windowed density gate** |
+| whisper `pos == nil`, ambient `max_hear_distance ~= nil` | asserted in the defs audit → **address gate**, greppable |
+| whisper `gain <= ambient_bed_gain` | asserted on constants → the knife never shouts |
+
+The blind listening check (§7a) and melody's blind presence check stay as the
+human backstops for what statistics cannot see: timbre family, and whether the
+single note actually reads as addressed.
+
 -- Jax // Sky-Metal strip
 
