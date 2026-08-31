@@ -551,5 +551,41 @@ Therefore:
    indices** (`ghost#3 -> target#7`) minted at match start and meaningless
    afterwards — never names.
 
+### §7h — Who records: the soak measures what the bots do
+
+Correction to the record, with receipts. `botmatch.record_event(key, amount)`
+(`aaa_botmatch/init.lua:264`) is **not** callerless. It has eight callers, all in
+one layer:
+
+    behavior.lua:202 disconnects   :574 repairs      :577 exorcisms
+    :596 ghost_summons             :619 offers       :629 revivals
+    :648 sabotages                 :662 possessions
+
+Every one is in `aaa_botmatch/behavior.lua`. **Telemetry in this project is
+recorded by the bot behaviour layer, never by the game mods** — which is why a
+`whisper_sends` call inside `whisper.lua` would be the first game-side recorder
+and would couple a shipping mod to a test-only mod. Either guard it
+(`if botmatch and botmatch.record_event then`) or follow the existing convention
+and record from `behavior.lua` at the point the bot spends the whisper.
+
+**The consequence, and it invalidates a gate I wrote myself:** the soak measures
+**what bots do**. `grep -rn whisper mods/game/aaa_botmatch` returns nothing on
+either branch — bots possess (`behavior.lua:660`, via `possession_focus`) but they
+never whisper. So `whisper_sends` would read 0 forever, and my own falsifiable
+condition on bound 3 — *if the soak shows zero confessions, strike it* — is
+unsound as written.
+
+> **A usage gate is only valid if the bot policy can perform the action.**
+> Otherwise the counter measures the bot, not the design.
+
+Two honest options per usage gate: teach the bot the action (for the whisper the
+bot is already standing in the right place — same `possession_focus` path), or
+label the gate *human playtest only* and never quote its zero as evidence.
+
+Practical note for the §7g grep: `aaa_botmatch` logs bot names by design
+(`behavior.lua:665`, `[botmatch][possess-debug] %s refused at %s`). It is a
+test-only mod that never ships, so it belongs on an allowlist — otherwise the
+durable-store grep produces noise and gets ignored, which is how greps die.
+
 -- Jax // Sky-Metal strip
 
