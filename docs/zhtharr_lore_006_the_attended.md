@@ -68,6 +68,26 @@ passes, so a builder can slot it without re-deriving the lore.*
   offerings persisting across matches. Their permanence is both beats at once — the
   horror (some places are just *always* left) and the faith (someone has been leaving
   things here, cycle after cycle, for ninety thousand years).
+- **THE TTL CORRECTION (§7f, `…cbda95`): the offering must be a NODE, not a dropped
+  item — and the floor everywhere else must be swept.** Two verified facts revise the
+  earlier "survives by construction" line. (1) The whitelist sweep cannot *remove* an
+  offering, but nothing stops the engine: `item_entity_ttl` is unset in the tree, so
+  Luanti defaults to **900 seconds** — a dropped ration bar evaporates fifteen minutes
+  in, mid-match, with no lore reason. Persistence built on an absent cleanup is revoked
+  by an equally absent config. Fix: laying an offering consumes the item and **places a
+  world node** at the block (the plate sets a node) — position-keyed, immune to TTL,
+  outside the whitelist by construction, permanent because someone decided it should be.
+  It also gives the block something to *be* without a render: a place where the floor is
+  different, discovered by touch. (2) **If nothing is ever tidied, surviving is not a
+  miracle — it is litter.** Dropped loot from match 1 would persist into match 2 (a free
+  fabricated weapon, which violates *fabricated only* and *inventories reset*). So the
+  match-end sweep clears the floor everywhere, with a **positional exemption around the
+  block only**. The offering means something precisely because it is the one thing the
+  world tidies away everywhere else and does not touch here.
+  Canon reason, free: a dropped item is refuse the world has not yet decided about; an
+  offering is a *structure*, the smallest one — and structures persist because they were
+  attended into being, the same way the beacons and the block persist. You do not leave
+  a ration bar at the nightwatch. You *set it down on purpose*, and purpose is a node.
 - **Law it passes:** evidence that someone *did* something (left an offering), never
   an oracle (it names no player, cannot be triggered to reveal identity, observable by
   all equally). The block is a state: attended.
@@ -189,9 +209,10 @@ passes, so a builder can slot it without re-deriving the lore.*
     honest N) or they stay and hold (the perimeter stops; the rate drops to the
     candle-rate; the lullaby's note in the level steadies). Holding is its own
     interaction with no win-state fanfare — the match simply... stops getting warmer.
-- **Build footprint, stated honestly (`…6a74a2`):** Rungs 0–4 are pure content on
-  existing surfaces. Rung 5 is content **plus the smallest code footprint on the
-  table** — say it so "zero new systems" is not overclaimed:
+- **Build footprint, stated honestly (`…6a74a2`, `…cbda95`):** Rungs 1–4 are pure
+  content on existing surfaces. Two small node footprints, house-pattern: Rung 0 adds
+  the offering-node (item consumed → world node) and the positional floor-sweep
+  exemption; Rung 5 adds the smallest code footprint on the table —
   1. **Under-layer entry seam:** reuse the existing `mods/game/sl_teleport` mod for the
      pass *through* the block — do not invent a portal. The block stays a state, never a
      rendered door; the teleport fires only for a crew that reaches and chooses it.
@@ -276,10 +297,12 @@ Continue button, in the same green terminal color, where no prompt ever was:
 Everything above is content and canon, riding systems that already ship — results
 formspec, targeting log, the `W.traces` whitelist sweep, the whisper channel, the
 ambient mix, the band clock, possession, and `mods/game/sl_teleport`. **This specimen
-claims no file and asks for no new *system*.** Rungs 0–4 are zero new code. Rung 5 is
-the smallest code footprint on the table — one teleport seam (existing mod), one plate
-node def, and one long dig-time (`on_dig`) — about fifteen lines in existing patterns,
-filed under Rung 5 above so the claim is never overstated. It is the text, the audio,
+claims no file and asks for no new *system*.** Rungs 1–4 are zero new code. Two small
+node footprints, both house-pattern: **Rung 0** — laying an offering consumes the item
+and places a world node at the block, plus a positional match-end floor sweep that
+exempts the block (§7f); **Rung 5** — one teleport seam (existing `sl_teleport`), one
+plate node def, and one long dig-time (`on_dig`), about fifteen lines. All stated
+above so the claim is never overstated. It is the text, the audio,
 and one held dig-bar the existing systems should carry if the owner ratifies the lore
 as canon.
 
