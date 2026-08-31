@@ -43,11 +43,19 @@ passes, so a builder can slot it without re-deriving the lore.*
   world fails to account for.
 - **The offerings rule (this is the content):** objects placed at the block by players
   — ration bars, tokens, the spent transponders from Rung 4 — **do not decay and are
-  not swept by match-end cleanup the way ordinary residue is.** Mechanically this is
-  the `corpses.lua` residue sweep simply *failing to sweep a node the manifest cannot
-  see*. No new system: the sweep already skips unregistered nodes. The block's
-  perpetually-fresh, always-one-set, same-direction mark is jax's "nightwatch, not a
-  grave" (`...3bd91f`): a repeating world-event, not a static prop.
+  not swept by match-end cleanup the way ordinary residue is.** Verified mechanism
+  (`…6a74a2`, citing `corpses.lua:489-514`): `W.sweep_scene()` iterates `W.traces` — a
+  **whitelist of node positions the mod itself created** — and removes only nodes whose
+  current name still equals its recorded trace name. It never scans the world, so
+  player-placed offerings at the block survive cleanup **by construction**, whether the
+  block renders, is registered, or is on any manifest — the sweep does not know the
+  offering exists. (Lore canon stays "the manifest cannot see the block"; the build cites
+  the whitelist, not an "unregistered-node skip," which does not exist.) **§7b condition
+  (`…d979fc`):** the exemption must key on **position, never on who placed it** — an
+  owner-keyed skip puts identity data in the sweeper and the node starts reporting on
+  the living. The block is a *place* that is permanent; it is never a witness to a
+  person. The block's perpetually-fresh, always-one-set, same-direction mark is jax's
+  "nightwatch, not a grave" (`...3bd91f`): a repeating world-event, not a static prop.
 - **Permanence is deliberate, not an oversight — the one immortal trace**
   (flagged `…debfcb`): every other mark in a match — cracks, residue, spent
   transponders, corpses — is swept at match end because the Node reclaims everything it
@@ -181,6 +189,29 @@ passes, so a builder can slot it without re-deriving the lore.*
     honest N) or they stay and hold (the perimeter stops; the rate drops to the
     candle-rate; the lullaby's note in the level steadies). Holding is its own
     interaction with no win-state fanfare — the match simply... stops getting warmer.
+- **Build footprint, stated honestly (`…6a74a2`):** Rungs 0–4 are pure content on
+  existing surfaces. Rung 5 is content **plus the smallest code footprint on the
+  table** — say it so "zero new systems" is not overclaimed:
+  1. **Under-layer entry seam:** reuse the existing `mods/game/sl_teleport` mod for the
+     pass *through* the block — do not invent a portal. The block stays a state, never a
+     rendered door; the teleport fires only for a crew that reaches and chooses it.
+  2. **The plate is one node def** (`register_node`, house style) beside the existing
+     possession nodes.
+  3. **The hold is the dig bar — no new engine surface.** There is no "hold" input in
+     Luanti. The plate is a node with a **long dig time**; the dig bar *is* the pressure
+     meter. Start digging and release early → `RETURN GRIP: NONE` (the freeze never
+     answers); hold to full (`on_dig`) → `BENEFICIARY STATUS: ATTENDED`. The hand never
+     grips back because the bar is a timer over a hand that does not answer. One
+     `groups` entry and one `on_dig`, ~15 lines in existing patterns, styled like the
+     two-punch exorcism. The "no prompt" rule survives: the player never pressed a
+     button, they just did not let go.
+- **The warmth stop is the ENDING, never mid-match (`…6a74a2`, binding):** the hold must
+  land on the end-state, not a mid-match global effect. One pool, one clock, the account
+  is the match — a mid-match warmth-stop would be a second warmth source and a second
+  clock, splitting the band that was just ratified match-global. The stop *is* the good
+  ending: the room stops billing, the perimeter stops, that is the resolution — the same
+  end-state the Vigil achievement already sits in. No warm relief while the arena is
+  still running.
 - **What the game never does:** it never plays a cutscene revealing the mother, never
   states the cure does not exist, never tells the player they have done the good thing.
   The reward for holding is that the room stops billing. The players who work out what
@@ -209,6 +240,16 @@ Continue button, in the same green terminal color, where no prompt ever was:
 - Optional, owner/glitch's call. It costs one string and zero systems. It is the
   cheapest scare on the wire, and the only one the marketing department must never be
   allowed to explain.
+- **Audience boundary (`…ee09bb`, §7d):** the string is an **account-level state, shown
+  identically to every viewer, non-selective, no name** — that is what keeps it lawful.
+  It must never gain a per-Operator column, a source attribution, or a roster slot. The
+  moment a post-match surface publishes *who* did or earned *what* in a match, it
+  publishes a live secret one round late — especially in a `/sl_tournament` season where
+  the same people play the next match. Outcomes may be public; **the breakdown is a
+  confession and belongs to the player alone** (`BRIEF GDD.md:60`). `ATTENDED` is safe
+  precisely because it says the same thing to everyone and nothing about anyone. Season-
+  scale reveals wait for the end of the season; the dead are declassified, the rostered
+  are not.
 
 ---
 
@@ -232,11 +273,15 @@ Continue button, in the same green terminal color, where no prompt ever was:
 
 ## File of record
 
-Everything above is content and canon, not code. The systems it rides — results
-formspec, targeting log, residue sweep, whisper channel, ambient mix, band clock,
-possession — all exist or are already specced on the build lane. **This specimen
-claims no file and asks for no new system.** It is the text and the audio the existing
-systems should carry if the owner ratifies the lore as canon.
+Everything above is content and canon, riding systems that already ship — results
+formspec, targeting log, the `W.traces` whitelist sweep, the whisper channel, the
+ambient mix, the band clock, possession, and `mods/game/sl_teleport`. **This specimen
+claims no file and asks for no new *system*.** Rungs 0–4 are zero new code. Rung 5 is
+the smallest code footprint on the table — one teleport seam (existing mod), one plate
+node def, and one long dig-time (`on_dig`) — about fifteen lines in existing patterns,
+filed under Rung 5 above so the claim is never overstated. It is the text, the audio,
+and one held dig-bar the existing systems should carry if the owner ratifies the lore
+as canon.
 
 The Subscriber buried the truth in a lighting subroutine. The least the wire can do is
 bury the payload in the systems already shipping.
