@@ -364,6 +364,67 @@ class TestLint(MailboxTestCase):
         self.assertEqual(proc.returncode, 0, "a dead pointer warns, it does not fail")
         self.assertIn("names no file", proc.stdout)
 
+    def test_lint_accepts_a_path_with_a_line_suffix(self):
+        """`path:line` is what `grep -n` emits and the natural way to cite
+        evidence. Every one of carmack's five refs in 20260831T144642Z-2796d3
+        warned as a dead pointer because the resolver stripped `#fragment` but
+        not `:line` - four false positives from correct citations."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_lineref_000007.md").write_text(
+            "---\nid: 20260101T000000Z-000007\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [game.conf:1]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertNotIn("names no file", proc.stdout,
+                         "game.conf:1 names a real file; the line suffix "
+                         "must be stripped before resolution")
+
+    def test_lint_recognises_a_ref_that_lives_on_another_branch(self):
+        """A ref points at a peer's work, which lives on the peer's branch.
+        Reporting it as dead was a false positive that taught agents to ignore
+        the check. The warning text claimed to search fetched branches while
+        the code only stat'd the working tree - the claim was false, so this
+        test now makes it true."""
+        # a peer branch carrying a file this working tree does not have
+        self.git("branch", "arena/peer-branch")
+        self.git("checkout", "-q", "arena/peer-branch")
+        (self.root / "docs").mkdir(parents=True, exist_ok=True)
+        (self.root / "docs" / "peer_only.md").write_text("peer\n", encoding="utf-8")
+        self.git("add", "docs/peer_only.md")
+        self.git("commit", "-q", "-m", "peer work")
+        self.git("push", "-q", "-u", "origin", "arena/peer-branch")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        self.git("fetch", "-q", "origin")
+
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_peerref_000008.md").write_text(
+            "---\nid: 20260101T000000Z-000008\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [docs/peer_only.md]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertNotIn("names no file", proc.stdout,
+                         "the file exists on a fetched branch; that is not a "
+                         "dead pointer")
+        self.assertIn("exists on another branch", proc.stdout)
+
+    def test_lint_still_reports_a_genuinely_dead_ref(self):
+        """The fix must not silence real dead pointers - a path that exists on
+        no branch at all still warns, and says where it looked."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_trulydead_000009.md").write_text(
+            "---\nid: 20260101T000000Z-000009\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [mods/nope/nowhere.lua:42]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, "a dead pointer warns, it does not fail")
+        self.assertIn("names no file in this working tree", proc.stdout)
+        self.assertIn("any branch you have fetched", proc.stdout)
+
     def test_ack_accepts_refs(self):
         """zhtharr's ack failed at the CLI because `ack` took no --refs
         (20260831T135211Z-05f1e4)."""
@@ -374,6 +435,18 @@ class TestLint(MailboxTestCase):
         reply = json.loads(self.mail("read", out.split()[1], "--json"))
         self.assertIn(parent, reply["meta"]["refs"])
         self.assertIn("game.conf", reply["meta"]["refs"])
+
+    def test_ack_takes_a_body_file(self):
+        out = self.mail("send", "--to", "all", "--topic", "Ack me too", "-m", "x")
+        body = self.tmp / "reply.md"
+        body.write_text("a long ack\nfrom a file\n", encoding="utf-8")
+        out = self.mail("ack", out.split()[1], "--body-file", str(body))
+        self.assertIn("a long ack", self.mail("read", out.split()[1]))
+
+    def test_ack_still_defaults_its_body(self):
+        out = self.mail("send", "--to", "all", "--topic", "No body ack", "-m", "x")
+        out = self.mail("ack", out.split()[1])
+        self.assertIn("Acknowledged: No body ack", self.mail("read", out.split()[1]))
 
     def test_lint_warns_but_passes_on_non_routable_wp(self):
         msgs = self.root / "agent_mail" / "messages"

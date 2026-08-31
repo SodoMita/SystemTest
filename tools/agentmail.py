@@ -542,8 +542,14 @@ def commit_paths(root: Path, paths: list[str], message: str) -> bool:
     return True
 
 
-def read_body(args) -> str:
-    if args.body_file:
+def read_body(args, require: bool = True) -> str:
+    """Body from -m, --body-file, stdin, or $EDITOR.
+
+    `ack` shares this so the two composing commands cannot drift apart again:
+    `ack` having neither --body-file nor --refs cost an agent a message
+    (20260831T135211Z-05f1e4), and asymmetric flags are how that keeps happening.
+    """
+    if getattr(args, "body_file", None):
         return Path(args.body_file).read_text(encoding="utf-8")
     if args.body is not None:
         return args.body.replace("\\n", "\n")
@@ -552,7 +558,7 @@ def read_body(args) -> str:
         if data.strip():
             return data
     editor = os.environ.get("EDITOR") or os.environ.get("VISUAL")
-    if editor:
+    if editor and require:
         import tempfile
         with tempfile.NamedTemporaryFile("w+", suffix=".md", delete=False) as fh:
             fh.write("\n\n# Write your message above this line.\n")
@@ -563,6 +569,8 @@ def read_body(args) -> str:
         text = text.split("\n# Write your message above this line.")[0].strip()
         if text:
             return text
+    if not require:
+        return ""
     raise SystemExit("no message body: use -m, --body-file, stdin, or set $EDITOR")
 
 
@@ -671,10 +679,28 @@ def lint_mailbox(root: Path, fix: bool = False) -> list[dict]:
                 continue
             if _ID_RE.match(base) or re.fullmatch(r"[0-9a-f]{7,40}", base):
                 continue  # a message id or a commit sha
+            # `path:line` is the form `grep -n` and most tools emit, and it is
+            # the natural way to cite evidence. Strip the line suffix the same
+            # way the `#fragment` suffix is stripped above, or every correct
+            # citation that names a line warns as a dead pointer.
+            stripped = base.rsplit(":", 1)
+            if (len(stripped) == 2 and stripped[1].isdigit()
+                    and not (root / base).exists()):
+                base = stripped[0]
             if not (root / base).exists():
-                warnings.append(
-                    "%s: ref '%s' names no file on any branch you have fetched"
-                    % (where, text[:48]))
+                if path_in_any_branch(root, base):
+                    # Correct citation, file lives on a branch we have not
+                    # merged. That is the normal case on this wire, so say so
+                    # instead of calling the pointer dead.
+                    warnings.append(
+                        "%s: ref '%s' names a file that exists on another "
+                        "branch but not in this working tree"
+                        % (where, text[:48]))
+                else:
+                    warnings.append(
+                        "%s: ref '%s' names no file in this working tree or on "
+                        "any branch you have fetched"
+                        % (where, text[:48]))
 
         # --- secrets: R4, now covering the whole message and not just refs ----
         for label, masked in find_secrets(msg.body) + find_secrets(
@@ -958,7 +984,7 @@ def cmd_ack(args, cfg) -> int:
     parent = find_message(root, args.message)
     if parent is None:
         raise SystemExit("no message matching '%s'" % args.message)
-    body = args.body or ("Acknowledged: %s" % parent.topic)
+    body = read_body(args, require=False) or ("Acknowledged: %s" % parent.topic)
     refs = [parent.id] + [r for r in (args.refs or []) if r != parent.id]
     msg, path = build_message(
         root, me, [parent.sender], "Re: %s" % parent.topic, body, "ack",
@@ -1005,6 +1031,42 @@ def files_in_ref(root: Path, ref: str, scope: str) -> list[str]:
     out = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only",
                           ref, "--", scope], capture_output=True, text=True)
     return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
+_FOUND_ON_BRANCH: set = set()
+
+
+def all_branch_heads(root: Path) -> list[str]:
+    """Every local and fetched remote branch head.
+
+    A ref points at a peer's work, and a peer's work lives on *their* branch.
+    Without this, every cross-branch citation warns even when it is correct.
+
+    Deliberately not cached: `sync` fetches new branches mid-session, and a
+    cached head list would go stale and resurrect the false positives this
+    function exists to remove.
+    """
+    out = subprocess.run(
+        ["git", "-C", str(root), "for-each-ref", "--format=%(refname)",
+         "refs/heads/", "refs/remotes/"],
+        capture_output=True, text=True)
+    return [r.strip() for r in out.stdout.splitlines() if r.strip()]
+
+
+def path_in_any_branch(root: Path, path: str) -> bool:
+    """True if `path` exists in any branch head we have locally.
+
+    Only positive results are remembered. Caching a negative would be wrong:
+    the branch that has the file may be fetched after this call.
+    """
+    key = (str(root), path)
+    if key in _FOUND_ON_BRANCH:
+        return True
+    for ref in all_branch_heads(root):
+        if files_in_ref(root, ref, path):
+            _FOUND_ON_BRANCH.add(key)
+            return True
+    return False
 
 
 def cmd_sync(args, cfg) -> int:
@@ -1314,6 +1376,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ack", help="acknowledge a message in its thread")
     p.add_argument("message")
     p.add_argument("-m", "--body")
+    p.add_argument("--body-file")
     p.add_argument("--refs", action="append", default=[],
                    help="extra refs to cite; the parent id is always included")
     p.add_argument("--commit", action="store_true")
