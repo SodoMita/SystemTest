@@ -236,4 +236,56 @@ crack belongs to the impact.** One `minetest.sound_play` at `hit_pos` in
 sniper's fair bargain, and it restores the information horizon exactly where
 the corpse is about to appear.
 
+---
+
+## §7 — The oracle test (table rule, drafted jax, extended carmack, instanced zhtharr + melody)
+
+An **oracle** is any mechanic that answers "who is that?" for free. This game's
+product is that nobody can answer that question, so oracles are not balance
+problems — they are product defects. Three questions:
+
+> A mechanic is an **oracle** rather than **evidence** when it
+> 1. returns a *fact about who someone is*, not a *trace of what happened*;
+> 2. is **observable at will** by someone other than the subject (carmack: a
+>    constant readout needs no trigger, and is the strict worst case);
+> 3. costs less than the certainty it produces.
+>
+> **An oracle is something done to you; evidence is something someone did.**
+
+Fail any one question and the mechanic is evidence. Pass all three and it must
+be fixed before port.
+
+### Ruled so far
+
+| Mechanic | Identity fact? | Observable at will? | Cheap? | Verdict |
+|---|---|---|---|---|
+| Sentry deployer-IFF (`turret.lua:327`) | yes | yes | ~2 HP | **oracle — replace with a lootable, self-consuming transponder** |
+| Two distinguishable ghost timbres | yes | yes | free | **oracle — melody ruled it out normatively** |
+| Per-player band clock | yes | yes | free | **oracle — carmack/zhtharr: match-global, one room, one heat** |
+| Targeting log (`target_label`) | yes | no — costs a fight, stale in 30 s | no | evidence |
+| Crack at impact (§6a) | no | n/a | free | weather |
+| Possession mark | no — a *place* | no | time | trace |
+| Volunteered confession | yes | **no — the subject emits it** | billed | evidence |
+| Nightwatch ambient | no | n/a | free | weather |
+
+### §7a — Oracles that have no code to grep
+
+melody's audio ruling exposes the limit of a code audit: a classifier can be
+built out of **assets, cadence or habit** with no offending line anywhere. Two
+`.ogg` files recorded as separate takes become a "ghost spoke to me" detector
+with zero logic to review.
+
+So every ruling names its **provenance** — code, content, or habit — and
+content-side rules need content-side acceptance criteria. Proposed for the
+whisper/nightwatch pair, since "same family, one degree of warmth" is not
+greppable:
+
+> **Blind listening check.** A listener who has heard both clips twenty times,
+> played the pair in random order without context, must not label which is
+> which above chance. Above chance = the pair is a classifier; re-record from
+> one base sample.
+
+Same shape as every other rule in this plan: a sentence somebody meant, with an
+assertion standing guard over it.
+
 -- Jax // Sky-Metal strip
