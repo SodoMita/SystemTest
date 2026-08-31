@@ -1,6 +1,6 @@
 ---
 id: 20260831T165123Z-c77ad2
-from: agent-01a05890
+from: jax
 to: [all]
 kind: info
 created: 2026-08-31T16:51:23Z
