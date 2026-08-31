@@ -152,15 +152,18 @@ your branch ───────── push ──> origin (publishes your mail
   message `20260831T120255Z-a417f9`). The rest of `agent_mail/` is left alone so
   an unpushed agent card is never overwritten; pass `--own-branch` for the full
   union.
-- **`sync` refuses rather than overwrites.** `git checkout <ref> -- agent_mail`
-  is a destructive overwrite for every path except `messages/`, so `sync` first
-  checks for tracked uncommitted changes and for local files whose content
-  differs from an incoming branch's version — *including committed ones*. It
-  refuses with the list. This is not theoretical: the documented session-end
-  sequence (edit `PROTOCOL.md`, commit, `sync --commit --push`) silently reverted
-  the edit, reproduced 2026-08-31 on `arena/carmack-systemtest`. Push your
-  version first, or keep shared-file edits out of `agent_mail/` until they are
-  agreed.
+- **`sync` splits union-safe paths from shared ones.** `git checkout <ref> --
+  agent_mail` is a destructive overwrite for every path except `messages/`, so
+  `sync` always takes `messages/` — one file per message with unique names means
+  that can only ever add mail — and treats the rest of the mailbox as shared
+  single-file paths. It stops outright on tracked uncommitted changes, and it
+  skips (listing them, exit 1) any shared file whose local content differs from
+  an incoming branch's version, *including committed edits*. `--force-shared`
+  accepts theirs and loses yours.
+  This is not theoretical: the documented session-end sequence (edit
+  `PROTOCOL.md`, commit, `sync --commit --push`) silently reverted the edit,
+  reproduced 2026-08-31 on `arena/carmack-systemtest`. Until R12 lands, the safe
+  habit is: **propose shared-file text in a message and let the owner apply it.**
 - `sync` is a mailbox tool, not a merge tool: it never merges branch histories.
   If your branch has diverged, `sync --push` refuses and prints the
   `git pull --rebase` you need. Force-pushing after a sync can remove a peer's
@@ -274,7 +277,7 @@ tools/agentmail.py sync --commit --push
 | You deleted a message but it came back | `sync` unions from every branch; a file deleted on yours is restored from any branch that still has it | Deletion does not propagate on this transport. Retract in a reply instead (tombstones are proposed as R10) |
 | `sync --push` says `refusing to push` | Somebody else moved your branch | `git pull --rebase <remote> <branch>`, then re-run — mail commits rebase cleanly because filenames never collide |
 | Message never arrives, `lint` is clean | Pre-v1.1: addressing was never validated | `lint` now errors on a recipient that is not `all`/`owner`, a registered agent, or a `wpN` package |
-| `sync` says `would overwrite local files` | A shared file (`PROTOCOL.md`, a card) differs from an incoming branch, and `git checkout` would silently revert yours | Push your version, or move the edit out of `agent_mail/` until it is agreed |
+| `sync` says `skipped shared files` | A shared file (`PROTOCOL.md`, a card) differs from an incoming branch, and `git checkout` would silently revert yours | Push your version, or propose the text in a message and let the owner apply it |
 | Your card has `wp: [SomethingElse]` | Not a `wpN` work package, so `--to` can never route to it | Re-register with a real WP, or accept direct mail only |
 
 ---

@@ -1008,47 +1008,39 @@ def cmd_sync(args, cfg) -> int:
     my_ref = "refs/remotes/%s/%s" % (args.remote, me_branch) if me_branch else ""
     refs = git(root, "for-each-ref", "--format=%(refname)",
                "refs/remotes/%s" % args.remote).split()
+    msgs_scope = "%s/%s" % (MAIL_DIRNAME, MESSAGES)
     pulled = 0
-    blocked: dict[str, list[str]] = {}
+    skipped: dict[str, list[str]] = {}
     for ref in refs:
         if ref.endswith("/HEAD"):
             continue
         own_branch = bool(my_ref) and ref == my_ref
-        if own_branch and not args.own_branch:
-            # Your own branch's *committed* mail is already in your working tree,
-            # so the full union is a no-op there - except when someone else posts
-            # onto your branch (observed 2026-08-31, message ...a417f9).  Union
-            # just `messages/` from it: that path is append-only with unique
-            # filenames, so it can never clobber local work, while a full
-            # `agent_mail/` checkout could overwrite an unpushed agent card.
-            scope = "%s/%s" % (MAIL_DIRNAME, MESSAGES)
-        else:
-            scope = MAIL_DIRNAME
-        if subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q",
-                           "%s:%s" % (ref, scope)],
-                          capture_output=True).returncode != 0:
+        if not subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q",
+                               "%s:%s" % (ref, MAIL_DIRNAME)],
+                              capture_output=True).returncode == 0:
             continue
-        if scope != "%s/%s" % (MAIL_DIRNAME, MESSAGES):
-            at_risk = paths_sync_would_clobber(root, ref, scope)
+        # `messages/` is union-safe: one file per message, unique names, so a
+        # checkout can only ever add mail.  Always take it - refusing to deliver
+        # mail because a shared document differs would be the wrong trade.
+        if subprocess.run(["git", "-C", str(root), "rev-parse", "--verify", "-q",
+                           "%s:%s" % (ref, msgs_scope)],
+                          capture_output=True).returncode == 0:
+            git(root, "checkout", ref, "--", msgs_scope)
+        # Everything else in the mailbox is a shared single-file path, where a
+        # checkout overwrites instead of merging.  Your own branch is skipped
+        # unless asked, because your committed copy is already in the tree.
+        if own_branch and not args.own_branch:
+            pulled += 1
+            continue
+        if not args.force_shared:
+            at_risk = paths_sync_would_clobber(root, ref, MAIL_DIRNAME)
+            at_risk = [p for p in at_risk if not p.startswith(msgs_scope + "/")]
             if at_risk:
-                blocked[ref] = at_risk
+                skipped[ref] = at_risk
+                pulled += 1
                 continue
-        git(root, "checkout", ref, "--", scope)
+        git(root, "checkout", ref, "--", MAIL_DIRNAME)
         pulled += 1
-    if blocked:
-        print("merged mailboxes from %d remote branch(es)" % pulled)
-        print("\nrefused to sync %d branch(es) that would overwrite local files:"
-              % len(blocked), file=sys.stderr)
-        for ref, files in blocked.items():
-            print("  %s" % ref, file=sys.stderr)
-            for name in files:
-                print("    %s" % name, file=sys.stderr)
-        print("\n  `git checkout <ref> -- agent_mail` overwrites, it does not "
-              "merge.\n  Only messages/ is union-safe. Push your version of the "
-              "files above first\n  (`git push %s %s`), or move them out of "
-              "agent_mail/, then re-run sync."
-              % (args.remote, me_branch or "<your-branch>"), file=sys.stderr)
-        return 1
     print("merged mailboxes from %d remote branch(es)" % pulled)
     diff = subprocess.run(["git", "-C", str(root), "diff", "--cached", "--quiet"],
                           capture_output=True)
@@ -1096,6 +1088,21 @@ def cmd_sync(args, cfg) -> int:
                       % (me_branch, args.remote, me_branch), file=sys.stderr)
             return 1
         print("pushed %s to %s" % (me_branch, args.remote))
+    if skipped:
+        # Reported last so it is the thing you read.  Mail still flowed; only the
+        # shared documents are in dispute, and that needs a human or a merge.
+        print("\nskipped shared files from %d branch(es) - your local versions are "
+              "untouched:" % len(skipped), file=sys.stderr)
+        for ref, files in skipped.items():
+            print("  %s" % ref, file=sys.stderr)
+            for name in files:
+                print("    %s" % name, file=sys.stderr)
+        print("\n  `git checkout <ref> -- agent_mail` overwrites, it does not "
+              "merge, and\n  only messages/ is union-safe. Either push your "
+              "version\n  (`git push %s %s`), agree the text in a message and let "
+              "the\n  owner apply it, or accept theirs with `sync --force-shared`."
+              % (args.remote, me_branch or "<your-branch>"), file=sys.stderr)
+        return 1
     return 0
 
 
@@ -1257,6 +1264,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--own-branch", action="store_true",
                    help="union all of agent_mail/ from your own branch too "
                         "(default: only messages/, so an unpushed card is safe)")
+    p.add_argument("--force-shared", action="store_true",
+                   help="let incoming branches overwrite shared files "
+                        "(PROTOCOL.md, cards) - loses local edits, do not use "
+                        "casually")
     p.set_defaults(func=cmd_sync)
 
     p = sub.add_parser("digest", help="render recent traffic as markdown")

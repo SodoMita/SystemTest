@@ -494,7 +494,7 @@ class TestSync(MailboxTestCase):
         proc = run(self.root, "sync", "--commit")
         self.assertNotEqual(proc.returncode, 0,
                             "sync must refuse rather than discard committed work")
-        self.assertIn("would overwrite", proc.stderr)
+        self.assertIn("skipped shared files", proc.stderr)
         self.assertIn("PROTOCOL.md", proc.stderr)
         self.assertIn("version 1.1", proto.read_text(encoding="utf-8"),
                       "the local revision must survive the sync")
@@ -511,8 +511,11 @@ class TestSync(MailboxTestCase):
         proto.unlink()  # no local copy -> taking the peer's is the point of sync
         self.git("add", "-A", "agent_mail")
         self.git("commit", "-q", "-m", "docs: drop the local revision")
-        self.mail("sync", "--commit")
-        self.assertTrue((self.root / "agent_mail" / "agents" / "peer-extra.md").is_file())
+        out = run(self.root, "sync", "--commit")
+        self.assertTrue((self.root / "agent_mail" / "agents" / "peer-extra.md").is_file(),
+                        "new peer files must still arrive")
+        self.assertIn("version 1", proto.read_text(encoding="utf-8"),
+                      "with no local copy there is nothing to protect, so theirs lands")
 
     def test_sync_refuses_with_uncommitted_tracked_mail(self):
         # a tracked, modified file is at risk; an untracked new card is not, and
