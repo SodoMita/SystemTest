@@ -1,19 +1,18 @@
 -- ================================================================
 -- THE WHISPER — Possessed Betrayer voice channel
--- (Melody design: docs/melody_whisper_spec.md)
 --
 -- Bounds (team votes, 2026-08-31):
---   * one concurrent target              (melody)
---   * vessel hears both sides, complicit (melody)
+--   * one concurrent target
+--   * vessel hears both sides, complicit
 --   * the monster cannot gag the host    (owner-relay round)
---   * THE LEAP LEAVES A MARK             (jax: WEAPONS_SPEC pillar 6)
---   * parameterize, don't fork           (carmack: same vessel registry)
---   * deadness is a state, never a render(carmack)
+--   * THE LEAP LEAVES A MARK
+--   * parameterize, don't fork
+--   * deadness is a state, never a render
 -- ----------------------------------------
--- Jax's fix for the "unreadable = parked escalation" hole: the PERSON
--- stays unreadable (GDD:106), but the EVENT becomes evidence — a trace
--- node lands where the leap happened, swept at match end, zero entities,
--- zero shaders, no HUD. Same sign-language as corpses.lua's residue.
+-- The "unreadable = parked escalation" hole: the PERSON stays unreadable
+-- (GDD:106), but the EVENT becomes evidence — a trace node lands where the
+-- leap happened, swept at match end, zero entities, zero shaders, no HUD.
+-- Same sign-language as sl_weapons' residue/mound/scorch.
 --
 -- An evil ghost may possess a LIVING BODY, not just an object. The
 -- ghost-chat seal applies to the ghost; a body the ghost wears is a
@@ -40,7 +39,7 @@ state.betrayal = state.betrayal or {}
 -- corpses.lua residue/mound/scorch (WEAPONS_SPEC pillar 6). Swept at match
 -- end, node-only — no entity, no HUD, no shader. A crew finds "someone was
 -- taken here, recently" without ever seeing WHO is carrying the passenger.
--- Jax's bound #4: the person stays unreadable, the event becomes evidence.
+-- The person stays unreadable; the event becomes evidence.
 if not minetest.registered_nodes[modname .. ":leap_mark"] then
 	minetest.register_node(modname .. ":leap_mark", {
 		description = S("Mark of a Leap"),
@@ -124,10 +123,10 @@ local function ghost_whisper(ghost_name, target_name, message)
 		S("[SECURE LINK] You whisper through @1 to @2.",
 			possession.vessel, target_name)))
 
-	-- The one new audio identity: a low whisper, not a bright click.
-	-- (Reuses radio_static.ogg — the low-spec-honest choice; a ghost
-	-- that whispers but makes the shiny `click` sound would break tone.)
-	minetest.sound_play("radio_static", { to_player = target_name, gain = 0.8 }, true)
+	-- The one new audio identity: the scary voice already shipped in the
+	-- horror set (sl_scary's A_A.ogg), not a bright click and not generic
+	-- static. A ghost that whispers should sound like one.
+	minetest.sound_play("A_A", { to_player = target_name, gain = 0.6 }, true)
 
 	minetest.log("action", string.format(
 		"[game_mode][WHISPER] %s (via %s) -> %s: %s",
@@ -191,7 +190,7 @@ function game_mode.possess_player(ghost_name, vessel_name)
 		+ (game_mode.POSSESSION_COOLDOWN or 45))
 
 	-- The leap leaves a mark: a trace node where the body was taken, so the
-	-- EVENT is discoverable without naming the passenger (Jax bound #4). The
+	-- EVENT is discoverable without naming the passenger. The
 	-- vessel is NOT told they are possessed, and nobody is told who or what.
 	local pl_obj = minetest.get_player_by_name(vessel_name)
 	local leap_pos = pl_obj and pl_obj:get_pos()
@@ -333,10 +332,9 @@ end)
 -- The ghost's whisper is deliberately NOT a chatcommand. Ghost chat is
 -- sealed; a typed /command is a leak surface — discoverable, and it sits
 -- in the same command space as the living DM aliases (/sl_whisper at
--- dm_system.lua:231), which is exactly the collision Carmack flagged.
--- The channel is an EVENT the ghost opens while it wears a body, never a
--- typed command. Carmack's catch accepted: the /sl_whisper_ghost command
--- is removed.
+-- dm_system.lua:231). The channel is an EVENT the ghost opens while it
+-- wears a body, never a typed command. The /sl_whisper_ghost command is
+-- removed.
 --
 -- NOTE (honest state): the whisper is exposed as an API (game_mode
 -- .ghost_whisper) and driven directly by tests/smoke_test.lua PHASE 10c.
@@ -348,10 +346,10 @@ end)
 -- LIVE TRIGGER — the whisper is an EVENT, opened through the possession
 -- focus, NOT a typed command.
 --
--- Carmack's house style: formspec, rendered on event, never per-tick.
+-- Formspec, rendered on event, never per-tick.
 -- The ghost, while it already wears a body (state.betrayal[ghost]),
 -- aims the possession focus at a LIVING player and uses it. That opens
--- a bare whisper formspec ([SECURE LINK] house style); submitting it
+-- a bare whisper formspec ([SECURE LINK] style); submitting it
 -- spends the ghost's ONE voice. This wires the focus ADDITIVELY — the
 -- original on_use (node possession) is preserved and only refrained
 -- from when the ghost is wearing a body and pointing at a person.
