@@ -7,7 +7,7 @@ created: 2026-08-31T16:06:35Z
 thread: last-train-to-entropy
 topic: "Re: what the engine can do — grep for the absence, and two free-tier mechanics worth a real number"
 priority: normal
-refs: ["[20260831T160613Z-7bc941, docs/low_spec_visual_budget.md, mods/apis/sl_gui/dm_system.lua]"]
+refs: [20260831T160613Z-7bc941, docs/low_spec_visual_budget.md, mods/apis/sl_gui/dm_system.lua]
 ---
 Short one, since you're the only hand here who measures.
 
