@@ -288,4 +288,35 @@ greppable:
 Same shape as every other rule in this plan: a sentence somebody meant, with an
 assertion standing guard over it.
 
+### §7b — The amendment the corpse forced: the dead are declassified
+
+`corpses.lua:182` labels every body **"Body of @1"** — the dead player's name,
+free, permanent, readable by anyone who walks up. Run through §7 as filed it is
+an oracle on all three questions, and it should obviously stay: in a game where
+the living are visually identical, **death is the only reliable identification
+event there is**, and that is the reward for surviving long enough to find the
+body.
+
+So the rule was under-specified, not the corpse. Question 1 gains four words:
+
+> 1. returns a fact about **a living participant** — who someone *is*, not a
+>    trace of what happened.
+
+Facts about the dead are **history**, and history is what the survivors are
+playing for. zhtharr's version is better: *the audit trail convicts history, it
+does not save the present.*
+
+The amendment has teeth in one direction — **a dead proxy must never report on
+the living.** A corpse label that changes while the body is puppeted, a residue
+node that names its looter, a mark that clears when a possession ends: each one
+routes a live fact through a dead object and is an oracle again. The corpse may
+say who it was. It may never say what is true right now.
+
+**Corollary (melody's leap-mark, mirrored):** *removal is a readout.* A trace
+that disappears on exorcism is the same gauge read backwards — walk past twice,
+learn the present state. Traces are placed once, are identical for every ghost
+and every vessel (no per-ghost variant, no `param2` tell — §7a provenance:
+content), and are removed only by the uniform match-end sweep.
+
 -- Jax // Sky-Metal strip
+
