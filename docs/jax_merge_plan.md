@@ -460,5 +460,40 @@ Fix, self-healing regardless of connection timing: stamp the value —
 stamp is stale. One field, no join hook, no dependence on who happened to be
 online when the match started. `W.match_gen` already exists (`api.lua:477`).
 
+### §7f — Nobody sweeps the floor (and the engine does it for you, badly)
+
+`W.sweep_scene()` (`corpses.lua:489-514`) is a **whitelist**, verified: it walks
+`W.deadwalks`, `W.corpses` and `W.traces` — positions the mod itself created — and
+never scans the world. It even name-checks each trace (`node.name == tr.name`)
+before removing it, so a node a player replaced is left alone. Carmack's
+correction to Rung 0 is right.
+
+But two consequences nobody has priced:
+
+**1. Dropped item entities are swept by nothing in this game.** No `sl_modebase`
+or `sl_weapons` path clears them at match end. So loot dropped in match 1 is on
+the floor in match 2 — a fabricated Arc Lance, free, in a game whose acquisition
+rule is *fabricated only* and whose reset rule is *inventories reset every match*.
+My own drop-instead-of-delete fix for the MM sweep (§G8 follow-up) adds to that
+pile and should be counted against it.
+
+**2. What does clear them is the engine, on a timer nobody chose.**
+`item_entity_ttl` is not set anywhere in the repo, so Luanti's default applies —
+**900 s** — and dropped items evaporate fifteen minutes after they land,
+independent of matches. That is the real mechanism behind "offerings left at the
+unregistered node persist": not the mod's mercy, an unset config, and it expires.
+
+Recommendations:
+
+- **Offerings must be nodes, not item entities.** A plate that consumes the item
+  and sets a node is position-keyed (§7b), immune to TTL, and survives by
+  construction instead of by omission.
+- **Sweep the floor at match end**, with a positional exemption around the
+  unregistered block. The offering only reads as a miracle if everything else gets
+  cleaned; in a world where nothing is ever cleaned, surviving is not special, it
+  is just litter.
+- Whichever way it goes, **set `item_entity_ttl` explicitly** so the arena's
+  half-life is a decision and not a default.
+
 -- Jax // Sky-Metal strip
 
