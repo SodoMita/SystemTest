@@ -297,6 +297,16 @@ H.advance(120, 0.5)
 local po2, pe2 = gm.possess_player("alpha", "beta")
 check(po2 == true, "re-possess for the event-drive test" .. (po2 and "" or (" -> " .. tostring(pe2))))
 
+-- Jax bound #4: the leap leaves a mark in the world (person unreadable,
+-- event becomes evidence). Node-only, no entity.
+local marks_before = #(state.leap_marks or {})
+check(marks_before >= 1, "the leap left a world trace node (jax's bound #4)")
+local bpos = vector.round(beta:get_pos())
+check(minetest.get_node(bpos).name == "sl_modebase:leap_mark",
+	"leap mark node is at the vessel's position")
+check(state.leap_marks[marks_before].x == bpos.x and state.leap_marks[marks_before].z == bpos.z,
+	"leap mark recorded for the match-end sweep")
+
 -- A ghost wearing a body aims the possession focus at a LIVING player and
 -- uses it -> the whisper formspec (an EVENT) opens, no command typed.
 local focus2 = minetest.registered_tools["sl_modebase:possession_focus"]
@@ -322,6 +332,9 @@ check((state.betrayal.alpha or {}).whispers >= 1, "one voice spent in the regist
 -- Clearing for the rest of the suite: drop the re-possession.
 gm.clear_all_betrayal()
 check(state.betrayal.alpha == nil, "betrayal cleared for the reset phase")
+check(#(state.leap_marks or {}) == 0, "leap marks swept by the match-end clear (node-only evidence)")
+check(minetest.get_node(bpos).name ~= "sl_modebase:leap_mark",
+	"mark node removed from the world, not left to leak a match")
 
 section("PHASE 11 — match timer, result screen, lobby reset")
 state.settings.match_duration = 5

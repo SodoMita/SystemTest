@@ -2,6 +2,19 @@
 -- THE WHISPER — Possessed Betrayer voice channel
 -- (Melody design: docs/melody_whisper_spec.md)
 --
+-- Bounds (team votes, 2026-08-31):
+--   * one concurrent target              (melody)
+--   * vessel hears both sides, complicit (melody)
+--   * the monster cannot gag the host    (owner-relay round)
+--   * THE LEAP LEAVES A MARK             (jax: WEAPONS_SPEC pillar 6)
+--   * parameterize, don't fork           (carmack: same vessel registry)
+--   * deadness is a state, never a render(carmack)
+-- ----------------------------------------
+-- Jax's fix for the "unreadable = parked escalation" hole: the PERSON
+-- stays unreadable (GDD:106), but the EVENT becomes evidence — a trace
+-- node lands where the leap happened, swept at match end, zero entities,
+-- zero shaders, no HUD. Same sign-language as corpses.lua's residue.
+--
 -- An evil ghost may possess a LIVING BODY, not just an object. The
 -- ghost-chat seal applies to the ghost; a body the ghost wears is a
 -- loophole. The Betrayer (the vessel) is NOT told "you are possessed."
@@ -18,9 +31,32 @@
 
 local S = game_mode.S
 local state = game_mode.state
+local modname = game_mode.modname
 
 -- Betrayal registry: [ghost_name] = { vessel = <player>, whispers = 0, until_time }
 state.betrayal = state.betrayal or {}
+
+-- The leap leaves a mark: a world-state trace node, same sign-language as
+-- corpses.lua residue/mound/scorch (WEAPONS_SPEC pillar 6). Swept at match
+-- end, node-only — no entity, no HUD, no shader. A crew finds "someone was
+-- taken here, recently" without ever seeing WHO is carrying the passenger.
+-- Jax's bound #4: the person stays unreadable, the event becomes evidence.
+if not minetest.registered_nodes[modname .. ":leap_mark"] then
+	minetest.register_node(modname .. ":leap_mark", {
+		description = S("Mark of a Leap"),
+		tiles = { "sl_weapons_residue.png" },
+		paramtype = "light",
+		light_source = 1,
+		groups = { cracky = 2, not_in_creative_inventory = 1 },
+		is_ground_content = false,
+		walkable = false,
+		drop = "",
+	})
+end
+
+-- Track placed leap marks so the match-end sweep clears them (node-only,
+-- never left behind to leak a match).
+state.leap_marks = state.leap_marks or {}
 
 -- The ghost's single lie-channel. Redacted sender, whisper audio, and
 -- an audible echo to the vessel. Reuses the shipped DM formspec/color
@@ -154,6 +190,17 @@ function game_mode.possess_player(ghost_name, vessel_name)
 	g_pl.possession_ready_at = now + (game_mode.POSSESSION_DURATION
 		+ (game_mode.POSSESSION_COOLDOWN or 45))
 
+	-- The leap leaves a mark: a trace node where the body was taken, so the
+	-- EVENT is discoverable without naming the passenger (Jax bound #4). The
+	-- vessel is NOT told they are possessed, and nobody is told who or what.
+	local pl_obj = minetest.get_player_by_name(vessel_name)
+	local leap_pos = pl_obj and pl_obj:get_pos()
+	if leap_pos then
+		leap_pos = vector.round(leap_pos)
+		minetest.set_node(leap_pos, { name = modname .. ":leap_mark" })
+		table.insert(state.leap_marks, leap_pos)
+	end
+
 	-- Identity-neutral broadcast; the vessel is NOT told they are possessed.
 	game_mode.broadcast(S("Something has reached into a body."))
 	minetest.sound_play("alert", { to_player = vessel_name, gain = 0.6 })
@@ -188,6 +235,14 @@ function game_mode.clear_all_betrayal()
 			pl.possession_pos = nil
 		end
 	end
+	-- Sweep the leap marks so no evidence survives the match (node-only,
+	-- never left to leak the next one).
+	for _, pos in ipairs(state.leap_marks or {}) do
+		if minetest.get_node(pos).name == modname .. ":leap_mark" then
+			minetest.remove_node(pos)
+		end
+	end
+	state.leap_marks = {}
 end
 
 -- Additive wrapper: the match-end reset already calls clear_all_possession,
