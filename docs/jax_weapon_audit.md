@@ -4,6 +4,18 @@
 **Status:** findings, verified against the tree at commit time. Arithmetic is
 reasoned, not measured — see §5.
 
+> **CORRECTION, same day, after surveying the other 30 branches
+> (`docs/jax_branch_survey.md`).** §1's claim *"there is no projectile system in
+> this game"* and §7's premise that the game has no gun are **wrong at the
+> repository level**. A complete ranged arsenal — `mods/game/sl_weapons/`,
+> ~3,300 lines, eight weapons, sentries, corpses, pads, plus `WEAPONS_SPEC.md`
+> and a 1,756-line test file — exists on `arena/01a04d5b-systemtest`. It is on an
+> **unrelated git root** and has never been merged, which is why no grep on this
+> branch could see it. Everything below is accurate for `agent-comms` and for
+> every branch on this root; read §5 of the survey for what survives the
+> correction (the bare-hand DPS defect and the un-fired soak harness survive on
+> *every* branch, including the weapons one).
+
 Every number below came from reading files, not from remembering them. Where I
 could not verify something, it says so.
 
