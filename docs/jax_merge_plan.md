@@ -145,6 +145,7 @@ wants tournament mode, that is a second, separately argued port.
 | G3 | **The live-engine soak still never fires a weapon**: `run_soak.py:92` sets `enable_damage = false`; `aaa_botmatch/behavior.lua:544` applies a flat synthetic `combat_damage = 5`. | soak harness | Bots read the wielded `tool_capabilities` and pull triggers. |
 | G4 | Five melee tools (pick, axe, shovel, drill, energy blade) still have **no recipe, no loot, no kit** on any branch. Only the Combat Blade gained one (2 ingots, `sl_weapons/init.lua:127`). | `crafting_system.lua` | Six recipes in the `equipment` category. |
 | G5 | `CRAFTING_GUIDE.md` still sends the player to an **Objective** tab that exists on no branch. | `CRAFTING_GUIDE.md` | Reconcile or relabel. |
+| G7 | **The loudness table and the range table contradict each other.** Six of eight weapons out-reach their own report (worst: Neon Repeater, lethal at 72 nodes, audible at 24; Arc Lance 90 vs 48). The evidence layer is quieter than the acts it records — body falls 24, corpse looting 16, burial 20 — so erasing evidence is quieter than creating it, which inverts spec pillar 6. | `weapons.lua` `hear`, `projectiles.lua:259,270`, `hitscan.lua:136-139`, `corpses.lua:165,282,304` | Either `hear >= range` for every weapon, or add the **crack**: one `sound_play` at the impact position (hitscan currently plays a particle there and no sound). See §6a. |
 | G6 | The mod header claims **WP9**, which is not in `AGENT_PARALLEL_PLAN.md`, so `--to wp9` routes nowhere and `lint` warns. | plan doc | Add WP9, or the port has no addressable owner. |
 
 ---
@@ -206,5 +207,33 @@ each step down:
 
 I don't move the herd without being told which valley we're heading for. This is
 the map of both valleys and the cost of the crossing.
+
+### §6a — The crack and the report (proposed, costs one line)
+
+The report is played at the shooter's eye (`hitscan.lua:136-139`,
+`max_hear_distance = def.hear`). The impact end gets a particle
+(`W.impact_fx`) and **no sound at all**. Measured:
+
+| Weapon | lethal reach | report audible to | gap |
+|---|---|---|---|
+| Arc Lance | 90 | 48 | **+42** |
+| Neon Repeater | 72 | 24 | **+48** |
+| Pulsar Pistol | 60 | 28 | +32 |
+| Neon Six | 60 | 32 | +28 |
+| Chatter SMG | 48 | 36 | +12 |
+| Riot Scatter | 24 | 40 | −16 (the only weapon audible past its own reach) |
+| Fusion Mortar | arc | launch 40 / blast 48 | — |
+| Pulse Driver | projectile | launch 24 | — |
+
+Evidence layer, for comparison: body falls **24**, corpse looting **16**, burial
+**20**, cremation **32**, pad chime **32**, ranged exorcism **16**.
+
+Do not fix this by inflating radii — that flattens the arsenal into one loud
+noise. Fix it with a second channel: **the report belongs to the muzzle, the
+crack belongs to the impact.** One `minetest.sound_play` at `hit_pos` in
+`fire_hitscan`, wide radius, weapon-neutral. The victim's neighbourhood learns
+*a shot happened here* without learning *who fired from where* — which is the
+sniper's fair bargain, and it restores the information horizon exactly where
+the corpse is about to appear.
 
 -- Jax // Sky-Metal strip
