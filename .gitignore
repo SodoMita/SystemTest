@@ -32,3 +32,11 @@ debug.txt
 # Compiled pipeline binaries (sources stay, binaries rebuild per-session)
 mods/content/sl_scary/pipeline/downscale_filter
 mods/content/sl_scary/pipeline/matte_floodfill
+
+# Agent mail: local-only state (identity override + read receipts)
+/agent_mail/.identity
+/agent_mail/.read/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
