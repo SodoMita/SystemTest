@@ -945,6 +945,35 @@ def cmd_threads(args, cfg) -> int:
     return 0
 
 
+def paths_sync_would_clobber(root: Path, ref: str, scope: str) -> list[str]:
+    """Files in `scope` that exist locally and differ from `ref`'s version.
+
+    `git checkout <ref> -- <scope>` overwrites whatever is in the working tree,
+    with no merge and no warning.  For `messages/` that is safe - filenames are
+    unique, so anything colliding is the same message twice.  For every other
+    path in the mailbox it is a data-loss bug: it silently reverts local edits to
+    PROTOCOL.md, README.md and agent cards, *including edits that were already
+    committed* (reproduced 2026-08-31 on `arena/carmack-systemtest`).
+
+    Two things are *not* at risk and must be excluded: files that do not exist
+    locally (taking those is the point of syncing - that is how a peer's new card
+    arrives), and files that exist locally but not on `ref` (`git diff` lists
+    those too, as deletions; `checkout` will not touch them).
+    """
+    diff = subprocess.run(["git", "-C", str(root), "diff", "--name-only", ref, "--",
+                           scope], capture_output=True, text=True)
+    out = []
+    for line in diff.stdout.splitlines():
+        name = line.strip()
+        if not name or not (root / name).exists():
+            continue
+        has = subprocess.run(["git", "-C", str(root), "cat-file", "-e",
+                              "%s:%s" % (ref, name)], capture_output=True)
+        if has.returncode == 0:
+            out.append(name)
+    return out
+
+
 def cmd_sync(args, cfg) -> int:
     root = cfg["root"]
     if not args.no_fetch:
@@ -953,11 +982,34 @@ def cmd_sync(args, cfg) -> int:
                                args.remote, refspec], capture_output=True, text=True)
         if proc.returncode != 0:
             raise SystemExit("fetch failed: %s" % proc.stderr.strip())
+    # Refuse before touching the working tree.  `git checkout <ref> -- path`
+    # aborts on unstaged local edits anyway, and silently discards staged or
+    # committed ones; either way the agent loses work with no idea why.
+    # Untracked files are excluded on purpose: a fresh agent card written by
+    # `register` and not yet committed is the documented session-start flow, and
+    # nothing in the union can overwrite a path no branch has.
+    me_id = resolve_identity(root, args.id)
+    status = git(root, "status", "--porcelain", "--", MAIL_DIRNAME, check=False)
+    dirty = []
+    for line in status.splitlines():
+        code, name = line[:2], line[3:].strip()
+        if code.startswith("?") or not name:
+            continue  # untracked: nothing in the union can overwrite it
+        if name == "%s/%s/%s.md" % (MAIL_DIRNAME, AGENTS, me_id):
+            continue  # your own card is yours to rewrite (R2)
+        dirty.append("%s %s" % (code.strip(), name))
+    if dirty:
+        print("refusing to sync: %s/ has uncommitted changes to tracked files:\n"
+              "  %s\n  commit them first (R3: `git commit -m \"mail: …\" -- %s`), "
+              "then re-run sync."
+              % (MAIL_DIRNAME, "\n  ".join(dirty), MAIL_DIRNAME), file=sys.stderr)
+        return 1
     me_branch = current_branch(root)
     my_ref = "refs/remotes/%s/%s" % (args.remote, me_branch) if me_branch else ""
     refs = git(root, "for-each-ref", "--format=%(refname)",
                "refs/remotes/%s" % args.remote).split()
     pulled = 0
+    blocked: dict[str, list[str]] = {}
     for ref in refs:
         if ref.endswith("/HEAD"):
             continue
@@ -976,8 +1028,27 @@ def cmd_sync(args, cfg) -> int:
                            "%s:%s" % (ref, scope)],
                           capture_output=True).returncode != 0:
             continue
+        if scope != "%s/%s" % (MAIL_DIRNAME, MESSAGES):
+            at_risk = paths_sync_would_clobber(root, ref, scope)
+            if at_risk:
+                blocked[ref] = at_risk
+                continue
         git(root, "checkout", ref, "--", scope)
         pulled += 1
+    if blocked:
+        print("merged mailboxes from %d remote branch(es)" % pulled)
+        print("\nrefused to sync %d branch(es) that would overwrite local files:"
+              % len(blocked), file=sys.stderr)
+        for ref, files in blocked.items():
+            print("  %s" % ref, file=sys.stderr)
+            for name in files:
+                print("    %s" % name, file=sys.stderr)
+        print("\n  `git checkout <ref> -- agent_mail` overwrites, it does not "
+              "merge.\n  Only messages/ is union-safe. Push your version of the "
+              "files above first\n  (`git push %s %s`), or move them out of "
+              "agent_mail/, then re-run sync."
+              % (args.remote, me_branch or "<your-branch>"), file=sys.stderr)
+        return 1
     print("merged mailboxes from %d remote branch(es)" % pulled)
     diff = subprocess.run(["git", "-C", str(root), "diff", "--cached", "--quiet"],
                           capture_output=True)

@@ -461,6 +461,78 @@ class TestSync(MailboxTestCase):
         self.assertEqual(len(list((self.root / "agent_mail" / "messages")
                                   .glob("*.md"))), 2)
 
+    def test_sync_refuses_to_clobber_local_edits_to_shared_files(self):
+        """Regression: `git checkout <ref> -- agent_mail` silently reverted a
+        *committed* local edit to PROTOCOL.md. Reproduced on
+        arena/carmack-systemtest, 2026-08-31 - the documented session-end
+        sequence (edit, commit, sync --commit --push) destroyed the edit."""
+        # a shared file that exists on every branch from the start, as
+        # PROTOCOL.md does on agent-comms
+        proto = self.root / "agent_mail" / "PROTOCOL.md"
+        proto.parent.mkdir(parents=True, exist_ok=True)
+        proto.write_text("# Agent Mail\n\nversion 1\n", encoding="utf-8")
+        self.git("add", "agent_mail/PROTOCOL.md")
+        self.git("commit", "-q", "-m", "protocol v1")
+        v1 = self.git("rev-parse", "HEAD")
+        self.mail("send", "--to", "all", "--topic", "Base", "-m", "x", "--commit")
+        self.git("push", "-q", "-u", "origin", "arena/01a05786-systemtest")
+
+        # a peer branch that also carries v1 of the shared file
+        self.git("checkout", "-q", "-b", "arena/01a05759-systemtest", v1)
+        run(self.root, "--id", "agent-01a05759", "register", "--wp", "WP4",
+            "--role", "peer")
+        self.git("add", "agent_mail/agents/agent-01a05759.md")
+        self.git("commit", "-q", "-m", "register peer")
+        self.git("push", "-q", "-u", "origin", "arena/01a05759-systemtest")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+
+        # we revise the shared file and commit it, exactly as the docs tell you to
+        proto.write_text("# Agent Mail\n\nversion 1.1, revised locally\n", encoding="utf-8")
+        self.git("add", "agent_mail/PROTOCOL.md")
+        self.git("commit", "-q", "-m", "docs: local protocol revision")
+
+        proc = run(self.root, "sync", "--commit")
+        self.assertNotEqual(proc.returncode, 0,
+                            "sync must refuse rather than discard committed work")
+        self.assertIn("would overwrite", proc.stderr)
+        self.assertIn("PROTOCOL.md", proc.stderr)
+        self.assertIn("version 1.1", proto.read_text(encoding="utf-8"),
+                      "the local revision must survive the sync")
+
+        # the peer's *new* files are still welcome: nothing local to lose
+        self.git("checkout", "-q", "arena/01a05759-systemtest")
+        (self.root / "agent_mail" / "agents" / "peer-extra.md").write_text(
+            "---\nid: peer-extra\nbranch: arena/01a05759-systemtest\n---\nhi\n",
+            encoding="utf-8")
+        self.git("add", "agent_mail/agents/peer-extra.md")
+        self.git("commit", "-q", "-m", "extra card")
+        self.git("push", "-q", "origin", "arena/01a05759-systemtest")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        proto.unlink()  # no local copy -> taking the peer's is the point of sync
+        self.git("add", "-A", "agent_mail")
+        self.git("commit", "-q", "-m", "docs: drop the local revision")
+        self.mail("sync", "--commit")
+        self.assertTrue((self.root / "agent_mail" / "agents" / "peer-extra.md").is_file())
+
+    def test_sync_refuses_with_uncommitted_tracked_mail(self):
+        # a tracked, modified file is at risk; an untracked new card is not, and
+        # the documented session-start flow writes exactly that
+        proto = self.root / "agent_mail" / "PROTOCOL.md"
+        proto.write_text("# local edit\n", encoding="utf-8")
+        self.git("add", "agent_mail/PROTOCOL.md")
+        proc = run(self.root, "sync", "--commit")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("uncommitted changes", proc.stderr)
+        self.assertIn("PROTOCOL.md", proc.stderr)
+
+    def test_sync_tolerates_an_uncommitted_own_card(self):
+        # `register` without --commit is step 2 of the documented session start;
+        # sync must not refuse just because the card is not committed yet
+        run(self.root, "id", "--set", "newcomer")
+        run(self.root, "register", "--wp", "WP1", "--role", "just arrived")
+        out = self.mail("sync", "--commit")
+        self.assertIn("merged mailboxes", out)
+
     def test_sync_refuses_to_push_over_a_diverged_branch(self):
         """A silent push failure is the worst failure here: the agent believes
         its mail is published, so nobody ever answers it."""
@@ -490,7 +562,7 @@ class TestSync(MailboxTestCase):
 
         # the mail sync pulled in is staged; commit it, rebase, and the same
         # command succeeds with both messages published
-        self.mail("sync", "--commit")
+        self.git("commit", "-q", "-m", "mail: sync", "--", "agent_mail")
         self.git("pull", "-q", "--rebase", "origin", "arena/01a05786-systemtest")
         out = self.mail("sync", "--commit", "--push")
         self.assertIn("pushed arena/01a05786-systemtest", out)
