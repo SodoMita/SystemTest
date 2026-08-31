@@ -193,25 +193,40 @@ class TestMessaging(MailboxTestCase):
         self.assertEqual(len(files), 3)
         self.assertEqual(len(set(files)), 3)
 
-    def test_send_refuses_a_credential_in_the_body(self):
-        """Mail is append-only and pushed to every clone, so the guard has to
-        fire at composition time - lint is far too late."""
-        before = len(list((self.root / "agent_mail" / "messages").glob("*.md")))
-        proc = run(self.root, "send", "--to", "all", "--topic", "Here is the PAT",
-                   "-m", "use this: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+    def test_reply_to_inherits_thread_and_cites_parent(self):
+        """R6 says copy the parent's thread:; the old default guaranteed a fork
+        because every reply topic starts with "Re:" and thread defaults to
+        slugify(topic).  Observed three times in one day."""
+        out = self.mail("send", "--to", "all", "--topic", "Original ask",
+                        "-m", "first")
+        parent_id = out.split()[1]
+        out = self.mail("send", "--reply-to", parent_id, "-m", "my answer")
+        import json
+        reply = json.loads(self.mail("read", out.split()[1], "--json"))
+        self.assertEqual(reply["meta"]["thread"], "original-ask",
+                         "must stay in the parent's thread")
+        self.assertEqual(reply["meta"]["topic"], "Re: Original ask")
+        self.assertIn(parent_id, reply["meta"]["refs"], "the parent must be cited")
+        self.assertEqual(reply["meta"]["to"], ["agent-01a05786"],
+                         "defaults to the parent's author, not reply-to-all")
+        threads = json.loads(self.mail("threads", "--json"))
+        self.assertEqual(len(threads), 1, "a reply must not fork the conversation")
+
+    def test_reply_to_explicit_overrides_win(self):
+        out = self.mail("send", "--to", "all", "--topic", "Original", "-m", "x")
+        out = self.mail("send", "--reply-to", out.split()[1], "--to", "wp4",
+                        "--topic", "Different subject", "--thread", "my-thread",
+                        "-m", "y")
+        import json
+        reply = json.loads(self.mail("read", out.split()[1], "--json"))
+        self.assertEqual(reply["meta"]["to"], ["wp4"])
+        self.assertEqual(reply["meta"]["topic"], "Different subject")
+        self.assertEqual(reply["meta"]["thread"], "my-thread")
+
+    def test_send_still_requires_a_topic_without_reply_to(self):
+        proc = run(self.root, "send", "--to", "all", "-m", "no subject")
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("refusing to send", proc.stderr)
-        self.assertNotIn("16C7e42F292c6912E7710c838347Ae178B4a", proc.stderr,
-                         "the error must not echo the credential")
-        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
-                                  .glob("*.md"))), before,
-                         "nothing should have been written")
-        # documented escape hatch for false positives still works
-        self.mail("send", "--to", "all", "--topic", "False positive",
-                  "-m", "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
-                  "--allow-secret")
-        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
-                                  .glob("*.md"))), before + 1)
+        self.assertIn("--topic", proc.stderr + proc.stdout)
 
     def test_send_refuses_a_credential_in_the_body(self):
         """Mail is append-only and pushed to every clone, so the guard has to

@@ -806,10 +806,24 @@ def cmd_agents(args, cfg) -> int:
 def cmd_send(args, cfg) -> int:
     root = cfg["root"]
     sender = resolve_identity(root, args.id)
-    recipients = args.to or ["all"]
-    recipients = [r.strip() for r in recipients for r in [r] if r.strip()]
+    parent = None
+    if args.reply_to:
+        parent = find_message(root, args.reply_to)
+        if parent is None:
+            raise SystemExit("no message matching '%s' to reply to" % args.reply_to)
+    recipients = [r.strip() for r in (args.to or []) if r.strip()]
     if not recipients:
-        raise SystemExit("send needs at least one --to")
+        # A reply defaults to the parent's author.  Not to the parent's full
+        # recipient list: a reply-to-all on a `to: all` thread is how a mailbox
+        # fills with noise nobody asked for.  Name the others with --to.
+        recipients = [parent.sender] if parent else ["all"]
+    topic = args.topic
+    if topic is None:
+        if parent is None:
+            raise SystemExit("send needs --topic (or --reply-to <id>)")
+        topic = parent.topic
+        if not topic.lower().startswith("re:"):
+            topic = "Re: %s" % topic
     body = read_body(args)
     if args.kind not in KINDS:
         raise SystemExit("unknown kind '%s' (expected: %s)" % (args.kind, ", ".join(KINDS)))
@@ -825,8 +839,19 @@ def cmd_send(args, cfg) -> int:
             "  If this is a false positive, re-run with --allow-secret and say "
             "why in the thread."
             % "\n".join("  - looks like a %s (%s)" % hit for hit in leaks))
-    msg, path = build_message(root, sender, recipients, args.topic, body, args.kind,
-                              args.thread, args.priority, args.refs or [],
+    # R6 says copy the parent's `thread:` and do not invent one.  The default
+    # thread value is slugify(topic), and every reply topic starts with "Re:",
+    # so the default *guaranteed* a fork - observed three times in one day
+    # (...d44c6f, ...958921, and the fork this message is avoiding).  Inherit it
+    # instead, so following the rule is the path of least resistance.
+    thread = args.thread
+    if thread is None and parent is not None:
+        thread = parent.thread
+    refs = list(args.refs or [])
+    if parent is not None and parent.id not in refs:
+        refs.insert(0, parent.id)
+    msg, path = build_message(root, sender, recipients, topic, body, args.kind,
+                              thread, args.priority, refs,
                               args.needs_reply_by)
     rel = str(path.relative_to(root))
     if args.commit:
@@ -1219,9 +1244,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_agents)
 
     p = sub.add_parser("send", help="compose a message")
-    p.add_argument("--to", action="append", required=True,
-                   help="recipient: all | wp3 | agent-01a05786 (repeatable)")
-    p.add_argument("--topic", required=True)
+    p.add_argument("--to", action="append",
+                   help="recipient: all | wp3 | agent-01a05786 (repeatable; "
+                        "defaults to the parent's author with --reply-to)")
+    p.add_argument("--topic", help="defaults to \"Re: <parent topic>\" with "
+                                   "--reply-to")
+    p.add_argument("--reply-to", metavar="ID",
+                   help="inherit thread:, prefix the topic, cite the parent in "
+                        "refs:, and default --to to its author (R6)")
     p.add_argument("--kind", default="info", choices=KINDS)
     p.add_argument("--thread")
     p.add_argument("--priority", default="normal", choices=PRIORITIES)

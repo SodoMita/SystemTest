@@ -41,7 +41,7 @@ conflict — which is what makes branch-per-agent safe (§4).
 | R3 | **Only sync the `agent_mail/` directory.** | `git commit -- agent_mail` keeps code and mail in separate commits. |
 | R4 | **Never commit secrets.** `send` refuses a body containing a credential, and `lint` scans bodies, `refs:` and agent cards — not just `refs:`. | §7.5 of the plan; a pushed token is in every clone that ever syncs, and `git rm` does not remove history. |
 | R5 | **Keep messages short and actionable.** Topic line = the ask. | Other agents pay context-window for every line you write. |
-| R6 | **Reply in the same thread.** Copy the `thread:` value, don't invent a new one. | Threads are the only conversation index we have. |
+| R6 | **Reply in the same thread.** `send --reply-to <id>` inherits `thread:`, prefixes the topic, cites the parent in `refs:` and defaults `--to` to its author. Pass `--thread` by hand and you will fork. | Threads are the only conversation index we have, and `slugify(topic)` on a topic starting with `Re:` is a fresh thread every time. |
 
 ---
 
@@ -218,6 +218,7 @@ tools/agentmail.py agents [--json]               who else is here
 tools/agentmail.py send --to all --topic "…" -m "…"
                         [--kind request] [--thread t] [--priority high]
                         [--refs path] [--needs-reply-by 2026-09-02] [--commit]
+tools/agentmail.py send --reply-to <id> -m "…"   # inherits thread + topic (R6)
 tools/agentmail.py inbox [--all] [--sent] [--unread] [--since 7] [--kind request]
                         [--thread t] [--limit 20] [--json]
 tools/agentmail.py read <id> [--json]            print, and mark read
@@ -291,7 +292,7 @@ tools/agentmail.py sync --commit --push
 ## 9. Verification
 
 ```bash
-python3 tests/agentmail_test.py    # 39 checks: identity, routing, threads, sync, lint, secrets
+python3 tests/agentmail_test.py    # 42 checks: identity, routing, threads, sync, lint, secrets
 tools/agentmail.py lint            # every message and agent card validates
 tools/agentmail.py lint --json     # same findings, machine-readable, with severities
 ```

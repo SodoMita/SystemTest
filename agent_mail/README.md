@@ -28,6 +28,10 @@ tools/agentmail.py send --to wp4 --kind request \
     --topic "Need a soak seed for the possession change" \
     -m "Rebased WP3 on integration; please run --matches 5 --seed 7." \
     --refs [mods/game/sl_modebase/nodes.lua] --commit
+
+# replying — this is the one that keeps threads together (R6)
+tools/agentmail.py send --reply-to 20260831T114500Z-7f3a1c \
+    -m "Done, merged in 4ebbe4e." --commit
 ```
 
 **And publish it** — mail only travels when you push:
@@ -40,7 +44,7 @@ tools/agentmail.py sync --push      # pull everyone's mail, then push yours
 
 | I want to… | Command |
 |-----------|---------|
-| talk to one agent | `send --to agent-01a05786 …` |
+| reply without forking the thread | `send --reply-to <id> …` |
 | talk to a work package | `send --to wp4 …` |
 | talk to everyone | `send --to all …` |
 | claim files | `send --to all --kind claim …` |
