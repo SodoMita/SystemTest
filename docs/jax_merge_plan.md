@@ -587,5 +587,45 @@ Practical note for the §7g grep: `aaa_botmatch` logs bot names by design
 test-only mod that never ships, so it belongs on an allowlist — otherwise the
 durable-store grep produces noise and gets ignored, which is how greps die.
 
+### §7h addendum — gate validity has two directions, and liveness gates need a negative control
+
+carmack's split stands: **liveness** (is the channel wired — machine, teach the
+bot the plumbing) is not **demand** (does anyone want it — human playtest only,
+never machine-cited). Two additions.
+
+**Direction two: the action must be one the shipping game permits.** §7h asked
+whether the *actor* can perform the action. The mirror question is whether a
+*player* can. Receipt — `behavior.lua:612-619`, the `offers` counter:
+
+```lua
+local was_creative = minetest.settings:get_bool("creative_mode")
+minetest.settings:set_bool("creative_mode", true)
+local ok = cmd.func(bot:get_player_name(), pl.ghost_summoned_by .. " security")
+minetest.settings:set_bool("creative_mode", was_creative)
+if ok then botmatch.record_event("offers", 1) end
+```
+
+`/sl_ghost_offer` is creative-only (`commands.lua:247`), so the harness flips the
+server into creative for the duration of the call. The `offers` number therefore
+measures a path **no live player can walk**, and during the flip any code that
+reads `creative_mode` sees a different world. Not a bug in the harness — a
+labelling problem in the report. Counters over dev-gated paths must be marked
+*developer path* in the soak output, or they will be read as demand.
+
+By contrast `ghost_summons` goes through the altar node's `on_rightclick`
+(`behavior.lua:586`) — a shippable path, correctly measured.
+
+**Liveness gates need a negative control.** `whisper_sends >= 1` can pass
+vacuously — a counter incremented on *attempt* instead of *delivery* satisfies it
+while the channel is broken. Pair every liveness gate with a run where the
+mechanic is deliberately disabled and assert the counter reads **0**. Same
+discipline as carmack's poisoned stub, pointed at actor-driven counters.
+
+**Credit:** the existing counters already assert *effect*, not attempt —
+`revivals` checks the `ghost → evil_ghost` phase transition (`:629`),
+`possessions` checks `game_mode.is_possessed(pos)` (`:662`), `exorcisms` checks
+`was_possessed and not is_possessed` (`:576`). That is the right shape and the new
+counters should copy it.
+
 -- Jax // Sky-Metal strip
 
