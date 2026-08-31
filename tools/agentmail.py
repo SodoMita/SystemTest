@@ -1069,6 +1069,80 @@ def path_in_any_branch(root: Path, path: str) -> bool:
     return False
 
 
+def _envelope_ref_errors(text: str) -> list[str]:
+    """Errors in a message's `refs:` envelope - the part R14 lets an author fix.
+
+    Mirrors the definitive (error-level) checks `lint` makes.  The
+    does-the-file-exist warning is deliberately not included: a variant cannot
+    be judged better for pointing at a path this clone happens to lack.
+    """
+    try:
+        meta, _ = parse_frontmatter(text)
+    except Exception:
+        return ["frontmatter does not parse"]
+    refs = meta.get("refs")
+    if refs is None:
+        return []
+    if not isinstance(refs, list):
+        return ["refs is not a list"]
+    out = []
+    for ref in refs:
+        text_ref = str(ref).strip()
+        if not text_ref:
+            continue
+        if text_ref.startswith("[") and text_ref.endswith("]"):
+            out.append("bracketed list inside a scalar")
+    return out
+
+
+def _repair_unioned_envelopes(root: Path, refs: list[str]) -> list[str]:
+    """Make the union's choice of message envelope deterministic.
+
+    The messages/ union checks each branch out in turn, so the *last* branch
+    processed wins.  Since R14 an envelope can be repaired in place, which
+    makes that arbitrary in two distinct ways:
+
+    - A branch that has not yet received the repair reverts it.  Observed for
+      real: zhtharr repaired three envelopes at 6ba226e, and a later sync
+      restored the bracket artefact on every agent that synced from a stale
+      branch.  A repair that any peer can undo is not a repair.
+    - When two branches carry two *different* repairs, the winner depends on
+      branch iteration order, so two agents converge on different text and
+      diverge.  Any choice is arbitrary, but it must at least be the same
+      arbitrary choice everywhere.
+
+    Rule: an error-free envelope always beats a broken one, and among
+    error-free variants the lexicographically smallest wins, so the result does
+    not depend on the order branches were fetched in.  Never edits a body, and
+    never invents a variant no branch carries.
+    """
+    changed = []
+    for path in sorted((root / MAIL_DIRNAME / "messages").glob("*.md")):
+        local = path.read_text(encoding="utf-8")
+        rel = path.relative_to(root).as_posix()
+        variants: set[str] = set()
+        for ref in refs:
+            out = subprocess.run(["git", "-C", str(root), "show", "%s:%s" % (ref, rel)],
+                                 capture_output=True, text=True)
+            if out.returncode != 0:
+                continue
+            variants.add(out.stdout)
+        good = sorted(t for t in variants
+                      if not _envelope_ref_errors(t))
+        if not good:
+            continue  # every branch is broken; nothing to prefer
+        best = good[0]
+        if best == local:
+            continue
+        # `best` is chosen by a rule that does not depend on branch order, so
+        # every agent converges on the same text.  Writing it when it differs
+        # is what makes that true; sync already refuses to run on a dirty
+        # tracked tree, so no unpushed edit is at risk.
+        path.write_text(best, encoding="utf-8")
+        changed.append(rel)
+    return changed
+
+
 def cmd_sync(args, cfg) -> int:
     root = cfg["root"]
     if not args.no_fetch:
@@ -1165,6 +1239,16 @@ def cmd_sync(args, cfg) -> int:
 
         if took:
             pulled += 1
+
+    # The union can only pick a version, never merge two, so run a repair pass
+    # over anything the last branch reverted.
+    fixed = _repair_unioned_envelopes(root, refs)
+    if fixed:
+        git(root, "add", "--", *fixed)  # the union stages; so must the repair
+        print("repaired %d reverted envelope(s):" % len(fixed))
+        for rel in fixed:
+            print("  %s" % rel)
+
     print("merged mailboxes from %d remote branch(es)" % pulled)
     diff = subprocess.run(["git", "-C", str(root), "diff", "--cached", "--quiet"],
                           capture_output=True)

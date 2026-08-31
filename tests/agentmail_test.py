@@ -727,6 +727,118 @@ class TestSync(MailboxTestCase):
         self.assertIn("Diverged", listing)
         self.assertIn("Second", listing)
 
+    def test_sync_does_not_let_a_stale_branch_revert_an_envelope_repair(self):
+        """R14 lets an author repair their own envelope in place, but the
+        messages/ union checks each branch out in turn, so the last branch
+        processed wins.  A branch that has not yet received the repair silently
+        reverts it.  Observed for real: zhtharr repaired three envelopes and a
+        later sync restored the bracket artefact everywhere.  A repair that any
+        peer can undo is not a repair."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        broken = ("---\nid: 20260101T000000Z-0000aa\nfrom: agent-x\nto: [all]\n"
+                  "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+                  'refs: ["[docs/a.md,docs/b.md]"]\n---\nbody\n')
+        repaired = broken.replace('refs: ["[docs/a.md,docs/b.md]"]',
+                                  "refs: [docs/a.md, docs/b.md]")
+        name = "20260101T000000Z_agent-x_to-all_envelope_0000aa.md"
+        (msgs / name).write_text(broken, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "message with a broken envelope")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+
+        # a peer branch repairs the envelope
+        self.git("checkout", "-q", "-b", "arena/peer-repaired")
+        (msgs / name).write_text(repaired, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "R14 envelope repair")
+        self.git("push", "-q", "-u", "origin", "arena/peer-repaired")
+
+        # a second peer branch, forked before the repair, still has the artefact
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        self.git("checkout", "-q", "-b", "arena/peer-stale")
+        (msgs / "20260101T000000Z_agent-y_to-all_other_0000bb.md").write_text(
+            "---\nid: 20260101T000000Z-0000bb\nfrom: agent-y\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n---\nbody\n", encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "unrelated mail")
+        self.git("push", "-q", "-u", "origin", "arena/peer-stale")
+
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        proc = run(self.root, "sync")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("repaired", proc.stdout,
+                      "sync must undo what the stale branch reverted")
+
+        final = (msgs / name).read_text(encoding="utf-8")
+        self.assertIn("refs: [docs/a.md, docs/b.md]", final,
+                      "the repaired envelope must survive the union")
+        self.assertNotIn('["[', final)
+
+        lint = run(self.root, "lint")
+        self.assertEqual(lint.returncode, 0,
+                         "the bracket artefact must be gone, not just moved: "
+                         + lint.stdout)
+
+    def test_sync_picks_the_same_envelope_whatever_order_branches_arrive_in(self):
+        """When two branches carry two different repairs, any choice is
+        arbitrary - but it must be the SAME arbitrary choice everywhere, or two
+        agents converge on different text and diverge.  The union alone picks
+        by branch iteration order, which is fetch order, which differs per
+        agent.  The rule here does not depend on order."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        name = "20260101T000000Z_agent-x_to-all_disagree_0000cc.md"
+        broken = ("---\nid: 20260101T000000Z-0000cc\nfrom: agent-x\nto: [all]\n"
+                  "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+                  'refs: ["[docs/a.md]"]\n---\nbody\n')
+        (msgs / name).write_text(broken, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "broken envelope")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+
+        for branch, refs in (("arena/peer-fix-a", "refs: [docs/a.md]"),
+                             ("arena/peer-fix-b", "refs: [docs/other.md]")):
+            self.git("checkout", "-q", "-b", branch)
+            (msgs / name).write_text(broken.replace('refs: ["[docs/a.md]"]', refs),
+                                     encoding="utf-8")
+            self.git("add", ".")
+            self.git("commit", "-q", "-m", "a different repair")
+            self.git("push", "-q", "-u", "origin", branch)
+            self.git("checkout", "-q", "arena/01a05786-systemtest")
+
+        proc = run(self.root, "sync")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        first = (msgs / name).read_text(encoding="utf-8")
+        self.assertIn("refs: [docs/a.md]", first,
+                      "the lexicographically smallest valid variant wins, "
+                      "independent of branch order")
+        self.assertNotIn('["[', first)
+
+        # Re-running must be a no-op, and a fresh clone in a different fetch
+        # order must land on the same text - that is the whole claim.  Commit
+        # first: the repair is an uncommitted change, and D7 rightly refuses to
+        # sync over one.
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "mail: sync")
+        again = run(self.root, "sync")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(first, (msgs / name).read_text(encoding="utf-8"),
+                         "the rule must be idempotent")
+
+        other = self.tmp / "other-clone"
+        subprocess.run(["git", "clone", "-q", str(self.origin), str(other)], check=True)
+        rev = subprocess.run(
+            ["git", "-C", str(other), "checkout", "-q", "arena/peer-fix-b"],
+            capture_output=True, text=True)
+        self.assertEqual(rev.returncode, 0, rev.stderr)
+        clone_sync = run(other, "sync")
+        self.assertEqual(clone_sync.returncode, 0, clone_sync.stderr)
+        self.assertEqual(first, (other / "agent_mail" / "messages" / name)
+                         .read_text(encoding="utf-8"),
+                         "a clone standing on the OTHER repair branch must "
+                         "converge on the same envelope")
+
     def test_sync_leaves_unrelated_changes_uncommitted(self):
         (self.root / "mods" / "important.lua").parent.mkdir(parents=True, exist_ok=True)
         (self.root / "mods" / "important.lua").write_text("return {}\n", encoding="utf-8")
