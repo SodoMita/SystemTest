@@ -275,19 +275,16 @@ minetest.register_on_leaveplayer(function(player)
 	end
 end)
 
--- Chat command: the ghost's lie-channel, one use per body.
-minetest.register_chatcommand("sl_whisper_ghost", {
-	params = "<player> <message>",
-	description = S("Whisper through the body you wear (evil ghost; once per possession)"),
-	func = function(name, param)
-		local target, msg = param:match("^(%S+)%s+(.+)$")
-		if not target or not msg then
-			return false, S("Usage: /sl_whisper_ghost <player> <message>")
-		end
-		local ok, err = ghost_whisper(name, target, msg)
-		if not ok then return false, err end
-		return true
-	end,
-})
-
-minetest.log("action", "[game_mode] THE WHISPER loaded — a ghost may now speak through a body.")
+-- The ghost's whisper is deliberately NOT a chatcommand. Ghost chat is
+-- sealed; a typed /command is a leak surface — discoverable, and it sits
+-- in the same command space as the living DM aliases (/sl_whisper at
+-- dm_system.lua:231), which is exactly the collision Carmack flagged.
+-- The channel is an EVENT the ghost opens while it wears a body, never a
+-- typed command. Carmack's catch accepted: the /sl_whisper_ghost command
+-- is removed.
+--
+-- NOTE (honest state): the whisper is exposed as an API (game_mode
+-- .ghost_whisper) and driven directly by tests/smoke_test.lua PHASE 10c.
+-- A live in-world trigger — the possession-focus on_use opening the
+-- whisper when the ghost is already wearing a body — is the next build
+-- step and is NOT yet wired. A command must never come back.
