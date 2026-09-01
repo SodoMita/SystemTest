@@ -109,22 +109,61 @@ MM) lets a whisper happen.
 ## 5. DECISION — First-pass point values + the balance model (Phase 4)
 
 **Tension.** We have no values yet — all scores read 0. The balance model is a
-constraint/optimization problem (per ROADMAP Phase 5). Here's the **recommended starting
-shape** to sweep. These are *tuning knobs*, not laws.
+constraint/optimization problem (per ROADMAP Phase 5). **I've stopped guessing and started
+deriving** — these are now pulled from the game's actual math, via
+`tools/point_economy_model.py` (reusable, runnable). The values are *derived*, not felt;
+I still need soak deltas to validate the *scale*, but the *relative ordering* is now
+principled.
 
-### 5.1 Recommended per-action values (individual points)
+### 5.1 Derived per-action values (from game math, not vibes)
 
-| Action class | Value | Why |
-|---|---|---|
-| Eliminate an opposing living player | **+1** | Low on purpose — kills shouldn't dominate identity/survival. |
-| Repair a sabotaged system/beacon | **+2** | Rewards the defense/repair loop. |
-| Survive or overcome a sabotage | **+1** | Rewards *reading* the sabotage, not just tanking it. |
-| Beacon pressure (damage dealt to opposing beacon) | **+1 per 10 dmg** | Scales with the objective; capped so it can't dwarf a kill. |
-| Objective action (scavenge/craft/deliver toward Core) | **+3 per step** | The headline loop. Delivering the Core itself → team win. |
-| Monster Master income | **+1 per monster kill it commands**, +1 per monster that survives >30 s | Asymmetric; ties MM to monster *activity*, not just deploy. |
-| Evil Ghost | **forfeit all; earn +0** | The sacrifice, enforced (already in code). |
+The model sets points ∝ **win-progress created/denied** = (base time for the action) ×
+(its leverage against a kill). Grounded constants: player HP 20, combat blade 6 dmg/0.8s,
+energy blade 12 dmg/0.6s, beacon HP 100, beacon punch 5 dmg, sabotage corrosion 2 dmg/sec
+(up to 60 HP if uncleared), match 600s.
 
-### 5.2 Constraints the model must respect
+| Action class | Derived value | Base time | Leverage | Why |
+|---|---|---|---|---|
+| Eliminate a living player | **+4** | 3.0s | 1.0 | Baseline. Removes one contributor. |
+| Repair a sabotaged system/beacon | **+6** | 0.8s | 6.0 | **Highest — one punch denies up to 60 beacon HP** (6× a 10-HP unit). Rewards the counterplay loop the GDD makes central. |
+| Beacon pressure | **+2 / 10 HP** | 1.6s | 1.0 | Scales with objective; capped so it can't dwarf a kill. |
+| Objective action (toward Core) | **+20 / step** | 8.0s | 2.0 | The headline win path. Highest per-step. |
+| Survive a sabotage | **+1** | 1.0s | 0.5 | Low direct win-progress. |
+| Monster Master income | **+1 / monster kill it commands**, +1 per survivor >30 s | — | — | Asymmetric; ties MM to monster *activity*. |
+| Evil Ghost | **forfeit all; earn +0** | — | — | The sacrifice, enforced (already in code). |
+
+> **The important correction from the previous version:** I had kill at +1 and repair at
+> +2. The math says that under-values repair badly. One punch *denies* up to 60 beacon HP;
+> a kill removes one 20-HP contributor. So repair > kill per unit effort is the model's
+> clearest signal — and it lines up with the GDD's "detect, prevent, recover" emphasis.
+
+### 5.2 What the model audits (and what it surfaced)
+
+Run `python3 tools/point_economy_model.py` to reproduce. It solves an integer set and
+audits it against **realistic match frequencies** (2 kills, 4×10 beacon HP, 5 objective
+steps, 2 repairs, 2 survives = 130 pts):
+
+| Action | ×freq | Pts | Share |
+|---|---|---|---|
+| kill | ×2 | 8 | 6.2% |
+| beacon10 | ×4 | 8 | 6.2% |
+| **objective** | **×5** | **100** | **76.9%** |
+| repair | ×2 | 12 | 9.2% |
+| survive | ×2 | 2 | 1.5% |
+
+**What the model DECIDES for us:** 'kill-only' supplies only 6.2% → a killer **cannot** top
+the board without the Core (ROADMAP Phase-5 intent met). No negative sinks. repair:kill =
+6:4.
+
+**What the model CANNOT decide — the real meeting question:** objective dominates at
+**76.9%** of a full-match total. Is the Core the MVP, or a 1-dimensional scoreboard?
+- **(A) Core = MVP:** the builder IS the story; teammates are support. Simplest.
+- **(B) Split the Core (recommend):** give the *crafter* delivery points, give the
+  *defenders* beacon-pressure + survive + repair the rest, so every role shows on the
+  board. The GDD's "no single action >40%" intent is that every ROLE is visible — a 2v2
+  where only "who crafted" reads is a flat scoreboard.
+
+### 5.3 Constraints the model must respect
 - **Win-rate band:** side bias stays ~45–55% (no inherent team A/B advantage).
 - **K/D band per role:** no role pushes an impossible K/D (keeps the game from being
   "which side has the better slayer").
@@ -134,15 +173,17 @@ shape** to sweep. These are *tuning knobs*, not laws.
   makes people turtle).
 - **Individual-vs-team split** (see DECISION 1): points are individual; win is team.
 
-**Verify cheaply.** Solve the MiniZinc model for ~30 unrelated feasible regimes; pick the
-2–3 that hit all constraints; soak-sweep them for per-match point deltas + win rate.
+**Verify cheaply.** The derivation is already done and auditable
+(`tools/point_economy_model.py`). To *validate scale,* soak-sweep the derived set for
+per-match point deltas + win rate; tune the SCALE constant (not the ratios) if a strong
+match lands too high or too low.
 
-### 5.3 What I need to actually do this
-I need the soak harness to emit **per-action point deltas** (it currently emits win rate,
-side bias, K/D, beacon damage, event counters — **not** per-action point deltas). Add that
-to the capture list in §7.
+### 5.4 What I need to finish this
+The soak harness to emit **per-action point deltas** (it currently emits win rate, side
+bias, K/D, beacon damage, event counters — **not** per-action point deltas). Add that to
+the capture list in §7. With it I can lock the scale; the *ordering* is already derived.
 
-**DECIDED / DEFERRED / NEEDS DATA**  ← this one needs data
+**DECIDED / DEFERRED / NEEDS DATA**  ← the ordering is solved; the scale needs this data
 
 ---
 
@@ -181,10 +222,11 @@ So the next review has **data, not vibes**. Ask the implementer to record, per m
 
 ## 8. My ask of the meeting (30 seconds, not a speech)
 
-I own the whisper + the challenge layer. I can draft the **full point-economy value
-table** and the **balance constraint set** the moment I have per-action deltas, and I can
-turn the §12 feel checklist into a **review rubric** once we agree on the §6 criteria.
-That's my lane and I'll do it. I just can't *feel* the numbers until the implementers
-ship the capture list. Give me that and the next-next meeting has real tuning to argue about.
+I own the whisper + the challenge layer. I've already **derived** the point economy from
+game math (`tools/point_economy_model.py`) rather than guessing — it's on the agenda in
+§5.1. What's left is **choose (A) Core = MVP or (B) split the Core**, then give the
+implementers the capture list so the soak validates the *scale*. I'll turn the §12 feel
+checklist into a **review rubric** once we agree on the §6 criteria. Give me per-action
+deltas and I lock the scale; the *ordering* is already solved.
 
 — Melody 💜
