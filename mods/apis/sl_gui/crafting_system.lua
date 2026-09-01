@@ -208,8 +208,13 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 
                 if recipe then
                     -- World-affecting outputs belong to machines, never inventory crafting.
-                    -- A registered node is the authoritative signal for this prototype.
-                    if minetest.registered_nodes[recipe.output] then
+                    -- A registered node is the authoritative signal for this prototype;
+                    -- a def that opts in via groups.sl_craft_in_inventory (today: the
+                    -- Objective Core — the named +3 craft of the essence ruling §13.3)
+                    -- is the documented exception.
+                    local out_def = minetest.registered_nodes[recipe.output]
+                    local machine_only = out_def and not (out_def.groups and out_def.groups.sl_craft_in_inventory)
+                    if machine_only then
                         minetest.chat_send_player(player:get_player_name(),
                             "Machine required: this output cannot be crafted in inventory.")
                     else
@@ -231,6 +236,13 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 
                             local total_output = recipe.output_count * quantity
                             inv:add_item("main", ItemStack(recipe.output .. " " .. total_output))
+
+                            -- Essence ruling (§13.3 rule 2): named crafts credit the MM
+                            -- pool on completion (the Objective Core is the +3 example).
+                            -- Guarded so this is inert when sl_modebase is not loaded.
+                            if game_mode and game_mode.on_craft_essence then
+                                game_mode.on_craft_essence(recipe.output, total_output)
+                            end
 
                             if give_experience then
                                 give_experience(player, 5 * quantity)

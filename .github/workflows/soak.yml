@@ -47,6 +47,9 @@ jobs:
       - name: sl_weapons stub suite (fire pipeline, corpses, pads, turrets, lash, fabricator, tournament)
         run: luajit tests/weapons_test.lua
 
+      - name: MM essence stub suite (provenance, pricing, pool, hazard)
+        run: luajit tests/essence_test.lua
+
       - name: Weapons stub turbo soak (40 matches, kill-share + lash gates)
         run: luajit tests/soak_stub_turbo.lua
 

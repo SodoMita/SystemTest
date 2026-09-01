@@ -71,9 +71,23 @@ game_mode.MONSTER_TYPES = {
 		speed = 1.0,
 		damage = 10,
 	},
+	-- Automated security unit: spawned from the Node by the ambient
+	-- hazard rule when a match has no Monster Master and the essence
+	-- pool crosses a threshold (ruling §13.3 rule 4). The MM can also
+	-- deploy it from a spawner unit.
+	custodian = {
+		label = "Automated Security Unit",
+		texture = "monster_texture.png^[colorize:#55ddff:120",
+		hp = 40,
+		speed = 2.2,
+		damage = 5,
+		size = { x = 1, y = 1 },
+	},
 }
 
-game_mode.MONSTER_TYPE_ORDER = { "stalker", "scout", "brute", "dredger", "wraith", "containment" }
+game_mode.MONSTER_TYPE_ORDER = {
+	"stalker", "scout", "brute", "dredger", "wraith", "containment", "custodian",
+}
 
 -- ================================================================
 -- Monster spoils — the workshop economy

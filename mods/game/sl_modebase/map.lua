@@ -579,10 +579,18 @@ local function build_procedural(opts)
 	local cage2 = layout_or("cage", { x = origin.x, z = origin.z })
 	anchor.ghost = { x = cage2.x, y = fy + 40, z = cage2.z }
 
-	-- Initial mob population: seeded scatter inside the arena.
+	-- Initial mob population: seeded scatter inside the arena. The
+	-- custodian (automated security unit, §13.3 rule 4) is excluded:
+	-- it is hazard/MM-deploy only, never part of the map's initial
+	-- population — the ruling spawns it at pool thresholds when a
+	-- match has NO Monster Master.
 	local mobs = {}
 	local budget = math.max(0, sget_int("sl_map.mobs", 6))
-	local variants = game_mode.MONSTER_TYPE_ORDER or { "stalker" }
+	local variants = {}
+	for _, v in ipairs(game_mode.MONSTER_TYPE_ORDER or { "stalker" }) do
+		if v ~= "custodian" then table.insert(variants, v) end
+	end
+	if #variants == 0 then variants = { "stalker" } end
 	local i = 0
 	while i < budget do
 		local px = origin.x + rng_int(rng, -(W - 5), W - 5)

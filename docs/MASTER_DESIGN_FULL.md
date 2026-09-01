@@ -658,8 +658,21 @@ This satisfies both documents at once: it is the owner's economy, and it is Zh't
 Custodian — *the account is billed for the work you do*, and the reclamation daemon
 answers traffic, never souls.
 
-**Status:** design ruling recorded; implementation is not yet wired (it needs the
-map system's node provenance plus the price table, and is queued after it).
+**Pool semantics (added at implementation):** the pool is per-match state, like
+every other match state — reset at every match start and every match end; nothing
+carries into the lobby. Provenance is per-match too: dropped on dig, cleared
+wholesale at reset.
+
+**Pricing (added at implementation):** the price of a node is
+`groups.sl_essence_value` on its def (default 0 — ground blocks, components and
+cheap scaffolding pay nothing). The craftable output defs carry real values from
+the crafting economy: fortify blocks (firenode/water/snowflake2) 1, plasma2 2,
+loot crate 1, hideout (hide_spot) 2, spawner unit 4, objective core 5.
+
+**Status:** implemented — `mods/game/sl_modebase/essence.lua` (provenance,
+pricing, pool, spawner pool-first spend, ambient hazard), wired at match
+start/end, read out in the spawner GUI and `/sl_state`. Tested by
+`tests/essence_test.lua`.
 
 ### 13.4 The vote — why this build refuses it, and what replaces it
 
