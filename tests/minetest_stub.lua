@@ -539,6 +539,7 @@ function minetest.explode_textlist_event(_) return { type = "nothing" } end
 minetest.settings = {
 	get_bool = function(_, key) return M.settings[key] == true end,
 	get = function(_, key) return M.settings[key] end,
+	set = function(_, key, value) M.settings[key] = value end,
 }
 
 -- Time
@@ -624,56 +625,11 @@ function minetest.get_meta(pos)
 	return metas[h]
 end
 
--- Entities / items in world
--- Objects are tracked in M.luaentities (id -> {name, object}) so mob
--- purges can find and remove them, mirroring the engine's registry.
-local function make_object(pos, name)
-	M.entity_seq = M.entity_seq + 1
-	local id = M.entity_seq
-	local obj = {
-		_pos = pos,
-		_props = {},
-		set_properties = function(self, props)
-			for k, v in pairs(props or {}) do self._props[k] = v end
-		end,
-		get_properties = function(self) return self._props end,
-		get_pos = function(self) return { x = self._pos.x, y = self._pos.y, z = self._pos.z } end,
-		set_pos = function(self, p) self._pos = { x = p.x, y = p.y, z = p.z } end,
-		set_velocity = function() end,
-		remove = function(self)
-			if M.luaentities[id] and M.luaentities[id].object == self then
-				M.luaentities[id] = nil
-			end
-			self._removed = true
-		end,
-		get_luaentity = function(self)
-			return { name = name, object = self }
-		end,
-	}
-	M.luaentities[id] = { name = name, object = obj }
-	return obj
-end
-
-function minetest.add_item(pos, stack)
-	local obj = make_object(pos, "__builtin:item")
-	-- Record the drop (the engine spawns a pickup-able item entity;
-	-- tests observe the fountain / salvage through this log).
-	if stack then
-		local s = type(stack) == "table" and stack.__is_stack and stack or ItemStack(stack)
-		table.insert(M.item_drops, {
-			pos = pos and { x = pos.x, y = pos.y, z = pos.z } or nil,
-			name = s:get_name(),
-			count = s:get_count(),
-		})
-	end
-	return obj
-end
-
-function minetest.add_entity(pos, name)
-	local obj = make_object(pos, name)
-	table.insert(M.entity_spawns, { pos = pos, name = name })
-	return obj
-end
+-- Entities / items in world: both go through the single rich object
+-- factory below (make_entity_object), so item entities carry the full
+-- ObjectRef surface (get_hp, punch, get_velocity, ...) the same way
+-- registered entities do — dropped items can be stepped, hit and
+-- purged by map reset exactly like on the engine.
 function minetest.add_particle(_) end
 function minetest.sound_play(_, _) end
 
@@ -1002,6 +958,15 @@ local function make_entity_object(pos, name)
 	function obj:get_acceleration() return { x = 0, y = 0, z = 0 } end
 	function obj:get_properties() return self._props end
 	function obj:set_properties(props) for k, v in pairs(props or {}) do self._props[k] = v end end
+	function obj:set_rotation(r) self._rotation = { x = r.x or 0, y = r.y or 0, z = r.z or 0 } end
+	function obj:get_rotation(_)
+		local r = self._rotation or {}
+		return { x = r.x or 0, y = r.y or 0, z = r.z or 0 }
+	end
+	function obj:set_yaw(y) self._yaw = y end
+	function obj:get_yaw() return self._yaw or 0 end
+	function obj:set_animation(frames, speed, frame_loop, blend) self._animation = { frames = frames, speed = speed } end
+	function obj:get_player_name() return nil end
 	function obj:set_armor_groups(g) self._armor = g or {} end
 	function obj:get_armor_groups() return self._armor end
 	function obj:get_hp() return self._hp end
@@ -1050,13 +1015,26 @@ local function make_entity_object(pos, name)
 	return obj
 end
 
-local raw_add_entity = minetest.add_entity
 minetest.add_entity = function(pos, name, staticdata)
 	local obj = make_entity_object(pos or { x = 0, y = 0, z = 0 }, name)
 	table.insert(M.entity_spawns, { pos = pos, name = name })
 	local lua = obj._lua
 	if lua and lua.on_activate then
 		pcall(lua.on_activate, lua, staticdata or "", 0)
+	end
+	return obj
+end
+minetest.add_item = function(pos, stack)
+	local obj = make_entity_object(pos or { x = 0, y = 0, z = 0 }, "__builtin:item")
+	-- Record the drop (the engine spawns a pickup-able item entity;
+	-- tests observe the fountain / salvage through this log).
+	if stack then
+		local s = type(stack) == "table" and stack.__is_stack and stack or ItemStack(stack)
+		table.insert(M.item_drops, {
+			pos = pos and { x = pos.x, y = pos.y, z = pos.z } or nil,
+			name = s:get_name(),
+			count = s:get_count(),
+		})
 	end
 	return obj
 end
