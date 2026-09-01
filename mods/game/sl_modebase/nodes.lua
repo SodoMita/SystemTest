@@ -981,3 +981,27 @@ function game_mode.sabotage_step(dtime)
 	base_sabotage_step_cage(dtime)
 	game_mode.containment_step(dtime)
 end
+
+-- ================================================================
+-- Stations from spoils (team directive 2026-08-29)
+-- ================================================================
+-- Mapgen places no workshops, so every station needed to craft
+-- anything is assembled by hand through the inventory crafting menu,
+-- and every ingredient is obtainable from monsters (see
+-- game_mode.MONSTER_LOOT in entities.lua).
+-- Registered once every mod is loaded (sl_gui loads after sl_modebase,
+-- so the crafting menu's global does not exist yet at this file's load).
+minetest.register_on_mods_loaded(function()
+	if not register_craft_recipe then return end
+	register_craft_recipe({
+		output = game_mode.modname .. ":ghost_altar",
+		output_count = 1,
+		ingredients = {
+			[game_mode.modname .. ":metal_ingot"] = 2,
+			[game_mode.modname .. ":energy_crystal"] = 2,
+			[game_mode.modname .. ":circuit_board"] = 1,
+		},
+		description = S("Ghost Altar (ritual station — summons a contained ghost for a relic)"),
+		category = "tactical",
+	})
+end)

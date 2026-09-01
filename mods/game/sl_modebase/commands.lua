@@ -79,6 +79,13 @@ minetest.register_chatcommand("sl_state", {
 		if pl.eliminated then
 			table.insert(parts, S("(Eliminated)"))
 		end
+		if pl.tournament_spectator then
+			table.insert(parts, S("(Tournament spectator)"))
+		elseif state.tournament then
+			table.insert(parts, S("Tournament: @1 match(es) left, @2 season points",
+				tostring(state.tournament_matches_left or 0),
+				tostring(state.tournament_scores[name] or 0)))
+		end
 
 		minetest.chat_send_player(name, "[System Looting] " .. table.concat(parts, " | "))
 		if state.match_active then
@@ -86,6 +93,56 @@ minetest.register_chatcommand("sl_state", {
 		else
 			minetest.chat_send_player(name, S("No active match."))
 		end
+	end,
+})
+
+minetest.register_chatcommand("sl_tournament", {
+	description = S("Tournament <start [matches]|stop>: fixed number of matches, roster locked at start, ranking at the end"),
+	privs = { server = true },
+	func = function(name, param)
+		local arg = (param or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+		local count = tonumber(arg:match("^start%s+(%d+)$") or "") or 5
+		if arg:match("^start") then
+			if state.tournament then
+				return false, S("Tournament mode is already running.")
+			end
+			if state.match_active then
+				return false, S("Start the tournament between matches.")
+			end
+			count = math.min(50, math.max(1, math.floor(count)))
+			state.tournament = true
+			state.tournament_planned = count
+			state.tournament_matches_left = count
+			state.tournament_scores = {}
+			-- The roster locks at the starting gun: everyone connected now
+			-- plays the season; anyone who joins later spectates (v1.3.5).
+			state.tournament_roster = {}
+			for _, player in ipairs(minetest.get_connected_players()) do
+				local pname = player:get_player_name()
+				state.tournament_roster[pname] = true
+				game_mode.get_player_state(pname).tournament_spectator = nil
+			end
+			local roster_n = 0
+			for _ in pairs(state.tournament_roster) do roster_n = roster_n + 1 end
+			game_mode.broadcast(S("TOURNAMENT MODE: @1 matches. Roster locked: @2 operators — late joiners spectate. Achievements, levels and abilities persist; inventories reset every match.",
+				tostring(count), tostring(roster_n)))
+			minetest.log("action", "[game_mode] tournament (" .. count ..
+				" matches) started by " .. name)
+			return true, S("Tournament started: @1 matches.", tostring(count))
+		elseif arg == "stop" then
+			if not state.tournament then
+				return false, S("No tournament is running.")
+			end
+			if state.match_active then
+				return false, S("Stop the tournament between matches.")
+			end
+			-- Ranking form first, then the one clean reset (shared with the
+			-- automatic end-of-season path in match.lua).
+			game_mode.end_tournament(S("stopped by @1", name))
+			minetest.log("action", "[game_mode] tournament stopped by " .. name)
+			return true, S("Tournament stopped: ranking shown, progression reset.")
+		end
+		return false, S("Usage: /sl_tournament <start|stop>")
 	end,
 })
 

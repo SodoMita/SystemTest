@@ -777,4 +777,25 @@ minetest.register_chatcommand("resetprogress", {
     end
 })
 
+-- ================================================================
+-- WP9 / WEAPONS_SPEC §12.1 — match-scoped achievement lifecycle.
+-- Called by sl_weapons at match end. Unlocked state and progress
+-- reset (the match forgets), after bumping a persistent lifetime
+-- counter per achievement in player meta (the record survives):
+--   times_earned_<id>  ->  surfaced in the UI as "First Blood × 12"
+-- /resetachievements remains the explicit admin wipe of everything,
+-- these counters included.
+-- ================================================================
+function reset_match_achievements(player)
+    if not player or not player.get_meta then return end
+    local data = get_achievement_data(player)
+    local meta = player:get_meta()
+    for id in pairs(data.unlocked or {}) do
+        meta:set_int("times_earned_" .. id, meta:get_int("times_earned_" .. id) + 1)
+    end
+    data.unlocked = {}
+    data.progress = {}
+    save_achievement_data(player, data)
+end
+
 minetest.log("action", "[achievement_system] Achievement system loaded! 🏆")

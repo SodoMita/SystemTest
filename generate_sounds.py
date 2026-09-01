@@ -1185,6 +1185,300 @@ def r_scratchy_pine(g, v):
 
 
 # --------------------------------------------------------------------------
+# sl_weapons — the ranged arsenal (WEAPONS_SPEC §13: "Assets (generated,
+# zero external files)"). Every name below is a literal the mod passes to
+# minetest.sound_play. The arsenal's audio identity is its warning
+# language: pads identify the weapon by pitch (council resolution #1 —
+# handled at runtime by the Lua `pitch` param, so pad_chime stays one
+# clean bell here), the dry click is intentionally loud and room-audible,
+# and blades/severance break loudly when they die.
+# --------------------------------------------------------------------------
+
+
+def _w_env(n, k=12.0):
+    return np.exp(-np.linspace(0.0, k, n))
+
+
+def _w_noiser(g, v, f2, f1=180.0, dur=0.40, k=22.0, gain=0.85, at=0.0):
+    sr = SR
+    n = int(dur * sr)
+    x = nburst(n, g, sr, f1=f1, f2=f2, peak=1.0) * _w_env(n, k) * gain
+    if at > 0:  # slow attack (booms, roars)
+        a = np.linspace(0.0, 1.0, int(at * sr))
+        x[:len(a)] *= a
+    x *= _pitch(v, g)  # slight per-variant character
+    return x, sr
+
+
+def _w_body(g, v, f, dur=0.40, k=26.0, gain=0.7):
+    sr = SR
+    n = int(dur * sr)
+    t = t_axis(dur, sr)
+    return np.sin(2 * np.pi * f * t) * _w_env(n, k) * gain, sr
+
+
+def _w_ring(g, v, f, dur=0.5, decay=11.0, bright=0.7, gain=0.3):
+    sr = SR
+    p = _pitch(v, g)
+    return metal_ring(f * p, dur, sr, decay, bright=bright) * gain, sr
+
+
+def _w_shoot(g, v, f2=4800.0, body_f=330.0, body_g=0.75, ring_f=1600.0,
+             ring_g=0.22, dur=0.42, rev=0.14):
+    """One gunshot: muzzle noise + body knock + optional ringing tail."""
+    sr = SR
+    n = int(dur * sr)
+    x = np.zeros(n)
+    ng, _ = _w_noiser(g, v, f2, f1=200.0, dur=dur, k=22.0, gain=0.9)
+    x += ng
+    bg, _ = _w_body(g, v, body_f, dur=dur, k=26.0, gain=body_g)
+    x += bg
+    if ring_g > 0:
+        rg, _ = _w_ring(g, v, ring_f, dur=dur, decay=12.0, bright=0.7, gain=ring_g)
+        x += rg
+    x = reverb(x, sr, rev, 0.32, 0.7)
+    return norm(fade(x, 0.001, 0.03, sr)), sr
+
+
+def _w_burst(g, v, shots=5, spacing=0.078):
+    """Machine-gun burst: n cracks at fixed spacing (chatter)."""
+    sr = SR
+    dur = spacing * (shots - 1) + 0.35
+    n = int(dur * sr)
+    x = np.zeros(n)
+    for i in range(shots):
+        ng, _ = _w_noiser(g, v, 4200, f1=220, dur=0.24, k=30.0, gain=0.85)
+        bg, _ = _w_body(g, v, 360, dur=0.24, k=34.0, gain=0.6)
+        mix_at(x, norm(ng + bg, 0.9), i * spacing, 1.0)
+    return norm(fade(x, 0.001, 0.03, sr)), sr
+
+
+def _w_two_note(g, v, gap=0.14):
+    """Two-note clack (lever action / reload slide): loud, then softer."""
+    sr = SR
+    n = int(0.55 * sr)
+    x = np.zeros(n)
+    for i, (g1, f2, k) in enumerate(((0.95, 5200, 24.0), (0.7, 3800, 26.0))):
+        ng, _ = _w_noiser(g, v, f2, f1=240, dur=0.28, k=k, gain=g1)
+        bg, _ = _w_body(g, v, 300, dur=0.28, k=30.0, gain=0.6)
+        mix_at(x, ng + bg, i * gap, 1.0)
+    return norm(fade(x, 0.001, 0.03, sr)), sr
+
+
+def _w_zap(g, v, f0=1900.0, f1=260.0, dur=0.22, vib=0.12):
+    sr = SR
+    x = glide(f0, f1, dur, sr, kind="sine", vib=vib, vib_rate=18.0)
+    x = reso(x, sr, 900.0, q=4.0) * 0.6
+    noise = nburst(len(x), g, sr, f1=800, f2=6000, peak=0.7) * env_ad(len(x), 0.05, 8.0)
+    return norm(fade(x * env_ad(len(x), 0.05, 7.0) + noise * 0.5, 0.001, 0.02, sr)), sr
+
+
+def _w_boom(g, v, dur=1.7, f2=650.0, k=7.0, sub=46.0):
+    sr = SR
+    n = int(dur * sr)
+    x, _ = _w_noiser(g, v, f2, f1=40.0, dur=dur, k=k, gain=1.0, at=0.02)
+    x += np.sin(2 * np.pi * sub * t_axis(dur, sr)) * _w_env(n, 9.0) * 0.9
+    x = reverb(x, sr, 0.45, 0.5, 1.0)
+    return norm(fade(x, 0.002, 0.12, sr)), sr
+
+
+def _w_chime(g, v, f=760.0, dur=0.9, decay=5.5, bright=1.0, rev=0.45):
+    sr = SR
+    p = _pitch(v, g)
+    x = metal_ring(f * p, dur, sr, decay, bright=bright) * 0.8
+    x += tone(f * 2.0 * p, dur, sr, decay=8.0, partials=((1.0, 0.3),)) * 0.25
+    x = reverb(x, sr, rev, 0.55, 0.8)
+    return norm(fade(x, 0.002, 0.10, sr)), sr
+
+
+def _w_hum(g, v, f=118.0, dur=1.5, loop=False, vib=0.004):
+    sr = SR_LOOP if loop else SR
+    t = t_axis(dur, sr)
+    fmod = np.sin(2 * np.pi * 1.9 * t) * f * vib * 8.0
+    x = np.sin(2 * np.pi * (f + fmod) * t) * 0.7
+    x += np.sin(2 * np.pi * 2 * (f + fmod) * t) * 0.25
+    x += np.sin(2 * np.pi * 3 * (f + fmod) * t) * 0.08
+    x = reso(x, sr, f * 4.0, q=2.0) * 0.25 + x
+    if loop:
+        x = loopify(x, sr, 0.5)
+    return norm(fade(x, 0.01, 0.01, sr)), sr
+
+
+def _w_glitch(g, v, up=True, dur=1.1):
+    """Glitch static: rising (deadwalk) or falling (dissolve) bursts."""
+    sr = SR
+    n = int(dur * sr)
+    x = np.zeros(n)
+    bursts = 14
+    for i in range(bursts):
+        t0 = (i / bursts) * (dur - 0.05)
+        L = int((0.02 + 0.045 * (i / bursts)) * sr)
+        filter_args = dict(f1=600, f2=9000) if up else dict(f1=200, f2=5000)
+        mix_at(x, nburst(L, g, sr, peak=0.8, **filter_args), t0, 0.6)
+    f0, f1 = (120.0, 850.0) if up else (900.0, 60.0)
+    x += glide(f0, f1, dur, sr, kind="saw", vib=0.5, vib_rate=11.0) * _w_env(n, 3.0) * 0.18
+    return norm(fade(reverb(x, sr, 0.25, 0.4, 0.8), 0.002, 0.05, sr)), sr
+
+
+def _w_dig(g, v, scoops=3, dur=1.25):
+    """Shovel burial: 2-3 scoops of filtered dirt, then a settle thump."""
+    sr = SR
+    n = int(dur * sr)
+    x = np.zeros(n)
+    step = 0.30
+    for i in range(scoops):
+        L = int(0.16 * sr)
+        d = nburst(L, g, sr, f1=120, f2=2600, peak=0.9) * env_ad(L, 0.18, 5.0)
+        t = thump(85, 0.16, sr, 9.0) * 0.8
+        mix_at(x, d + t, i * step, 1.0)
+    mix_at(x, thump(70, 0.25, sr, 8.0), scoops * step - 0.05, 0.9)
+    return norm(fade(x, 0.002, 0.04, sr)), sr
+
+
+def _w_whoosh(g, v, f0=300.0, f1=1300.0, dur=0.45, noise_f2=1800.0):
+    sr = SR
+    n = int(dur * sr)
+    x = glide(f0, f1, dur, sr, kind="sine", vib=0.3, vib_rate=8.0) * _w_env(n, 4.0) * 0.5
+    x += nburst(n, g, sr, f1=f0 * 0.7, f2=noise_f2) * _w_env(n, 4.5) * 0.8
+    return norm(fade(x, 0.002, 0.03, sr)), sr
+
+
+def _w_servo(g, v):
+    """Turret deploy: three metal clicks then a short servo whine."""
+    sr = SR
+    n = int(0.7 * sr)
+    x = np.zeros(n)
+    for i, f in enumerate((520.0, 430.0, 360.0)):
+        mix_at(x, knock(f, 0.16, sr, 9.0) * 0.8, i * 0.09, 1.0)
+    whine = glide(280, 520, 0.32, sr) * env_ad(int(0.32 * sr), 0.2, 4.0) * 0.35
+    mix_at(x, whine, 0.28, 1.0)
+    return norm(fade(x, 0.001, 0.03, sr)), sr
+
+
+def _w_chirp(g, v, f0=640.0, f1=1500.0, dur=0.22):
+    sr = SR
+    n = int(dur * sr)
+    x = np.zeros(n)
+    half = int(0.09 * sr)
+    mix_at(x, glide(f0, f1, 0.09, sr) * env_ad(half, 0.1, 6.0), 0.0, 0.8)
+    mix_at(x, glide(f0 * 1.2, f1 * 1.3, 0.09, sr) * env_ad(half, 0.1, 8.0), 0.11, 0.7)
+    mix_at(x, metal_ring(2200, 0.12, sr, 14.0, bright=1.2) * 0.4, 0.20, 1.0)
+    return norm(fade(x, 0.001, 0.02, sr)), sr
+
+
+def _w_powerdown(g, v, dur=0.62):
+    sr = SR
+    n = int(dur * sr)
+    x = glide(820, 110, dur, sr, kind="saw", vib=0.25, vib_rate=13.0) * _w_env(n, 3.4) * 0.55
+    x += nburst(n, g, sr, f1=300, f2=4000, peak=0.5) * _w_env(n, 5.0) * 0.5
+    return norm(fade(reverb(x, sr, 0.2, 0.4, 0.8), 0.002, 0.04, sr)), sr
+
+
+def _w_sweep(g, v, up=True):
+    sr = SR
+    dur = 0.24
+    n = int(dur * sr)
+    if up:
+        x = glide(420, 1500, dur, sr, kind="sine", vib=0.15, vib_rate=10.0)
+    else:
+        x = glide(1500, 420, dur, sr, kind="sine", vib=0.15, vib_rate=10.0)
+    x += nburst(n, g, sr, f1=900, f2=5200, peak=0.5) * env_ad(n, 0.1, 7.0)
+    return norm(fade(x, 0.002, 0.02, sr)), sr
+
+
+def _w_break(g, v):
+    """Blade / severance break: snap, ping, then shard rain."""
+    sr = SR
+    n = int(0.6 * sr)
+    x = np.zeros(n)
+    mix_at(x, nburst(int(0.05 * sr), g, sr, f1=1400, f2=9500, peak=0.95), 0.0, 1.0)
+    mix_at(x, metal_ring(2900, 0.4, sr, 10.0, bright=1.3) * 0.7, 0.01, 1.0)
+    for i in range(6):
+        mix_at(x, nburst(int(0.03 * sr), g, sr, f1=2200, f2=8000, peak=0.5),
+               0.08 + 0.05 * i + g.random() * 0.03, 1.0)
+    return norm(fade(reverb(x, sr, 0.22, 0.4, 0.8), 0.001, 0.05, sr)), sr
+
+
+def _w_mm_strike(g, v):
+    sr = SR
+    dur = 0.4
+    n = int(dur * sr)
+    x = thump(92, dur, sr, 11.0) * 0.95
+    x += knock(250, dur, sr, 8.0) * 0.5
+    x += nburst(n, g, sr, f1=350, f2=5500, peak=0.7) * env_ad(n, 0.08, 6.0) * 0.6
+    return norm(fade(reverb(x, sr, 0.2, 0.35, 0.7), 0.001, 0.03, sr)), sr
+
+
+
+def _w_fab_done(g, v):
+    """Fabricator completion: the two-note chime over a relay click."""
+    sr = SR
+    x = tone(880, 0.6, sr, decay=6.0) * 0.7
+    x += tone(1320, 0.6, sr, decay=6.0, partials=((1.0, 0.5),)) * 0.4
+    click = nburst(int(0.05 * sr), g, sr, f1=2500, f2=9000, peak=0.5) * 0.6
+    x[:len(click)] += click
+    return norm(fade(reverb(x, sr, 0.3, 0.45, 0.7), 0.002, 0.06, sr)), sr
+
+def _w_fab_start(g, v):
+    """Fabricator spin-up: click then the working hum swells in."""
+    sr = SR
+    n = int(1.6 * sr)
+    x = np.zeros(n)
+    hum, _ = _w_hum(g, v, f=96, dur=1.6, loop=False, vib=0.005)
+    at = np.linspace(0.0, 1.0, int(0.25 * sr))
+    hum[:len(at)] *= at
+    x += hum
+    mix_at(x, knock(600, 0.1, sr, 12.0) * 0.5, 0.0, 1.0)
+    return norm(fade(x, 0.002, 0.05, sr)), sr
+
+
+# --------------------------------------------------------------------------
+# sl_weapons family table: name -> builder(g, v) -> (samples, sr)
+# --------------------------------------------------------------------------
+
+WEAPONS_FAMILY = {
+    "sl_weapons_pistol_fire": lambda g, v: _w_shoot(g, v, f2=4800, body_f=330, body_g=0.7, ring_f=1700, ring_g=0.20, rev=0.12),
+    "sl_weapons_pistol": lambda g, v: _w_shoot(g, v, f2=4800, body_f=330, body_g=0.7, ring_f=1700, ring_g=0.20, rev=0.12),
+    "sl_weapons_chatter_fire": lambda g, v: _w_burst(g, v, shots=5, spacing=0.078),
+    "sl_weapons_scatter_fire": lambda g, v: _w_shoot(g, v, f2=3600, body_f=140, body_g=1.0, ring_f=700, ring_g=0.5, dur=0.6, rev=0.28),
+    "sl_weapons_lance_fire": lambda g, v: _w_shoot(g, v, f2=5200, body_f=260, body_g=0.75, ring_f=2600, ring_g=0.85, dur=0.8, rev=0.32),
+    "sl_weapons_six_fire": lambda g, v: _w_shoot(g, v, f2=4000, body_f=200, body_g=0.95, ring_f=1150, ring_g=0.45, dur=0.55, rev=0.2),
+    "sl_weapons_repeater_fire": lambda g, v: _w_two_note(g, v, gap=0.14),
+    "sl_weapons_pulse_fire": lambda g, v: _w_zap(g, v),
+    "sl_weapons_mortar_launch": lambda g, v: _w_whoosh(g, v, f0=250, f1=900, dur=0.5),
+    "sl_weapons_explosion": lambda g, v: _w_boom(g, v),
+    "sl_weapons_spark_hit": lambda g, v: (norm(fade(metal_ring(3400, 0.14, SR, 13.0, bright=1.4) * 0.8 + nburst(int(0.14 * SR), g, SR, f1=1800, f2=9000, peak=0.5) * env_exp(int(0.14 * SR), 16.0), 0.001, 0.02, SR)), SR),
+    "sl_weapons_dry_click": lambda g, v: (norm(fade(nburst(int(0.055 * SR), g, SR, f1=2600, f2=9000, peak=1.0) + knock(900, 0.055, SR, 12.0) * 0.35, 0.0005, 0.03, SR)), SR),
+    "sl_weapons_ammo_load": lambda g, v: _w_two_note(g, v, gap=0.07),
+    "sl_weapons_body_falls": lambda g, v: (norm(fade(reverb(thump(105, 0.4, SR, 9.0) * 0.9 + knock(190, 0.4, SR, 9.0) * 0.5 + nburst(int(0.4 * SR), g, SR, f1=120, f2=1200, peak=0.5) * env_exp(int(0.4 * SR), 9.0) * 0.5, SR, 0.25, 0.4, 0.7), 0.001, 0.05, SR)), SR),
+    "sl_weapons_exorcise": lambda g, v: (norm(fade(reverb(glide(1500, 240, 0.75, SR, kind="sine", vib=0.4, vib_rate=9.0) * _w_env(int(0.75 * SR), 3.0) * 0.7 + nburst(int(0.75 * SR), g, SR, f1=500, f2=6000, peak=0.4) * _w_env(int(0.75 * SR), 4.5), SR, 0.5, 0.55, 1.0), 0.002, 0.08, SR)), SR),
+    "sl_weapons_dissolve": lambda g, v: _w_glitch(g, v, up=False, dur=0.9),
+    "sl_weapons_deadwalk_rise": lambda g, v: _w_glitch(g, v, up=True, dur=1.2),
+    "sl_weapons_puppet_collapse": lambda g, v: (norm(fade(nburst(int(0.5 * SR), g, SR, f1=80, f2=1800, peak=0.85) * _w_env(int(0.5 * SR), 8.0) + thump(78, 0.5, SR, 9.0) * 0.9, 0.001, 0.06, SR)), SR),
+    "sl_weapons_cremation": lambda g, v: (norm(fade(reverb(_w_noiser(g, v, 520, f1=30, dur=2.2, k=4.0, gain=1.0, at=0.25)[0] + np.sin(2 * np.pi * 38 * t_axis(2.2, SR)) * _w_env(int(2.2 * SR), 5.0) * 0.8, SR, 0.55, 0.5, 1.0), 0.01, 0.25, SR)), SR),
+    "sl_weapons_shovel_bury": lambda g, v: _w_dig(g, v),
+    "sl_weapons_loot_hum": lambda g, v: _w_hum(g, v, f=170, dur=1.6, loop=True, vib=0.01),
+    "sl_weapons_fab_start": lambda g, v: _w_fab_start(g, v),
+    "sl_weapons_fab_hum": lambda g, v: _w_hum(g, v, f=96, dur=10.0, loop=True, vib=0.006),
+    "sl_weapons_fab_done": lambda g, v: _w_fab_done(g, v),
+    "sl_weapons_pad_chime": lambda g, v: _w_chime(g, v),
+    "sl_weapons_lash_launch": lambda g, v: (norm(fade(_w_shoot(g, v, f2=5400, body_f=400, body_g=0.5, ring_f=3200, ring_g=0.4, dur=0.3, rev=0.15)[0] + _w_whoosh(g, v, f0=400, f1=1500, dur=0.3)[0] * 0.6, 0.001, 0.03, SR)), SR),
+    "sl_weapons_lash_bite": lambda g, v: (norm(fade(metal_ring(2400, 0.16, SR, 12.0, bright=1.3) * 0.8 + nburst(int(0.16 * SR), g, SR, f1=1200, f2=8500, peak=0.9) * env_exp(int(0.16 * SR), 14.0), 0.001, 0.02, SR)), SR),
+    "sl_weapons_lash_snap": lambda g, v: (norm(fade(nburst(int(0.25 * SR), g, SR, f1=1500, f2=9000, peak=1.0) * env_exp(int(0.25 * SR), 22.0) + metal_ring(3200, 0.25, SR, 12.0, bright=1.2) * 0.6, 0.001, 0.05, SR)), SR),
+    "sl_weapons_mm_strike": lambda g, v: _w_mm_strike(g, v),
+    "sl_weapons_turret_acquire": lambda g, v: _w_chirp(g, v),
+    "sl_weapons_turret_deploy": lambda g, v: _w_servo(g, v),
+    "sl_weapons_turret_fire": lambda g, v: (norm(fade(_w_zap(g, v, f0=1400, f1=500, dur=0.14)[0] + tone(880, 0.14, SR, decay=9.0) * 0.4, 0.001, 0.02, SR)), SR),
+    "sl_weapons_turret_hit": lambda g, v: (norm(fade(metal_ring(2600, 0.2, SR, 12.0, bright=1.2) * 0.8, 0.001, 0.03, SR)), SR),
+    "sl_weapons_turret_death": lambda g, v: _w_powerdown(g, v, dur=0.7),
+    "sl_weapons_turret_powerdown": lambda g, v: _w_powerdown(g, v, dur=0.4),
+    "sl_weapons_zoom_in": lambda g, v: _w_sweep(g, v, up=True),
+    "sl_weapons_zoom_out": lambda g, v: _w_sweep(g, v, up=False),
+    "sl_weapons_blade_break": lambda g, v: _w_break(g, v),
+    "sl_weapons_severance_break": lambda g, v: _w_break(g, v),
+}
+
+
 # file -> recipe resolution
 # --------------------------------------------------------------------------
 
@@ -1222,6 +1516,10 @@ SPECIAL = {
     "default_tool_break.ogg": ("tool_break", 0),
     "player_damage.ogg": ("player_damage", 0),
 }
+
+SPECIAL.update({
+    f"{n}.ogg": (n, 0) for n in WEAPONS_FAMILY
+})
 
 DEFAULT_FAMILY = {
     "default_break_glass": "break_glass",
@@ -1325,6 +1623,8 @@ RECIPES = {
     "scratchy_pine": r_scratchy_pine,
 }
 
+RECIPES.update(WEAPONS_FAMILY)
+
 
 def resolve(filename: str):
     if filename in SPECIAL:
@@ -1397,6 +1697,10 @@ def main() -> int:
         ROOT / "mods/default/sounds/default_tool_break.ogg",
         ROOT / "mods/apis/sl_gui/sounds/level_up_sound.ogg",
     ]
+    targets += [
+        ROOT / "mods/game/sl_weapons/sounds" / (n + ".ogg")
+        for n in WEAPONS_FAMILY
+    ]
 
     total_new = total_old = 0
     rows = []
@@ -1422,6 +1726,7 @@ def main() -> int:
             print(f"!! nearly silent {name}: rms={rms:.4f}")
 
         old = path.stat().st_size if path.exists() else 0
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         rows.append((str(path.relative_to(ROOT)), old, len(data), round(dur_want, 2)))
         total_new += len(data)

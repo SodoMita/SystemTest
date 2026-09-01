@@ -767,6 +767,25 @@ minetest.register_chatcommand("givestatpoints", {
     end
 })
 
+-- Match-start progression reset (team directive 2026-08-29): levels
+-- and abilities are per-match, like achievements. Called additively by
+-- sl_modebase when a new match starts; global because sl_gui loads
+-- after sl_modebase and the call happens at match-start runtime.
+function reset_player_progression(player)
+    if not player then return end
+    local meta = player:get_meta()
+    if not meta then return end
+    meta:set_string("experience", "0")
+    local data = get_ability_data(player)
+    data.unlocked = {}
+    data.stat_points = 0
+    data.stat_values = {}
+    data.toggles = {}
+    save_ability_data(player, data)
+    if apply_stats then apply_stats(player) end
+    if apply_toggles then apply_toggles(player) end
+end
+
 minetest.register_chatcommand("resetprogress", {
     description = "Reset all player progress (admin)",
     privs = {server = true},

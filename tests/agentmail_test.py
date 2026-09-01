@@ -1,0 +1,966 @@
+#!/usr/bin/env python3
+"""Tests for tools/agentmail.py - the cross-agent git mailbox.
+
+Pure stdlib, no network.  Every test builds a throwaway git repository in a
+temp dir and drives the CLI exactly the way an agent would, so the tests cover
+the real entry point rather than internal functions only.
+
+    python3 tests/agentmail_test.py
+"""
+
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CLI = ROOT / "tools" / "agentmail.py"
+
+if not CLI.is_file():  # pragma: no cover - guard for odd checkouts
+    raise SystemExit("tools/agentmail.py not found")
+
+
+def run(root, *args, env_extra=None, stdin=None):
+    env = dict(os.environ)
+    env.update({
+        "GIT_AUTHOR_NAME": "Agent Test",
+        "GIT_AUTHOR_EMAIL": "agent@example.invalid",
+        "GIT_COMMITTER_NAME": "Agent Test",
+        "GIT_COMMITTER_EMAIL": "agent@example.invalid",
+        "EDITOR": "",
+    })
+    env.update(env_extra or {})
+    return subprocess.run(
+        [sys.executable, str(CLI), "--root", str(root), *args],
+        capture_output=True, text=True, env=env, cwd=str(root),
+        input=stdin)
+
+
+class MailboxTestCase(unittest.TestCase):
+    """A scratch git repo with agent_mail initialised, one agent registered."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="agentmail-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.root = self.tmp / "repo"
+        self.root.mkdir()
+        self.git("init", "-q", "-b", "arena/01a05786-systemtest")
+        self.git("config", "user.email", "agent@example.invalid")
+        self.git("config", "user.name", "Agent Test")
+        (self.root / "game.conf").write_text("name = system_looting\n", encoding="utf-8")
+        self.git("add", "game.conf")
+        self.git("commit", "-q", "-m", "init")
+        # a bare "remote" so `sync` has something to fetch from
+        self.origin = self.tmp / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(self.origin)], check=True)
+        self.git("remote", "add", "origin", str(self.origin))
+        self.git("push", "-q", "-u", "origin", "arena/01a05786-systemtest")
+        ok = run(self.root, "register", "--wp", "WP8", "--role", "docs & protocol")
+        self.assertEqual(ok.returncode, 0, ok.stderr)
+
+    def git(self, *args, **kwargs):
+        proc = subprocess.run(["git", "-C", str(self.root), *args],
+                              capture_output=True, text=True, **kwargs)
+        if proc.returncode != 0:
+            raise AssertionError("git %s failed: %s" % (args, proc.stderr))
+        return proc.stdout.strip()
+
+    def mail(self, *args, **kwargs):
+        proc = run(self.root, *args, **kwargs)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        return proc.stdout
+
+
+class TestIdentity(MailboxTestCase):
+    def test_identity_derives_from_arena_branch(self):
+        out = self.mail("id")
+        self.assertEqual(out.strip(), "agent-01a05786")
+
+    def test_identity_derives_from_plain_branch(self):
+        self.git("checkout", "-q", "-b", "feat/wp5-system-inventory-gui")
+        self.assertEqual(self.mail("id").strip(), "agent-feat-wp5-system-inventory-gui")
+
+    def test_env_override_wins(self):
+        out = self.mail("id", env_extra={"AGENTMAIL_ID": "glitch"})
+        self.assertEqual(out.strip(), "glitch")
+
+    def test_set_persists_identity_file(self):
+        self.mail("id", "--set", "glitch")
+        idfile = self.root / "agent_mail" / ".identity"
+        self.assertTrue(idfile.is_file())
+        self.assertEqual(idfile.read_text(encoding="utf-8").strip(), "glitch")
+        self.assertEqual(self.mail("id").strip(), "glitch")
+
+
+class TestRegistration(MailboxTestCase):
+    def test_agent_card_written_and_listed(self):
+        card = self.root / "agent_mail" / "agents" / "agent-01a05786.md"
+        self.assertTrue(card.is_file())
+        listed = self.mail("agents")
+        self.assertIn("agent-01a05786", listed)
+        self.assertIn("arena/01a05786-systemtest", listed)
+        self.assertIn("WP8", listed)
+
+    def test_reregister_keeps_unsupplied_fields(self):
+        self.mail("register", "--role", "mail ops")
+        text = (self.root / "agent_mail" / "agents" / "agent-01a05786.md").read_text(
+            encoding="utf-8")
+        self.assertIn("mail ops", text)
+        self.assertIn("WP8", text)  # not wiped by the second call
+
+    def test_agents_json(self):
+        import json
+        data = json.loads(self.mail("agents", "--json"))
+        self.assertEqual(data[0]["id"], "agent-01a05786")
+        self.assertEqual(data[0]["wp"], ["WP8"])
+
+
+class TestMessaging(MailboxTestCase):
+    def test_send_and_read_roundtrip(self):
+        out = self.mail("send", "--to", "all", "--topic", "Claiming WP3",
+                        "--kind", "claim", "-m", "taking nodes.lua ghost section")
+        msg_id = out.split()[1]
+        self.assertTrue(msg_id.startswith("20"), msg_id)
+
+        listing = self.mail("inbox")
+        self.assertIn("Claiming WP3", listing)
+        self.assertIn("claim", listing)
+
+        body = self.mail("read", msg_id)
+        self.assertIn("taking nodes.lua ghost section", body)
+        self.assertIn("from: agent-01a05786", body)
+        self.assertIn("to: [all]", body)
+
+        # reading clears the unread marker; --sent surfaces your own posts
+        self.assertNotIn("*", self.mail("inbox"))
+        self.mail("send", "--to", "wp3", "--topic", "Second note", "-m", "not for me")
+        self.assertIn("*", self.mail("inbox", "--sent", "--unread"))
+        self.assertNotIn("Second note", self.mail("inbox"))  # wp3 is not my WP
+
+    def test_unread_filter(self):
+        self.mail("send", "--to", "all", "--topic", "Ping", "-m", "alive?")
+        self.assertIn("Ping", self.mail("inbox", "--unread"))
+        msg_id = self.mail("inbox", "--json").split('"id"')[1].split('"')[1].strip(': "')
+        self.mail("read", msg_id)
+        self.assertIn("inbox empty for agent-01a05786", self.mail("inbox", "--unread"))
+
+    def test_addressing_routes_by_work_package(self):
+        self.mail("send", "--to", "wp3", "--topic", "Ghost API v2", "-m", "for WP3 only")
+        self.mail("send", "--to", "wp4", "--topic", "Soak seeds", "-m", "for WP4 only")
+        # this agent registered WP8, so neither is addressed to it...
+        mine = self.mail("inbox")
+        self.assertNotIn("Ghost API v2", mine)
+        self.assertNotIn("Soak seeds", mine)
+        # ...but it can still find its own posts
+        sent = self.mail("inbox", "--sent")
+        self.assertIn("Ghost API v2", sent)
+        everything = self.mail("inbox", "--all")
+        self.assertIn("Ghost API v2", everything)
+        self.assertIn("Soak seeds", everything)
+
+        # re-register as WP3 and the WP3 mail lands in the inbox
+        self.mail("register", "--wp", "WP3")
+        self.assertIn("Ghost API v2", self.mail("inbox"))
+        self.assertNotIn("Soak seeds", self.mail("inbox"))
+
+    def test_thread_grouping_and_ack(self):
+        out = self.mail("send", "--to", "wp4", "--topic", "Contract v2",
+                        "--kind", "contract", "--thread", "contract-v2",
+                        "-m", "please ack the new signature")
+        msg_id = out.split()[1]
+        ack = self.mail("ack", msg_id, "-m", "ack, merging tomorrow")
+        ack_id = ack.split()[1]
+        threads = self.mail("threads", "--all")
+        self.assertIn("contract-v2", threads)
+        text = self.mail("read", ack_id)
+        self.assertIn("kind: ack", text)
+        self.assertIn("contract-v2", text)
+        self.assertIn(msg_id, text)  # refs the parent
+
+    def test_body_from_stdin(self):
+        out = self.mail("send", "--to", "all", "--topic", "From stdin",
+                        stdin="body came through the pipe\n")
+        self.assertIn("body came through the pipe", self.mail("read", out.split()[1]))
+
+    def test_message_filenames_are_unique(self):
+        for _ in range(3):
+            self.mail("send", "--to", "all", "--topic", "Same second", "-m", "spam")
+        files = sorted(p.name for p in
+                       (self.root / "agent_mail" / "messages").glob("*.md"))
+        self.assertEqual(len(files), 3)
+        self.assertEqual(len(set(files)), 3)
+
+    def test_reply_to_inherits_thread_and_cites_parent(self):
+        """R6 says copy the parent's thread:; the old default guaranteed a fork
+        because every reply topic starts with "Re:" and thread defaults to
+        slugify(topic).  Observed three times in one day."""
+        out = self.mail("send", "--to", "all", "--topic", "Original ask",
+                        "-m", "first")
+        parent_id = out.split()[1]
+        out = self.mail("send", "--reply-to", parent_id, "-m", "my answer")
+        import json
+        reply = json.loads(self.mail("read", out.split()[1], "--json"))
+        self.assertEqual(reply["meta"]["thread"], "original-ask",
+                         "must stay in the parent's thread")
+        self.assertEqual(reply["meta"]["topic"], "Re: Original ask")
+        self.assertIn(parent_id, reply["meta"]["refs"], "the parent must be cited")
+        self.assertEqual(reply["meta"]["to"], ["agent-01a05786"],
+                         "defaults to the parent's author, not reply-to-all")
+        threads = json.loads(self.mail("threads", "--json"))
+        self.assertEqual(len(threads), 1, "a reply must not fork the conversation")
+        # --commit derived its message from args.topic, which is None here
+        out = self.mail("send", "--reply-to", parent_id, "-m", "and committed",
+                        "--commit")
+        self.assertIn("Re: Original ask",
+                      self.git("log", "-1", "--pretty=%s"))
+
+    def test_reply_to_explicit_overrides_win(self):
+        out = self.mail("send", "--to", "all", "--topic", "Original", "-m", "x")
+        out = self.mail("send", "--reply-to", out.split()[1], "--to", "wp4",
+                        "--topic", "Different subject", "--thread", "my-thread",
+                        "-m", "y")
+        import json
+        reply = json.loads(self.mail("read", out.split()[1], "--json"))
+        self.assertEqual(reply["meta"]["to"], ["wp4"])
+        self.assertEqual(reply["meta"]["topic"], "Different subject")
+        self.assertEqual(reply["meta"]["thread"], "my-thread")
+
+    def test_send_still_requires_a_topic_without_reply_to(self):
+        proc = run(self.root, "send", "--to", "all", "-m", "no subject")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("--topic", proc.stderr + proc.stdout)
+
+    def test_send_refuses_a_credential_in_the_body(self):
+        """Mail is append-only and pushed to every clone, so the guard has to
+        fire at composition time - lint is far too late."""
+        before = len(list((self.root / "agent_mail" / "messages").glob("*.md")))
+        proc = run(self.root, "send", "--to", "all", "--topic", "Here is the PAT",
+                   "-m", "use this: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("refusing to send", proc.stderr)
+        self.assertNotIn("16C7e42F292c6912E7710c838347Ae178B4a", proc.stderr,
+                         "the error must not echo the credential")
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), before,
+                         "nothing should have been written")
+        # documented escape hatch for false positives still works
+        self.mail("send", "--to", "all", "--topic", "False positive",
+                  "-m", "ghp_16C7e42F292c6912E7710c838347Ae178B4a",
+                  "--allow-secret")
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), before + 1)
+
+    def test_commit_flag_commits_only_the_message(self):
+        (self.root / "dirty.txt").write_text("unrelated work\n", encoding="utf-8")
+        self.git("add", "dirty.txt")
+        self.mail("send", "--to", "all", "--topic", "Committed mail",
+                  "-m", "with --commit", "--commit")
+        tracked = self.git("show", "--name-only", "--pretty=format:", "HEAD")
+        self.assertIn("agent_mail/messages", tracked)
+        self.assertNotIn("dirty.txt", tracked)
+        self.assertIn("dirty.txt", self.git("diff", "--cached", "--name-only"))
+
+
+class TestLint(MailboxTestCase):
+    def test_clean_mailbox_passes(self):
+        self.mail("send", "--to", "all", "--topic", "Clean", "-m", "body")
+        out = self.mail("lint")
+        self.assertIn("mail clean", out)
+
+    def test_lint_flags_bad_kind_and_missing_fields(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_bad_to-all_broken_000000.md").write_text(
+            "---\nid: nope\nfrom: Bad Sender\nto: []\nkind: shouting\n"
+            "created: yesterday\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0)
+        joined = proc.stdout
+        self.assertIn("malformed id", joined)
+        self.assertIn("malformed sender", joined)
+        self.assertIn("empty recipient list", joined)
+        self.assertIn("unknown kind", joined)
+        self.assertIn("unparseable created", joined)
+
+    def test_lint_fix_fills_optional_fields(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        name = "20260101T000000Z_agent-01a05786_to-all_no-thread_000001.md"
+        (msgs / name).write_text(
+            "---\nid: 20260101T000000Z-000001\nfrom: agent-01a05786\n"
+            "to: [all]\nkind: info\ncreated: 2026-01-01T00:00:00Z\n---\nbody\n",
+            encoding="utf-8")
+        proc = run(self.root, "lint", "--fix")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        text = (msgs / name).read_text(encoding="utf-8")
+        self.assertIn("thread: no-topic", text)
+        self.assertIn("refs: []", text)
+
+    def test_lint_detects_token_like_refs(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_leak_000002.md").write_text(
+            "---\nid: 20260101T000000Z-000002\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [github_pat_EXAMPLEONLYnotarealtoken1234567890]\n---\nbody\n",
+            encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("github fine-grained pat", proc.stdout)
+        # the finding must not quote the credential back out
+        self.assertNotIn("EXAMPLEONLYnotarealtoken1234567890", proc.stdout)
+
+    def test_lint_detects_token_in_body(self):
+        """R4 said 'never commit secrets'; v1 only ever inspected `refs:`."""
+        self.mail("send", "--to", "all", "--topic", "innocent",
+                  "-m", "body with no credentials at all")
+        msg = sorted((self.root / "agent_mail" / "messages").glob("*.md"))[-1]
+        text = msg.read_text(encoding="utf-8").replace(
+            "body with no credentials at all",
+            "here you go: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+        msg.write_text(text, encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0,
+                            "a token in the body must fail lint")
+        self.assertIn("github classic token", proc.stdout)
+
+    def test_lint_flags_undeliverable_recipient(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-typo_lost_000003.md").write_text(
+            "---\nid: 20260101T000000Z-000003\nfrom: agent-x\nto: [agnt-01a05786]\n"
+            "kind: request\ncreated: 2026-01-01T00:00:00Z\n---\nanyone there?\n",
+            encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("cannot be delivered", proc.stdout)
+
+    def test_lint_flags_a_bracketed_list_in_refs(self):
+        """Live artefact: three messages carried refs: ["[a,b]"] - a list pasted
+        inside a quoted scalar, which parses clean and names no file."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_deadref_000005.md").write_text(
+            "---\nid: 20260101T000000Z-000005\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            'refs: ["[agent_mail/PROTOCOL.md,agent_mail/README.md]"]\n'
+            "---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("bracketed list inside a scalar", proc.stdout)
+        self.assertIn("repeatable", proc.stdout)
+
+    def test_lint_warns_on_a_dead_ref_pointer(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_deadref2_000006.md").write_text(
+            "---\nid: 20260101T000000Z-000006\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [docs/does_not_exist.md]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, "a dead pointer warns, it does not fail")
+        self.assertIn("names no file", proc.stdout)
+
+    def test_lint_accepts_a_path_with_a_line_suffix(self):
+        """`path:line` is what `grep -n` emits and the natural way to cite
+        evidence. Every one of carmack's five refs in 20260831T144642Z-2796d3
+        warned as a dead pointer because the resolver stripped `#fragment` but
+        not `:line` - four false positives from correct citations."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_lineref_000007.md").write_text(
+            "---\nid: 20260101T000000Z-000007\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [game.conf:1]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertNotIn("names no file", proc.stdout,
+                         "game.conf:1 names a real file; the line suffix "
+                         "must be stripped before resolution")
+
+    def test_lint_recognises_a_ref_that_lives_on_another_branch(self):
+        """A ref points at a peer's work, which lives on the peer's branch.
+        Reporting it as dead was a false positive that taught agents to ignore
+        the check. The warning text claimed to search fetched branches while
+        the code only stat'd the working tree - the claim was false, so this
+        test now makes it true."""
+        # a peer branch carrying a file this working tree does not have
+        self.git("branch", "arena/peer-branch")
+        self.git("checkout", "-q", "arena/peer-branch")
+        (self.root / "docs").mkdir(parents=True, exist_ok=True)
+        (self.root / "docs" / "peer_only.md").write_text("peer\n", encoding="utf-8")
+        self.git("add", "docs/peer_only.md")
+        self.git("commit", "-q", "-m", "peer work")
+        self.git("push", "-q", "-u", "origin", "arena/peer-branch")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        self.git("fetch", "-q", "origin")
+
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_peerref_000008.md").write_text(
+            "---\nid: 20260101T000000Z-000008\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [docs/peer_only.md]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertNotIn("names no file", proc.stdout,
+                         "the file exists on a fetched branch; that is not a "
+                         "dead pointer")
+        self.assertIn("exists on another branch", proc.stdout)
+
+    def test_lint_still_reports_a_genuinely_dead_ref(self):
+        """The fix must not silence real dead pointers - a path that exists on
+        no branch at all still warns, and says where it looked."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-all_trulydead_000009.md").write_text(
+            "---\nid: 20260101T000000Z-000009\nfrom: agent-x\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+            "refs: [mods/nope/nowhere.lua:42]\n---\nbody\n", encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0, "a dead pointer warns, it does not fail")
+        self.assertIn("names no file in this working tree", proc.stdout)
+        self.assertIn("any branch you have fetched", proc.stdout)
+
+    def test_ack_accepts_refs(self):
+        """zhtharr's ack failed at the CLI because `ack` took no --refs
+        (20260831T135211Z-05f1e4)."""
+        out = self.mail("send", "--to", "all", "--topic", "Ack me", "-m", "please")
+        parent = out.split()[1]
+        out = self.mail("ack", parent, "-m", "done", "--refs", "game.conf")
+        import json
+        reply = json.loads(self.mail("read", out.split()[1], "--json"))
+        self.assertIn(parent, reply["meta"]["refs"])
+        self.assertIn("game.conf", reply["meta"]["refs"])
+
+    def test_ack_takes_a_body_file(self):
+        out = self.mail("send", "--to", "all", "--topic", "Ack me too", "-m", "x")
+        body = self.tmp / "reply.md"
+        body.write_text("a long ack\nfrom a file\n", encoding="utf-8")
+        out = self.mail("ack", out.split()[1], "--body-file", str(body))
+        self.assertIn("a long ack", self.mail("read", out.split()[1]))
+
+    def test_ack_still_defaults_its_body(self):
+        out = self.mail("send", "--to", "all", "--topic", "No body ack", "-m", "x")
+        out = self.mail("ack", out.split()[1])
+        self.assertIn("Acknowledged: No body ack", self.mail("read", out.split()[1]))
+
+    def test_lint_warns_but_passes_on_non_routable_wp(self):
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        (msgs / "20260101T000000Z_agent-x_to-wp9_orphan_000004.md").write_text(
+            "---\nid: 20260101T000000Z-000004\nfrom: agent-x\nto: [wp9]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n---\nhello wp9\n",
+            encoding="utf-8")
+        proc = run(self.root, "lint")
+        self.assertEqual(proc.returncode, 0,
+                         "an unrouted wp is a warning, not a failure")
+        self.assertIn("no registered agent claims wp", proc.stdout)
+
+    def test_lint_json_reports_severities(self):
+        import json
+        self.mail("send", "--to", "agnt-nobody", "--topic", "typo", "-m", "x")
+        data = json.loads(run(self.root, "lint", "--json").stdout)
+        self.assertGreaterEqual(data["errors"], 1)
+        self.assertEqual(data["findings"][0]["severity"], "error")
+
+
+class TestDigest(MailboxTestCase):
+    def test_digest_groups_threads(self):
+        self.mail("send", "--to", "all", "--topic", "Weather report",
+                  "--thread", "weather", "-m", "rain in sector 4")
+        self.mail("send", "--to", "wp3", "--topic", "Ghost tuning",
+                  "--thread", "ghosts", "-m", "cooldown down to 15s")
+        out_path = self.tmp / "digest.md"
+        self.mail("digest", "--days", "7", "--out", str(out_path))
+        text = out_path.read_text(encoding="utf-8")
+        self.assertIn("weather", text)
+        self.assertIn("ghosts", text)
+        self.assertIn("rain in sector 4", text)
+
+
+class TestSync(MailboxTestCase):
+    """Two agents, two clones, one mailbox that converges."""
+
+    def test_sync_unions_another_branches_mailbox(self):
+        # agent A publishes a broadcast, commits it and pushes
+        self.mail("send", "--to", "all", "--topic", "Hello from A",
+                  "-m", "mailbox is open", "--commit")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+
+        # agent B: a second clone of the same remote, on its own branch
+        peer = self.tmp / "peer"
+        subprocess.run(["git", "clone", "-q", str(self.origin), str(peer)],
+                       check=True, capture_output=True)
+        for key, value in (("user.email", "b@example.invalid"), ("user.name", "Agent B")):
+            subprocess.run(["git", "-C", str(peer), "config", key, value], check=True)
+        subprocess.run(["git", "-C", str(peer), "checkout", "-q", "-b",
+                        "arena/01a05759-systemtest"], check=True)
+        run(peer, "register", "--wp", "WP4", "--role", "tests")
+        self.assertIn("agent-01a05759", run(peer, "id").stdout)
+        run(peer, "send", "--to", "all", "--topic", "Hello from B",
+            "-m", "tests are green", "--commit")
+        subprocess.run(["git", "-C", str(peer), "push", "-q", "-u", "origin",
+                        "arena/01a05759-systemtest"], check=True)
+
+        # A syncs: B's message must appear, A's own message must survive
+        out = self.mail("sync", "--commit")
+        self.assertIn("merged mailboxes", out)
+        listing = self.mail("inbox", "--all")
+        self.assertIn("Hello from A", listing)
+        self.assertIn("Hello from B", listing)
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages").glob("*.md"))), 2)
+
+        # B syncs too and ends up with the same two messages
+        run(peer, "sync", "--commit")
+        peer_listing = run(peer, "inbox", "--all").stdout
+        self.assertIn("Hello from A", peer_listing)
+        self.assertIn("Hello from B", peer_listing)
+
+        # a second sync is a no-op, not a duplicate
+        out2 = self.mail("sync", "--commit")
+        self.assertIn("up to date", out2)
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages").glob("*.md"))), 2)
+
+    def test_sync_ignores_branches_without_mail(self):
+        self.mail("send", "--to", "all", "--topic", "Still here", "-m", "ok", "--commit")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+        # a branch forked before the mailbox existed must be skipped entirely
+        base = self.git("rev-list", "--max-parents=0", "HEAD")
+        self.git("checkout", "-q", "-b", "scratch/no-mail", base)
+        (self.root / "scratch.txt").write_text("x\n", encoding="utf-8")
+        self.git("add", "scratch.txt")
+        self.git("commit", "-q", "-m", "scratch")
+        self.git("push", "-q", "origin", "scratch/no-mail")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        out = self.mail("sync")
+        # 1, not 2: `scratch/no-mail` has no agent_mail/ and is skipped; the only
+        # branch consulted is our own, which is unioned for messages/ so that
+        # mail pushed onto it by somebody else still arrives.
+        self.assertIn("merged mailboxes from 1 remote branch", out)
+        self.assertIn("already up to date", out)
+        self.assertFalse((self.root / "scratch.txt").exists()
+                         or "scratch.txt" in self.git("ls-files"))
+
+    def test_sync_sees_mail_pushed_onto_its_own_branch(self):
+        """Regression: §4 skipped the branch you stand on, so a second agent
+        posting onto a shared branch was invisible to the branch's owner
+        (observed 2026-08-31, message 20260831T120255Z-a417f9)."""
+        self.mail("send", "--to", "all", "--topic", "B owns this branch",
+                  "-m", "resident post", "--commit")
+        self.git("push", "-q", "-u", "origin", "arena/01a05786-systemtest")
+
+        # a second agent pushes mail onto B's branch from their own clone
+        guest = self.tmp / "guest"
+        subprocess.run(["git", "clone", "-q", str(self.origin), str(guest)],
+                       check=True, capture_output=True)
+        for key, value in (("user.email", "g@example.invalid"), ("user.name", "Guest")):
+            subprocess.run(["git", "-C", str(guest), "config", key, value], check=True)
+        subprocess.run(["git", "-C", str(guest), "checkout", "-q",
+                        "arena/01a05786-systemtest"], check=True)
+        run(guest, "id", "--set", "guest")
+        run(guest, "register", "--wp", "WP1", "--role", "passing through")
+        run(guest, "send", "--to", "all", "--topic", "Posted onto your branch",
+            "-m", "shared branch post", "--commit")
+        subprocess.run(["git", "-C", str(guest), "push", "-q", "origin",
+                        "arena/01a05786-systemtest"], check=True)
+
+        # B syncs without pulling first: sync alone must make the mail visible
+        self.mail("sync", "--commit")
+        self.assertIn("Posted onto your branch", self.mail("inbox", "--all"))
+
+        # and the unpushed local card must survive the messages/-only union
+        self.assertTrue((self.root / "agent_mail" / "agents"
+                         / "agent-01a05786.md").is_file())
+
+        # publishing still needs a real merge: sync must refuse rather than let
+        # a force-push erase the guest's commit
+        proc = run(self.root, "sync", "--push")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("refusing to push", proc.stderr)
+        self.git("pull", "-q", "--rebase", "origin", "arena/01a05786-systemtest")
+        self.mail("sync", "--commit", "--push")
+        published = subprocess.run(
+            ["git", "-C", str(self.origin), "log", "--format=%s",
+             "arena/01a05786-systemtest"],
+            capture_output=True, text=True).stdout
+        self.assertIn("Posted onto your branch", self.mail("inbox", "--all"))
+        self.assertEqual(len(list((self.root / "agent_mail" / "messages")
+                                  .glob("*.md"))), 2)
+
+    def test_sync_refuses_to_clobber_local_edits_to_shared_files(self):
+        """Regression: `git checkout <ref> -- agent_mail` silently reverted a
+        *committed* local edit to PROTOCOL.md. Reproduced on
+        arena/carmack-systemtest, 2026-08-31 - the documented session-end
+        sequence (edit, commit, sync --commit --push) destroyed the edit."""
+        # a shared file that exists on every branch from the start, as
+        # PROTOCOL.md does on agent-comms
+        proto = self.root / "agent_mail" / "PROTOCOL.md"
+        proto.parent.mkdir(parents=True, exist_ok=True)
+        proto.write_text("# Agent Mail\n\nversion 1\n", encoding="utf-8")
+        self.git("add", "agent_mail/PROTOCOL.md")
+        self.git("commit", "-q", "-m", "protocol v1")
+        v1 = self.git("rev-parse", "HEAD")
+        self.mail("send", "--to", "all", "--topic", "Base", "-m", "x", "--commit")
+        self.git("push", "-q", "-u", "origin", "arena/01a05786-systemtest")
+
+        # a peer branch that also carries v1 of the shared file
+        self.git("checkout", "-q", "-b", "arena/01a05759-systemtest", v1)
+        run(self.root, "--id", "agent-01a05759", "register", "--wp", "WP4",
+            "--role", "peer")
+        self.git("add", "agent_mail/agents/agent-01a05759.md")
+        self.git("commit", "-q", "-m", "register peer")
+        self.git("push", "-q", "-u", "origin", "arena/01a05759-systemtest")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+
+        # we revise the shared file and commit it, exactly as the docs tell you to
+        proto.write_text("# Agent Mail\n\nversion 1.1, revised locally\n", encoding="utf-8")
+        self.git("add", "agent_mail/PROTOCOL.md")
+        self.git("commit", "-q", "-m", "docs: local protocol revision")
+
+        proc = run(self.root, "sync", "--commit")
+        self.assertNotEqual(proc.returncode, 0,
+                            "sync must refuse rather than discard committed work")
+        self.assertIn("skipped shared files", proc.stderr)
+        self.assertIn("PROTOCOL.md", proc.stderr)
+        self.assertIn("version 1.1", proto.read_text(encoding="utf-8"),
+                      "the local revision must survive the sync")
+
+        # a disputed shared document must not block a new agent from arriving,
+        # and must not revert your own card (observed live: melody.md and
+        # zhtharr.md were unreachable while PROTOCOL.md was in dispute)
+        self.git("checkout", "-q", "arena/01a05759-systemtest")
+        (self.root / "agent_mail" / "agents" / "newcomer.md").write_text(
+            "---\nid: newcomer\nbranch: arena/01a05759-systemtest\nwp: [WP1]\n"
+            "---\njust arrived\n", encoding="utf-8")
+        run(self.root, "--id", "agent-01a05759", "register", "--wp", "WP4",
+            "--role", "peer, revised")
+        self.git("add", "agent_mail/agents")
+        self.git("commit", "-q", "-m", "newcomer card + revised own card")
+        self.git("push", "-q", "origin", "arena/01a05759-systemtest")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        my_card_before = (self.root / "agent_mail" / "agents"
+                          / "agent-01a05786.md").read_text(encoding="utf-8")
+        run(self.root, "sync", "--commit")
+        self.assertTrue((self.root / "agent_mail" / "agents" / "newcomer.md").is_file(),
+                        "a new agent's card must arrive despite the dispute")
+        self.assertEqual(
+            (self.root / "agent_mail" / "agents" / "agent-01a05786.md")
+            .read_text(encoding="utf-8"), my_card_before,
+            "your own card must not be reverted by someone else's branch")
+        self.assertIn("newcomer", run(self.root, "agents").stdout)
+
+        # the peer's *new* files are still welcome: nothing local to lose
+        self.git("checkout", "-q", "arena/01a05759-systemtest")
+        (self.root / "agent_mail" / "agents" / "peer-extra.md").write_text(
+            "---\nid: peer-extra\nbranch: arena/01a05759-systemtest\n---\nhi\n",
+            encoding="utf-8")
+        self.git("add", "agent_mail/agents/peer-extra.md")
+        self.git("commit", "-q", "-m", "extra card")
+        self.git("push", "-q", "origin", "arena/01a05759-systemtest")
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        proto.unlink()  # no local copy -> taking the peer's is the point of sync
+        self.git("add", "-A", "agent_mail")
+        self.git("commit", "-q", "-m", "docs: drop the local revision")
+        out = run(self.root, "sync", "--commit")
+        self.assertTrue((self.root / "agent_mail" / "agents" / "peer-extra.md").is_file(),
+                        "new peer files must still arrive")
+        self.assertIn("version 1", proto.read_text(encoding="utf-8"),
+                      "with no local copy there is nothing to protect, so theirs lands")
+
+    def test_sync_refuses_with_uncommitted_tracked_mail(self):
+        # a tracked, modified file is at risk; an untracked new card is not, and
+        # the documented session-start flow writes exactly that
+        proto = self.root / "agent_mail" / "PROTOCOL.md"
+        proto.write_text("# local edit\n", encoding="utf-8")
+        self.git("add", "agent_mail/PROTOCOL.md")
+        proc = run(self.root, "sync", "--commit")
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("uncommitted changes", proc.stderr)
+        self.assertIn("PROTOCOL.md", proc.stderr)
+
+    def test_sync_tolerates_an_uncommitted_own_card(self):
+        # `register` without --commit is step 2 of the documented session start;
+        # sync must not refuse just because the card is not committed yet
+        run(self.root, "id", "--set", "newcomer")
+        run(self.root, "register", "--wp", "WP1", "--role", "just arrived")
+        out = self.mail("sync", "--commit")
+        self.assertIn("merged mailboxes", out)
+
+    def test_sync_refuses_to_push_over_a_diverged_branch(self):
+        """A silent push failure is the worst failure here: the agent believes
+        its mail is published, so nobody ever answers it."""
+        self.mail("send", "--to", "all", "--topic", "First", "-m", "one", "--commit")
+        self.git("push", "-q", "-u", "origin", "arena/01a05786-systemtest")
+
+        # somebody else moves the same branch, so our next push would be rejected
+        rival = self.tmp / "rival"
+        subprocess.run(["git", "clone", "-q", str(self.origin), str(rival)],
+                       check=True, capture_output=True)
+        for key, value in (("user.email", "r@example.invalid"), ("user.name", "Rival")):
+            subprocess.run(["git", "-C", str(rival), "config", key, value], check=True)
+        subprocess.run(["git", "-C", str(rival), "checkout", "-q",
+                        "arena/01a05786-systemtest"], check=True)
+        run(rival, "id", "--set", "rival")
+        run(rival, "send", "--to", "all", "--topic", "Diverged",
+            "-m", "rival posted", "--commit")
+        subprocess.run(["git", "-C", str(rival), "push", "-q", "origin",
+                        "arena/01a05786-systemtest"], check=True)
+
+        self.mail("send", "--to", "all", "--topic", "Second", "-m", "two", "--commit")
+        proc = run(self.root, "sync", "--push")
+        self.assertNotEqual(proc.returncode, 0,
+                            "a diverged push must not exit 0")
+        self.assertIn("refusing to push", proc.stderr)
+        self.assertIn("pull --rebase", proc.stderr)
+
+        # the mail sync pulled in is staged; commit it, rebase, and the same
+        # command succeeds with both messages published
+        self.git("commit", "-q", "-m", "mail: sync", "--", "agent_mail")
+        self.git("pull", "-q", "--rebase", "origin", "arena/01a05786-systemtest")
+        out = self.mail("sync", "--commit", "--push")
+        self.assertIn("pushed arena/01a05786-systemtest", out)
+        listing = self.mail("inbox", "--all")
+        self.assertIn("Diverged", listing)
+        self.assertIn("Second", listing)
+
+    def test_sync_does_not_let_a_stale_branch_revert_an_envelope_repair(self):
+        """R14 lets an author repair their own envelope in place, but the
+        messages/ union checks each branch out in turn, so the last branch
+        processed wins.  A branch that has not yet received the repair silently
+        reverts it.  Observed for real: zhtharr repaired three envelopes and a
+        later sync restored the bracket artefact everywhere.  A repair that any
+        peer can undo is not a repair."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        broken = ("---\nid: 20260101T000000Z-0000aa\nfrom: agent-x\nto: [all]\n"
+                  "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+                  'refs: ["[docs/a.md,docs/b.md]"]\n---\nbody\n')
+        repaired = broken.replace('refs: ["[docs/a.md,docs/b.md]"]',
+                                  "refs: [docs/a.md, docs/b.md]")
+        name = "20260101T000000Z_agent-x_to-all_envelope_0000aa.md"
+        (msgs / name).write_text(broken, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "message with a broken envelope")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+
+        # a peer branch repairs the envelope
+        self.git("checkout", "-q", "-b", "arena/peer-repaired")
+        (msgs / name).write_text(repaired, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "R14 envelope repair")
+        self.git("push", "-q", "-u", "origin", "arena/peer-repaired")
+
+        # a second peer branch, forked before the repair, still has the artefact
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        self.git("checkout", "-q", "-b", "arena/peer-stale")
+        (msgs / "20260101T000000Z_agent-y_to-all_other_0000bb.md").write_text(
+            "---\nid: 20260101T000000Z-0000bb\nfrom: agent-y\nto: [all]\n"
+            "kind: info\ncreated: 2026-01-01T00:00:00Z\n---\nbody\n", encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "unrelated mail")
+        self.git("push", "-q", "-u", "origin", "arena/peer-stale")
+
+        self.git("checkout", "-q", "arena/01a05786-systemtest")
+        proc = run(self.root, "sync")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("repaired", proc.stdout,
+                      "sync must undo what the stale branch reverted")
+
+        final = (msgs / name).read_text(encoding="utf-8")
+        self.assertIn("refs: [docs/a.md, docs/b.md]", final,
+                      "the repaired envelope must survive the union")
+        self.assertNotIn('["[', final)
+
+        lint = run(self.root, "lint")
+        self.assertEqual(lint.returncode, 0,
+                         "the bracket artefact must be gone, not just moved: "
+                         + lint.stdout)
+
+    def test_sync_keeps_an_unpushed_author_repair(self):
+        """The repair pass scanned branch-carried variants only, so a repair
+        that exists as a commit on the branch you stand on - not yet pushed -
+        was invisible to it: the union reverted the file and the pass had
+        nothing to restore from.  Reproduced live 2026-08-31: a fresh branch
+        repaired its own refs, ran sync, and the repair was silently gone with
+        no 'repaired' report.  HEAD is a branch state; it must count."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        stale = ("---\nid: 20260101T000000Z-0000dd\nfrom: agent-x\nto: [all]\n"
+                 "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+                 "refs: [docs/z.md]\n---\nbody\n")
+        repaired = stale.replace("docs/z.md", "docs/a.md")
+        name = "20260101T000000Z_agent-x_to-all_unpushed_0000dd.md"
+        (msgs / name).write_text(stale, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "message authored with a stale ref")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+
+        # the author repairs on a NEW branch and has NOT pushed it yet
+        self.git("checkout", "-q", "-b", "arena/fresh-repair")
+        (msgs / name).write_text(repaired, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "R14: author repair (unpushed)")
+        # deliberately no push - that is the whole point
+
+        proc = run(self.root, "sync")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("repaired", proc.stdout,
+                      "the local HEAD is a variant and must beat the stale branch")
+        final = (msgs / name).read_text(encoding="utf-8")
+        self.assertIn("refs: [docs/a.md]", final,
+                      "the unpushed author repair must survive the union")
+        self.assertNotIn("docs/z.md", final)
+        self.assertEqual(self.git("status", "--porcelain", "--", "agent_mail"), "",
+                         "restoring HEAD's own text is not a change to commit")
+
+    def test_sync_picks_the_same_envelope_whatever_order_branches_arrive_in(self):
+        """When two branches carry two different repairs, any choice is
+        arbitrary - but it must be the SAME arbitrary choice everywhere, or two
+        agents converge on different text and diverge.  The union alone picks
+        by branch iteration order, which is fetch order, which differs per
+        agent.  The rule here does not depend on order."""
+        msgs = self.root / "agent_mail" / "messages"
+        msgs.mkdir(parents=True, exist_ok=True)
+        name = "20260101T000000Z_agent-x_to-all_disagree_0000cc.md"
+        broken = ("---\nid: 20260101T000000Z-0000cc\nfrom: agent-x\nto: [all]\n"
+                  "kind: info\ncreated: 2026-01-01T00:00:00Z\n"
+                  'refs: ["[docs/a.md]"]\n---\nbody\n')
+        (msgs / name).write_text(broken, encoding="utf-8")
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "broken envelope")
+        self.git("push", "-q", "origin", "arena/01a05786-systemtest")
+
+        for branch, refs in (("arena/peer-fix-a", "refs: [docs/a.md]"),
+                             ("arena/peer-fix-b", "refs: [docs/other.md]")):
+            self.git("checkout", "-q", "-b", branch)
+            (msgs / name).write_text(broken.replace('refs: ["[docs/a.md]"]', refs),
+                                     encoding="utf-8")
+            self.git("add", ".")
+            self.git("commit", "-q", "-m", "a different repair")
+            self.git("push", "-q", "-u", "origin", branch)
+            self.git("checkout", "-q", "arena/01a05786-systemtest")
+
+        proc = run(self.root, "sync")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        first = (msgs / name).read_text(encoding="utf-8")
+        self.assertIn("refs: [docs/a.md]", first,
+                      "the lexicographically smallest valid variant wins, "
+                      "independent of branch order")
+        self.assertNotIn('["[', first)
+
+        # Re-running must be a no-op, and a fresh clone in a different fetch
+        # order must land on the same text - that is the whole claim.  Commit
+        # first: the repair is an uncommitted change, and D7 rightly refuses to
+        # sync over one.
+        self.git("add", ".")
+        self.git("commit", "-q", "-m", "mail: sync")
+        again = run(self.root, "sync")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(first, (msgs / name).read_text(encoding="utf-8"),
+                         "the rule must be idempotent")
+
+        other = self.tmp / "other-clone"
+        subprocess.run(["git", "clone", "-q", str(self.origin), str(other)], check=True)
+        rev = subprocess.run(
+            ["git", "-C", str(other), "checkout", "-q", "arena/peer-fix-b"],
+            capture_output=True, text=True)
+        self.assertEqual(rev.returncode, 0, rev.stderr)
+        clone_sync = run(other, "sync")
+        self.assertEqual(clone_sync.returncode, 0, clone_sync.stderr)
+        self.assertEqual(first, (other / "agent_mail" / "messages" / name)
+                         .read_text(encoding="utf-8"),
+                         "a clone standing on the OTHER repair branch must "
+                         "converge on the same envelope")
+
+    def test_sync_leaves_unrelated_changes_uncommitted(self):
+        (self.root / "mods" / "important.lua").parent.mkdir(parents=True, exist_ok=True)
+        (self.root / "mods" / "important.lua").write_text("return {}\n", encoding="utf-8")
+        self.git("add", "mods/important.lua")
+        self.mail("sync", "--commit")
+        tracked = self.git("show", "--name-only", "--pretty=format:", "HEAD")
+        self.assertNotIn("mods/important.lua", tracked)
+
+
+class TestFrontmatter(unittest.TestCase):
+    """Unit coverage for the mini YAML parser (no repo needed)."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / "tools"))
+        import agentmail  # noqa: E402
+        cls.m = agentmail
+
+    def test_inline_list_and_scalars(self):
+        text = ("---\nid: 20260101T000000Z-000001\nfrom: agent-a\n"
+                "to: [wp3, wp4]\nkind: request\ntopic: \"a: colon\"\n"
+                "refs: []\ncreated: 2026-01-01T00:00:00Z\n---\nline one\n\nline two\n")
+        meta, body = self.m.parse_frontmatter(text)
+        self.assertEqual(meta["to"], ["wp3", "wp4"])
+        self.assertEqual(meta["topic"], "a: colon")
+        self.assertEqual(meta["refs"], [])
+        self.assertEqual(body.splitlines()[0], "line one")
+
+    def test_block_list(self):
+        meta, _ = self.m.parse_frontmatter(
+            "---\nto:\n  - wp1\n  - wp2\nkind: info\n---\nbody\n")
+        self.assertEqual(meta["to"], ["wp1", "wp2"])
+
+    def test_roundtrip_quoting(self):
+        meta = {"id": "20260101T000000Z-000001", "from": "agent-a", "to": ["all"],
+                "kind": "info", "topic": "yes: really #1", "created": "2026-01-01T00:00:00Z"}
+        text = self.m.dump_frontmatter(meta, "body text\n")
+        again, body = self.m.parse_frontmatter(text)
+        self.assertEqual(again["topic"], "yes: really #1")
+        self.assertEqual(body.strip(), "body text")
+
+    def test_no_frontmatter(self):
+        meta, body = self.m.parse_frontmatter("just a note\n")
+        self.assertEqual(meta, {})
+        self.assertEqual(body, "just a note\n")
+
+    def test_branch_to_id(self):
+        self.assertEqual(self.m.branch_to_id("arena/01a05759-systemtest"),
+                         "agent-01a05759")
+        self.assertEqual(self.m.branch_to_id("master"), "agent-master")
+        self.assertEqual(self.m.branch_to_id("HEAD"), "agent-unknown")
+
+    def test_find_secrets_masks_and_ignores_prose(self):
+        hits = self.m.find_secrets("token: ghp_16C7e42F292c6912E7710c838347Ae178B4a")
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0][0], "github classic token")
+        self.assertNotIn("16C7e42F292c6912E7710c838347Ae178B4a", hits[0][1],
+                         "the finding must be masked, not a second leak")
+        self.assertEqual(self.m.find_secrets(
+            "never paste tokens; the ghp_ pattern is rejected by lint"), [])
+        self.assertEqual(self.m.find_secrets(
+            "see agent_mail/PROTOCOL.md and tools/agentmail.py"), [])
+
+    def test_id_collision_re_rolls_then_fails_loudly(self):
+        """`write_text` truncates, so a collision must never overwrite."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = self.m.rand_suffix
+            self.m.rand_suffix = lambda n=6: "abcdef"
+            try:
+                msg, path = self.m.build_message(
+                    root, "agent-a", ["all"], "Collision", "first", "info",
+                    None, "normal", [], None)
+                self.assertTrue(path.is_file())
+                self.assertIn("abcdef", path.name)
+                with self.assertRaises(SystemExit) as caught:
+                    self.m.build_message(
+                        root, "agent-a", ["all"], "Collision", "second", "info",
+                        None, "normal", [], None)
+                self.assertIn("collided", str(caught.exception))
+                self.assertEqual(path.read_text(encoding="utf-8").count("first"), 1,
+                                 "the original message must survive untouched")
+            finally:
+                self.m.rand_suffix = original
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
