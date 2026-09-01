@@ -23,3 +23,33 @@ sl_cube_size (Underground cube size) int 8 4 32
 # Total monsters spawned once during mapgen (not per cube / per chunk).
 # They are placed in underground cubes around the origin, then never again.
 sl_cube_monsters (Mapgen monster count) int 12 0 64
+
+# Map type used for matches. procedural = seeded generated arena;
+# test = deterministic test arena; schematic = handmade .mts map
+# (see /sl_map list).
+sl_map.type (Match map type) enum procedural procedural,test,schematic
+
+# Which handmade map to use when sl_map.type = schematic. "random"
+# picks one per match (seeded).
+sl_map.schematic (Handmade map) string random
+
+# Procedural map seed. 0 = a fresh arena every match; any other value
+# pins the same arena (and the same handmade-map pick).
+sl_map.seed (Map seed) int 0 0 2000000000
+
+# Full edge width of the generated procedural arena, in nodes.
+sl_map.arena_size (Procedural arena size) int 48 32 128
+
+# Initial mob population of a match map (procedural scatter, test
+# arena, and handmade maps without explicit mobs.N entries).
+sl_map.mobs (Map mob population) int 6 0 24
+
+# Arena build origin override for procedural/schematic maps, "x,y,z".
+# Leave empty for defaults (procedural {0,30,0}, schematic centered
+# with its floor at {0,30,0}; the test arena always builds at origin).
+sl_map.origin (Map origin) string
+
+# Legacy behavior: spawn a fixed budget of monsters once during
+# worldgen around the origin. Off by default — mobs are match
+# entities now: purged at match end, respawned at match start.
+sl_map.mapgen_mobs (Worldgen monsters (legacy)) bool false

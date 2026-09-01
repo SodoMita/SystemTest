@@ -21,14 +21,15 @@ local function node(name)
 	return name
 end
 
-function game_mode.build_test_arena(origin)
-	origin = origin or {x = 0, y = 0, z = 0}
+-- ================================================================
+-- Deterministic test arena — the "test procedural" map type.
+-- Registered with the map system as a builder so matches on it get
+-- the same initial-state reset contract as every other map.
+-- ================================================================
+local function build_test_map(opts)
+	local origin = table.copy(opts.origin) or { x = 0, y = 0, z = 0 }
 	local floor = node("ground:square_neon")
 	local wall = node("ground:square_neon_opaque")
-	local beacon_a = modname .. ":beacon_a"
-	local beacon_b = modname .. ":beacon_b"
-	local altar = modname .. ":ghost_altar"
-	local spawn_mm = modname .. ":spawn_mm"
 
 	-- Compact 41 x 21 neon arena: glasslike floor, opaque perimeter, MM pad.
 	for x = -20, 20 do
@@ -59,16 +60,59 @@ function game_mode.build_test_arena(origin)
 			end
 		end
 	end
-	minetest.set_node({x=origin.x, y=origin.y+1, z=origin.z+15}, {name=spawn_mm})
-	minetest.set_node({x=origin.x-12, y=origin.y+2, z=origin.z}, {name=beacon_a})
-	minetest.set_node({x=origin.x+12, y=origin.y+2, z=origin.z}, {name=beacon_b})
-	minetest.set_node({x=origin.x, y=origin.y+1, z=origin.z}, {name=altar})
-	state.teams.beacon_a.spawn = {x=origin.x-12, y=origin.y+3, z=origin.z}
-	state.teams.beacon_b.spawn = {x=origin.x+12, y=origin.y+3, z=origin.z}
-	state.monster_master.base_spawn = {x=origin.x, y=origin.y+2, z=origin.z+15}
-	state.ghost_spawn = {x=origin.x, y=origin.y+40, z=origin.z}
-	state.lobby_spawn = {x=origin.x, y=origin.y+5, z=origin.z}
-	game_mode.save_spawns()
+
+	-- Deterministic initial mob population (fixed seed: same arena,
+	-- same mobs, every time).
+	local mobs = {}
+	local budget = tonumber(minetest.settings:get("sl_map.mobs")) or 6
+	local variants = game_mode.MONSTER_TYPE_ORDER or { "stalker" }
+	local rng = game_mode.map.make_rng(1)
+	local spots = {
+		{ -6, 5 }, { 6, 5 }, { -6, -5 }, { 6, -5 }, { 0, 6 }, { 0, -6 },
+		{ -16, 0 }, { 16, 0 }, { -9, 7 }, { 9, 7 }, { -9, -7 }, { 9, -7 },
+	}
+	for i = 1, math.min(budget, #spots) do
+		table.insert(mobs, {
+			pos = { x = origin.x + spots[i][1], y = origin.y + 1, z = origin.z + spots[i][2] },
+			variant = variants[((i - 1) % #variants) + 1],
+		})
+	end
+
+	return {
+		type = "test",
+		name = "Deterministic test arena",
+		seed = opts.seed,
+		origin = origin,
+		anchor = {
+			beacon_a = { x = origin.x - 12, y = origin.y + 2, z = origin.z },
+			beacon_b = { x = origin.x + 12, y = origin.y + 2, z = origin.z },
+			altar = { x = origin.x, y = origin.y + 1, z = origin.z },
+			mm_pad = { x = origin.x, y = origin.y + 1, z = origin.z + 15 },
+			lobby = { x = origin.x, y = origin.y + 5, z = origin.z },
+			ghost = { x = origin.x, y = origin.y + 40, z = origin.z },
+		},
+		mobs = mobs,
+		minp = { x = origin.x - 21, y = origin.y - 2, z = origin.z - 11 },
+		maxp = { x = origin.x + 21, y = origin.y + 6, z = origin.z + 19 },
+	}
+end
+
+if game_mode.map and game_mode.map.register_builder then
+	game_mode.map.register_builder("test", build_test_map)
+end
+
+function game_mode.build_test_arena(origin)
+	origin = origin or {x = 0, y = 0, z = 0}
+	if game_mode.map and game_mode.map.prepare then
+		local ok, err = game_mode.map.prepare({ type = "test", origin = origin })
+		if not ok then
+			minetest.log("error", "[sl_test] arena build failed: " .. tostring(err))
+			return false
+		end
+	else
+		minetest.log("error", "[sl_test] map system unavailable")
+		return false
+	end
 	arena_built = true
 	minetest.log("action", "[sl_test] deterministic arena generated at " .. minetest.pos_to_string(origin))
 	return true

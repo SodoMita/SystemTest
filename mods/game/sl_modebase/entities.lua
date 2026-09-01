@@ -153,7 +153,11 @@ minetest.register_entity(MONSTER_NAME, {
 		textures = { "monster_texture.png" },
 		visual_size = { x = 1, y = 1 },
 		backface_culling = false,
-		static_save = true,
+		-- Match entities never persist in static data: the map system
+		-- purges every mob at match end and respawns the initial
+		-- population at match start, and a restart mid-match must not
+		-- resurrect stale monsters into the lobby.
+		static_save = false,
 	},
 
 	monster_owner = nil,

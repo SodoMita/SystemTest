@@ -121,6 +121,10 @@ match ends correctly and announces the winner.
 ## Phase 2 — Make it testable multiplayer (stability pass)
 1. **Build a small hand-made test map** (singlenode arena with two bases + loot points).
    Ship it as a saved map or a one-command builder, since there's no mapgen.
+   *Done: the match map system ships three types — procedural (seeded), test
+   (deterministic builder) and handmade `.mts` schematics — with committed
+   example maps (`mods/game/sl_modebase/maps/`) and full initial-state reset
+   between matches (see `MATCH_LOOP_SPEC.md`).*
 2. **Match lifecycle UX:** clear "how to start" (commands exist: `/sl_be_monster_master`,
    match start). Add an on-screen HUD for phase state, objective progress.
 3. **Convert menu audio to `.ogg`**, name it `menu_music.ogg`; add `menu/header.png` +
