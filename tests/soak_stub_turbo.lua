@@ -49,6 +49,15 @@ local function build_arena()
 	end
 end
 
+-- Map-system RNG must not perturb this soak's bot stream. The trial
+-- runs in its own 22x22 arena and never uses the match map, but every
+-- match start now rebuilds it: pin the map's seed (next_seed() skips
+-- math.random) and its initial mob budget (monster jitter also draws
+-- from math.random). Map determinism/variety is covered by the smoke
+-- suite (phases 17-20); this suite is a weapons-balance measurement.
+minetest.settings:set("sl_map.seed", "424242")
+minetest.settings:set("sl_map.mobs", "0")
+
 -- ----------------------------------------------------------------
 -- Bots
 -- ----------------------------------------------------------------

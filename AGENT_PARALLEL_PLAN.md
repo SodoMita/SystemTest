@@ -39,7 +39,7 @@ change request (§4) or a joint branch.
 
 | WP | Name | Owns (paths) | Mission |
 |----|------|--------------|---------|
-| WP1 | Arena & world | `worlds/`*, mapgen settings, `sl_modebase/nodes.lua` (spawn/arena nodes only), `mods/sl_blocks/**` | Hand-built arena per spec: two beacons, lobby, cage, routes, cover, hand-placed pickups |
+| WP1 | Arena & world | `worlds/`*, mapgen settings, `sl_modebase/map.lua`, `sl_modebase/maps/**`, `sl_modebase/nodes.lua` (spawn/arena nodes only), `mods/sl_blocks/**`, `tools/gen_example_map_mts.py` | Match map system: procedural/test/handmade (.mts) map types, initial-state reset between matches, mob population lifecycle, `/sl_map` |
 | WP2 | Match rules & sequencing | `sl_modebase/match.lua`, `state.lua`, `spawn.lua`, `matchmaking.lua`, `commands.lua` | Ready check, insertion, timer, results, clean reset, win conditions |
 | WP3 | Ghost systems | `sl_modebase/nodes.lua` (altar/ghost nodes), `content.lua` (ritual/sabotage items) | Cloud cage rules, altar ritual, information items, evil-ghost powers with counterplay |
 | WP4 | Test & simulation | `tests/**`, `mods/game/aaa_botmatch/**`, `sl_modebase/test_harness.lua`, `.github/workflows/**` | Stub smoke suite, soak harness, AI roles, CI, bug triage reports |
@@ -59,7 +59,9 @@ sections; `init.lua` include list is WP4-owned).
 
 1. `luac5.1 -p` clean on every touched `.lua`.
 2. `lua5.1 tests/smoke_test.lua` — all assertions pass (extend the suite
-   when you add rules; WP4 reviews coverage).
+   when you add rules; WP4 reviews coverage). Where no system `lua5.1`
+   binary exists, `python3 tests/run_lua51.py tests/smoke_test.lua` runs
+   the same suite under an embedded Lua 5.1 runtime (lupa).
 3. `python3 tests/soak/run_soak.py --matches 3` — verdict PASS, zero
    `[botmatch][BUG]`, zero engine ERROR lines.
 4. No new identity leaks: HUD/chat/formspec changes reviewed against the

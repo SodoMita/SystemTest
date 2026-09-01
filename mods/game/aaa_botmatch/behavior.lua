@@ -118,6 +118,30 @@ function botmatch.build_arena()
 	if minetest.load_area then minetest.load_area(vector.round(state.ghost_spawn)) end
 	if gm.build_cloud_cage then gm.build_cloud_cage() end
 
+	-- Register the arena with the map system: matches played here still
+	-- get the initial-state reset contract (journal restore of out-of-
+	-- volume node edits, mob purge at match end, mob respawn at match
+	-- start), but botmatch owns the build — the map system never
+	-- rebuilds this arena itself.
+	if gm.map and gm.map.adopt then
+		local l = state.lobby_spawn
+		local mm = state.monster_master.base_spawn
+		gm.map.adopt({
+			name = "botmatch arena",
+			minp = { x = -floor_half - 2, y = -1, z = -floor_half - 2 },
+			maxp = { x = floor_half + 2, y = math.max(25, gs.y + 5), z = floor_half + 2 },
+			anchor = {
+				beacon_a = { x = -bx, y = 1, z = 0 },
+				beacon_b = { x = bx, y = 1, z = 0 },
+				altar = { x = 0, y = 1, z = 0 },
+				mm_pad = { x = mm.x, y = mm.y - 1, z = mm.z },
+				lobby = { x = l.x, y = l.y, z = l.z },
+				ghost = { x = gs.x, y = gs.y, z = gs.z },
+			},
+			mobs = {},
+		})
+	end
+
 	minetest.log("action", "[botmatch] deterministic arena materialized")
 end
 

@@ -1,6 +1,6 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-01 (rev 3)
+**Date:** 2026-09-02 (rev 4)
 **Rev 3 adds:** the host hooks, test-stub, tournament mode and weapon audio that rev 2 shipped tests for
 but did not actually include (see §0.3).
 **Branch:** `arena/01a05980-systemtest`
@@ -58,6 +58,24 @@ combine **the good things that genuinely belong on main** into one branch and op
    `sound_play("sl_weapons_*")` 30+ times and shipped zero audio files), and wires
    the three new Lua suites into the `soak` CI gate. All suites now run on master's
    stub: smoke 126/126, strand 84/84, weapons 288/288, turbo soak PASS.
+
+4. **Rev 4 — the map system and the MM-essence ruling.** The single biggest
+   deferred unlock (`arena/01a0487f`) is now integrated: the match loop runs
+   on a real map system — seeded **procedural** arenas, the deterministic
+   **test** arena, and handler-built **schematic** maps with a full
+   initial-state reset contract (volume re-materialization, node-journal for
+   out-of-volume edits, mob purge + initial population respawn, beacon/ghost
+   restoration). Procedural maps gained **layout overrides**:
+   `sl_map.cage_pos` / `sl_map.beacon_a_pos` / `sl_map.beacon_b_pos` /
+   `sl_map.mm_base_pos` place the cloud cage, the two beacon bastions and the
+   Monster Master redoubt anywhere on the arena floor; the resolved layout is
+   carried by the descriptor so match-end rebuilds are drift-free and
+   `/sl_map save` exports it like any other arena. The owner's ruling on MM
+   essence (§13.3/§17.2 of MASTER_DESIGN_FULL) is recorded in the design
+   canon. Verification: smoke 193/193 (phases 17–21 cover map prepare/journal/
+   reset/mobs/schematics//sl_map/layout overrides), strand 84/84, weapons
+   288/288, turbo soak PASS (map RNG pinned so the weapons-balance stream
+   stays deterministic).
 
 ---
 
@@ -127,10 +145,10 @@ here is a history merge across roots.
 | `python3 tools/agentmail.py lint` | 0 errors (no message corpus to report on) |
 | `python3 tests/agentmail_test.py` | 53/53 |
 | LuaJIT syntax gate, all `mods/**/*.lua` | clean (incl. the modebase hook edits) |
-| `luajit tests/smoke_test.lua` | 126/126 |
+| `luajit tests/smoke_test.lua` | 193/193 (phases 17–21: map prepare/journal/reset, mob lifecycle, handmade maps, `/sl_map`, layout overrides) |
 | `luajit tests/strand_test.lua` | 84/84 |
 | `luajit tests/weapons_test.lua` | 288/288 (was: crash on missing stub `modpaths`, then 6+ real failures) |
-| `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors) |
+| `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors; map RNG pinned for a deterministic bot stream) |
 | sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 37 textures are 16×16 solid-colour placeholders (art baseline still deferred) |
 
 CI runs the new suites: `agent-mail` workflow (lint + unit tests) and the `soak`
@@ -145,14 +163,14 @@ This branch is a **curated port**, not a "merge every tip." The following are th
 genuinely-needed items that could not be shipped *safely* in a single PR and are
 therefore teed up as the next scoped steps (see §5, the owner decisions).
 
-1. **Map system (`arena/01a0487f`)** — the recommended step-1 integration, but it
-   deeply rewires the core loop: it edits `match.lua`, `commands.lua`, `init.lua`,
-   `content.lua`, `entities.lua`, `nodes.lua`, `test_harness.lua`, `settingtypes.txt`,
-   `aaa_botmatch/behavior.lua`, `sl_gui/*`, and `ground/mapgen.lua`. It must land with
-   an unresolved product decision (procedural vs `schematic` default) and its own
-   independently passing map-reset / map-ownership / mob-lifecycle tests. **Not
-   shipped here** because shipping it half-wired would be worse than shipping it
-   scoped; it is documented in `docs/jax_merge_plan.md` and flagged below.
+1. ~~**Map system (`arena/01a0487f`)**~~ **— shipped in rev 4.** Procedural /
+   test / schematic map types, initial-state reset (volume re-materialization,
+   node journal, mob purge + respawn, beacon + ghost restoration),
+   `/sl_map` command set, two shipped handmade maps, and — added here —
+   procedural layout overrides for the cloud cage, the beacon bastions and the
+   MM redoubt. Map policy resolved: procedural stays the default and is now
+   position-configurable; schematic exists for hand-built arenas; the test
+   arena keeps CI deterministic.
 2. ~~**`sl_weapons` host hooks**~~ **— shipped in rev 3.** `register_pickup_roll` /
    `get_pickup_rolls` + weighted loot rolling (`content.lua`), corpse capture
    (`match.lua` dieplayer), monster spoils + melee wear hook (`entities.lua`),
@@ -190,6 +208,17 @@ Drawn from `MASTER_DESIGN_FULL.md` §17 and the assessment snapshot:
    delivery → match end.
 5. **Green web release** — the WASM build fails (exit 77); `gh-pages` is not being
    advanced until it is fixed/made diagnosable.
+
+**Ruled since rev 3 (owner, 2026-09-02):**
+
+6. **Map policy** — procedural default stands, now with position overrides for
+   the cloud cage, beacons and MM base (`sl_map.cage_pos` /
+   `sl_map.beacon_a_pos` / `sl_map.beacon_b_pos` / `sl_map.mm_base_pos`);
+   schematic remains the handmade-map path, test the CI-deterministic one.
+7. **Essence from crew activity (§13.3)** — accepted with its mechanism ruled:
+   destruction of crew-placed nodes pays `price(node)` to the MM pool, select
+   crafts (the objective core, +3) pay directly, essence is **fuel, not score**,
+   and points come primarily from killing crew (no farming economy).
 
 ---
 

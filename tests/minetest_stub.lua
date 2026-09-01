@@ -33,10 +33,15 @@ M.luaentities = {}
 M.current_modname = "sl_modebase"
 M.entity_spawns = {}  -- list of { pos = ..., name = ... }, in spawn order
 M.item_drops = {}    -- list of { pos = ..., name = ..., count = ... } from minetest.add_item
+M.schematic_placements = {} -- place_schematic calls: {pos, kind, rotation, force}
+M.created_schematics = {}   -- create_schematic output paths
+M.dir_tree = {}     -- optional fake directory listing: [path] = {dirs={}, files={}}
+M.entity_seq = 0
 
 local handlers = {
-	joinplayer = {}, leaveplayer = {}, respawnplayer = {}, dieplayer = {},
-	punchplayer = {}, chat_message = {}, punchnode = {},
+	joinplayer = {}, leaveplayer = {}, dieplayer = {},
+	respawnplayer = {}, punchplayer = {}, chat_message = {},
+	punchnode = {}, placenode = {}, dignode = {},
 	player_receive_fields = {}, mods_loaded = {},
 }
 
@@ -438,6 +443,8 @@ function minetest.register_on_dieplayer(fn) table.insert(handlers.dieplayer, fn)
 function minetest.register_on_punchplayer(fn) table.insert(handlers.punchplayer, fn) end
 function minetest.register_on_chat_message(fn) table.insert(handlers.chat_message, fn) end
 function minetest.register_on_punchnode(fn) table.insert(handlers.punchnode, fn) end
+function minetest.register_on_placenode(fn) table.insert(handlers.placenode, fn) end
+function minetest.register_on_dignode(fn) table.insert(handlers.dignode, fn) end
 function minetest.register_on_player_receive_fields(fn) table.insert(handlers.player_receive_fields, fn) end
 function minetest.register_on_mods_loaded(fn) table.insert(handlers.mods_loaded, fn) end
 
@@ -447,6 +454,26 @@ function M.fire_chat_message(name, message)
 		if fn(name, message) ~= nil then return true end
 	end
 	return false
+end
+
+-- Player placed a node: the engine updates the map first, then runs
+-- the callbacks with the OLD node available.
+function M.fire_placenode(pos, newnode, placer, oldnode)
+	oldnode = oldnode or { name = M.voxels[vhash(pos)] or "air", param1 = 0, param2 = 0 }
+	newnode = newnode or { name = "default:stone" }
+	M.voxels[vhash(pos)] = newnode.name
+	for _, fn in ipairs(handlers.placenode) do
+		fn(pos, newnode, placer, oldnode, nil, nil)
+	end
+end
+
+-- Player dug a node: map updated first, callbacks get the old node.
+function M.fire_dignode(pos, oldnode, digger)
+	oldnode = oldnode or { name = M.voxels[vhash(pos)] or "air", param1 = 0, param2 = 0 }
+	M.voxels[vhash(pos)] = nil
+	for _, fn in ipairs(handlers.dignode) do
+		fn(pos, oldnode, digger)
+	end
 end
 
 function M.fire_punchnode(pos, node, puncher, pointed_thing)
@@ -512,6 +539,7 @@ function minetest.explode_textlist_event(_) return { type = "nothing" } end
 minetest.settings = {
 	get_bool = function(_, key) return M.settings[key] == true end,
 	get = function(_, key) return M.settings[key] end,
+	set = function(_, key, value) M.settings[key] = value end,
 }
 
 -- Time
@@ -575,6 +603,18 @@ function MetaMeta:get_inventory()
 	self._inv = self._inv or new_inv(32)
 	return self._inv
 end
+function MetaMeta:to_table()
+	local fields = {}
+	for k, v in pairs(self._data) do fields[k] = v end
+	return { fields = fields, inventory = self._inv }
+end
+function MetaMeta:from_table(t)
+	if type(t) ~= "table" then return false end
+	self._data = {}
+	for k, v in pairs(t.fields or {}) do self._data[k] = v end
+	if t.inventory then self._inv = t.inventory end
+	return true
+end
 
 local metas = {}
 function minetest.get_meta(pos)
@@ -585,37 +625,69 @@ function minetest.get_meta(pos)
 	return metas[h]
 end
 
--- Entities / items in world
-function minetest.add_item(pos, stack)
-	local s = type(stack) == "table" and stack.__is_stack and stack or ItemStack(stack)
-	-- Record the drop (the engine spawns a pickup-able item entity;
-	-- tests observe the fountain through this log).
-	table.insert(M.item_drops, {
-		pos = pos and { x = pos.x, y = pos.y, z = pos.z } or nil,
-		name = s:get_name(),
-		count = s:get_count(),
-	})
-	local obj = { set_velocity = function() end, remove = function() end }
-	return obj
-end
-function minetest.add_entity(pos, name)
-	local obj = {
-		_pos = pos,
-		_props = {},
-		set_properties = function(self, props)
-			for k, v in pairs(props or {}) do self._props[k] = v end
-		end,
-		get_properties = function(self) return self._props end,
-		get_pos = function(self) return self._pos end,
-		set_velocity = function() end,
-		remove = function() end,
-		get_luaentity = function() return { name = name } end,
-	}
-	table.insert(M.entity_spawns, { pos = pos, name = name })
-	return obj
-end
+-- Entities / items in world: both go through the single rich object
+-- factory below (make_entity_object), so item entities carry the full
+-- ObjectRef surface (get_hp, punch, get_velocity, ...) the same way
+-- registered entities do — dropped items can be stepped, hit and
+-- purged by map reset exactly like on the engine.
 function minetest.add_particle(_) end
 function minetest.sound_play(_, _) end
+
+-- Directory scanning (driven by M.dir_tree, populated by tests).
+function minetest.get_dir_list(path, is_dir)
+	local tree = M.dir_tree[tostring(path)]
+	if not tree then return {} end
+	if is_dir then return tree.dirs or {} end
+	return tree.files or {}
+end
+
+function minetest.get_worldpath()
+	return "/tmp/sl_stub_world"
+end
+
+-- Schematics. Table schematics are placed for real (engine order:
+-- z, then y, then x — x varies fastest); file paths are recorded.
+function minetest.place_schematic(pos, schematic, rotation, replacements, force_placement)
+	local kind = type(schematic) == "table" and "table" or tostring(schematic)
+	table.insert(M.schematic_placements,
+		{ pos = table.copy(pos), kind = kind, rotation = rotation, force = force_placement })
+	if type(schematic) == "table" and schematic.size and schematic.data then
+		local sx, sy, sz = schematic.size.x, schematic.size.y, schematic.size.z
+		for z = 0, sz - 1 do
+			for y = 0, sy - 1 do
+				for x = 0, sx - 1 do
+					local entry = schematic.data[z * sy * sx + y * sx + x + 1]
+					local p = { x = pos.x + x, y = pos.y + y, z = pos.z + z }
+					M.voxels[vhash(p)] = entry and entry.name or "air"
+				end
+			end
+		end
+		return true
+	end
+	return true
+end
+
+function minetest.read_schematic(schematic, options)
+	if type(schematic) == "table" then
+		return schematic
+	end
+	local path = tostring(schematic)
+	if path:match("%.lua$") then
+		local chunk = loadfile(path)
+		if chunk then
+			local ok, res = pcall(chunk)
+			if ok then return res end
+		end
+	end
+	return nil
+end
+
+-- The engine appends ".mts" to the filename it is given.
+function minetest.create_schematic(p1, p2, probability_list, filename)
+	local path = tostring(filename) .. ".mts"
+	M.created_schematics[path] = { p1 = table.copy(p1), p2 = table.copy(p2) }
+	return true
+end
 
 -- Protection base (the mod wraps this global at load time)
 minetest.is_protected = function(_, _) return false end
@@ -886,6 +958,15 @@ local function make_entity_object(pos, name)
 	function obj:get_acceleration() return { x = 0, y = 0, z = 0 } end
 	function obj:get_properties() return self._props end
 	function obj:set_properties(props) for k, v in pairs(props or {}) do self._props[k] = v end end
+	function obj:set_rotation(r) self._rotation = { x = r.x or 0, y = r.y or 0, z = r.z or 0 } end
+	function obj:get_rotation(_)
+		local r = self._rotation or {}
+		return { x = r.x or 0, y = r.y or 0, z = r.z or 0 }
+	end
+	function obj:set_yaw(y) self._yaw = y end
+	function obj:get_yaw() return self._yaw or 0 end
+	function obj:set_animation(frames, speed, frame_loop, blend) self._animation = { frames = frames, speed = speed } end
+	function obj:get_player_name() return nil end
 	function obj:set_armor_groups(g) self._armor = g or {} end
 	function obj:get_armor_groups() return self._armor end
 	function obj:get_hp() return self._hp end
@@ -934,13 +1015,26 @@ local function make_entity_object(pos, name)
 	return obj
 end
 
-local raw_add_entity = minetest.add_entity
 minetest.add_entity = function(pos, name, staticdata)
 	local obj = make_entity_object(pos or { x = 0, y = 0, z = 0 }, name)
 	table.insert(M.entity_spawns, { pos = pos, name = name })
 	local lua = obj._lua
 	if lua and lua.on_activate then
 		pcall(lua.on_activate, lua, staticdata or "", 0)
+	end
+	return obj
+end
+minetest.add_item = function(pos, stack)
+	local obj = make_entity_object(pos or { x = 0, y = 0, z = 0 }, "__builtin:item")
+	-- Record the drop (the engine spawns a pickup-able item entity;
+	-- tests observe the fountain / salvage through this log).
+	if stack then
+		local s = type(stack) == "table" and stack.__is_stack and stack or ItemStack(stack)
+		table.insert(M.item_drops, {
+			pos = pos and { x = pos.x, y = pos.y, z = pos.z } or nil,
+			name = s:get_name(),
+			count = s:get_count(),
+		})
 	end
 	return obj
 end
