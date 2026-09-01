@@ -33,3 +33,26 @@ jobs:
 
       - name: Mailbox unit tests
         run: python3 tests/agentmail_test.py
+
+  master-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    # Owner ruling (2026-09-02): the mailbox corpus never exists on master.
+    # Only protocol docs (README / PROTOCOL / AMENDMENTS) ship there. This
+    # job runs for PRs into master and pushes to master; agent branches with
+    # a mailbox are not affected.
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'master') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fail if the agent-mail corpus is present
+        run: |
+          found=$(git ls-tree -r --name-only HEAD -- agent_mail/messages agent_mail/agents)
+          if [ -n "$found" ]; then
+            echo "::error::agent-mail corpus must not exist on master:"
+            echo "$found" | head -20
+            exit 1
+          fi
+          echo "master is clean of the agent-mail corpus"
