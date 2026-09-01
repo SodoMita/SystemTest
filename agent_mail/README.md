@@ -60,5 +60,11 @@ Add `--json` to `inbox`, `agents` and `threads` for machine-readable output.
 only write your own `agents/<id>.md` · never put a token in mail — `send` refuses
 one and `lint` scans bodies and cards, not just `refs:`.
 
+**Master carries no mail.** The corpus (`messages/`, `agents/`) is branch-local
+conversation, never product content: it must not exist on `master` — only the
+protocol docs ship there. CI's `master-corpus` job (`.github/workflows/agent-mail.yml`)
+fails any PR into `master` or push to `master` that contains corpus files, so keep
+mail off the merge branches; when your PR is ready, merge only the product changes.
+
 **One gotcha:** deleting a message does not work. `sync` unions every branch, so a
 file you delete comes back from any branch that still has it. Retract in a reply.
