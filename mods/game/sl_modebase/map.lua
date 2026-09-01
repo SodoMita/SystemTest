@@ -110,6 +110,16 @@ local function parse_triplet(str)
 end
 map.parse_triplet = parse_triplet
 
+-- Two-coordinate "X,Z" setting value (layout overrides sit on the
+-- arena floor plane; the Y comes from the generator).
+local function parse_pair(str)
+	if not str then return nil end
+	local x, z = tostring(str):match("^%s*(-?%d+)%s*,%s*(-?%d+)%s*$")
+	if not x then return nil end
+	return { x = tonumber(x), z = tonumber(z) }
+end
+map.parse_pair = parse_pair
+
 local function write_node(pos, name, param2)
 	if param2 then
 		minetest.set_node(pos, { name = name, param2 = param2 })
@@ -465,48 +475,65 @@ local function build_procedural(opts)
 		end
 	end
 
-	-- Beacon bastions: raised 5x5 pads at the midfield line.
+	-- Layout overrides: X,Z anchors for the cloud cage, the two beacon
+	-- bastions and the MM redoubt. A descriptor's resolved layout wins
+	-- (a same-match reset must not drift if settings changed in between);
+	-- otherwise the sl_map.*_pos settings are read, and unset entries
+	-- fall back to the stock centre-line arrangement.
+	local function layout_or(key, fallback)
+		if opts.layout and opts.layout[key] then
+			return { x = opts.layout[key].x, z = opts.layout[key].z }
+		end
+		return parse_pair(sget("sl_map." .. key .. "_pos")) or fallback
+	end
+
+	-- Beacon bastions: raised 5x5 pads, by default at the midfield line.
 	local bx = W - 8
 	local anchor = {}
-	for side, ax in ipairs({ origin.x - bx, origin.x + bx }) do
+	local beacon_a2 = layout_or("beacon_a", { x = origin.x - bx, z = origin.z })
+	local beacon_b2 = layout_or("beacon_b", { x = origin.x + bx, z = origin.z })
+	if beacon_a2.x == beacon_b2.x and beacon_a2.z == beacon_b2.z then
+		minetest.log("warning",
+			"[game_mode] sl_map.beacon_a_pos and sl_map.beacon_b_pos are the same position; beacon B reverts to the default")
+		beacon_b2 = { x = origin.x + bx, z = origin.z }
+	end
+	for _, bp in ipairs({ beacon_a2, beacon_b2 }) do
 		for dx = -2, 2 do
 			for dz = -2, 2 do
-				write_node({ x = ax + dx, y = fy + 1, z = origin.z + dz }, WALL_NODE)
+				write_node({ x = bp.x + dx, y = fy + 1, z = bp.z + dz }, WALL_NODE)
 			end
 		end
 		for _, corner in ipairs({ { -2, -2 }, { -2, 2 }, { 2, -2 }, { 2, 2 } }) do
 			for y = 2, 3 do
-				write_node({ x = ax + corner[1], y = fy + y, z = origin.z + corner[2] }, WALL_NODE)
+				write_node({ x = bp.x + corner[1], y = fy + y, z = bp.z + corner[2] }, WALL_NODE)
 			end
 		end
-		local beacon_pos = { x = ax, y = fy + 2, z = origin.z }
-		if side == 1 then
-			anchor.beacon_a = beacon_pos
-		else
-			anchor.beacon_b = beacon_pos
-		end
 	end
+	anchor.beacon_a = { x = beacon_a2.x, y = fy + 2, z = beacon_a2.z }
+	anchor.beacon_b = { x = beacon_b2.x, y = fy + 2, z = beacon_b2.z }
 
 	-- Midfield altar platform.
 	ensure_platform({ x = origin.x, y = fy + 1, z = origin.z }, WALL_NODE)
 	anchor.altar = { x = origin.x, y = fy + 1, z = origin.z }
 
-	-- Monster Master redoubt at +Z.
-	local mmz = origin.z + W - 6
+	-- Monster Master redoubt, by default at +Z; overridable X,Z.
+	local mm2 = layout_or("mm_base", { x = origin.x, z = origin.z + W - 6 })
 	for dx = -3, 3 do
 		for dz = -3, 3 do
-			write_node({ x = origin.x + dx, y = fy + 1, z = mmz + dz }, WALL_NODE)
+			write_node({ x = mm2.x + dx, y = fy + 1, z = mm2.z + dz }, WALL_NODE)
 			local edge = (dx == -3 or dx == 3 or dz == -3 or dz == 3)
 			if edge then
 				for y = 2, 4 do
-					write_node({ x = origin.x + dx, y = fy + y, z = mmz + dz }, WALL_NODE)
+					write_node({ x = mm2.x + dx, y = fy + y, z = mm2.z + dz }, WALL_NODE)
 				end
 			end
 		end
 	end
-	write_node({ x = origin.x, y = fy + 2, z = mmz - 3 }, "air") -- doorway
-	write_node({ x = origin.x, y = fy + 3, z = mmz - 3 }, "air")
-	anchor.mm_pad = { x = origin.x, y = fy + 1, z = mmz }
+	-- Doorway on the side facing the arena centre.
+	local door_dir = (mm2.z >= origin.z) and -1 or 1
+	write_node({ x = mm2.x, y = fy + 2, z = mm2.z + door_dir * 3 }, "air")
+	write_node({ x = mm2.x, y = fy + 3, z = mm2.z + door_dir * 3 }, "air")
+	anchor.mm_pad = { x = mm2.x, y = fy + 1, z = mm2.z }
 
 	-- Seeded cover blocks, mirrored for fairness.
 	local clusters = {}
@@ -549,7 +576,8 @@ local function build_procedural(opts)
 		end
 	end
 	anchor.lobby = { x = origin.x, y = fy + 1, z = lz }
-	anchor.ghost = { x = origin.x, y = fy + 40, z = origin.z }
+	local cage2 = layout_or("cage", { x = origin.x, z = origin.z })
+	anchor.ghost = { x = cage2.x, y = fy + 40, z = cage2.z }
 
 	-- Initial mob population: seeded scatter inside the arena.
 	local mobs = {}
@@ -568,6 +596,18 @@ local function build_procedural(opts)
 
 	map.building = false
 
+	-- Reset box must contain every layout anchor, even when overrides
+	-- sit far outside the stock volume: the re-materialization replaces
+	-- nodes inside it, and outside it the journal restores edits.
+	local minp = { x = origin.x - W - 1, y = fy - 2, z = lz - 7 }
+	local maxp = { x = origin.x + W + 1, y = fy + 6, z = origin.z + W + 2 }
+	for _, a in ipairs({ anchor.beacon_a, anchor.beacon_b, anchor.mm_pad }) do
+		minp.x = math.min(minp.x, a.x - 4)
+		minp.z = math.min(minp.z, a.z - 4)
+		maxp.x = math.max(maxp.x, a.x + 4)
+		maxp.z = math.max(maxp.z, a.z + 4)
+	end
+
 	return {
 		type = "procedural",
 		name = S("Procedural arena @1", tostring(seed)),
@@ -575,8 +615,17 @@ local function build_procedural(opts)
 		origin = origin,
 		anchor = anchor,
 		mobs = mobs,
-		minp = { x = origin.x - W - 1, y = fy - 2, z = lz - 7 },
-		maxp = { x = origin.x + W + 1, y = fy + 6, z = origin.z + W + 2 },
+		minp = minp,
+		maxp = maxp,
+		-- Resolved layout: carried on the descriptor so a same-match
+		-- rebuild (reset) reproduces the exact anchors even if the
+		-- sl_map.*_pos settings were edited mid-match.
+		layout = {
+			cage = { x = anchor.ghost.x, z = anchor.ghost.z },
+			beacon_a = { x = anchor.beacon_a.x, z = anchor.beacon_a.z },
+			beacon_b = { x = anchor.beacon_b.x, z = anchor.beacon_b.z },
+			mm_base = { x = anchor.mm_pad.x, z = anchor.mm_pad.z },
+		},
 	}
 end
 
@@ -744,6 +793,7 @@ end
 
 local function serialize_descriptor(desc)
 	local function clean_pos(p) return p and { x = p.x, y = p.y, z = p.z } or nil end
+	local function clean_pair(p) return p and { x = p.x, z = p.z } or nil end
 	local mobs = {}
 	for _, m in ipairs(desc.mobs or {}) do
 		table.insert(mobs, { pos = clean_pos(m.pos), variant = m.variant })
@@ -760,6 +810,12 @@ local function serialize_descriptor(desc)
 			lobby = clean_pos(desc.anchor.lobby),
 			ghost = clean_pos(desc.anchor.ghost),
 		},
+		layout = desc.layout and {
+			cage = clean_pair(desc.layout.cage),
+			beacon_a = clean_pair(desc.layout.beacon_a),
+			beacon_b = clean_pair(desc.layout.beacon_b),
+			mm_base = clean_pair(desc.layout.mm_base),
+		} or nil,
 		mobs = mobs,
 		minp = clean_pos(desc.minp), maxp = clean_pos(desc.maxp),
 	}
@@ -810,6 +866,7 @@ local function materialize(desc)
 			seed = desc.seed,
 			origin = desc.origin,
 			name = desc.dir and desc.dir:match("([^/]+)$") or nil,
+			layout = desc.layout, -- resolved layout overrides (procedural)
 		})
 		if not rebuilt then
 			minetest.log("error", "[game_mode] map rebuild failed: " .. tostring(err))

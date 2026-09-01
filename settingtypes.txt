@@ -49,6 +49,19 @@ sl_map.mobs (Map mob population) int 6 0 24
 # with its floor at {0,30,0}; the test arena always builds at origin).
 sl_map.origin (Map origin) string
 
+# Procedural layout overrides, each an "x,z" position on the arena
+# floor (the Y is derived from the map origin). Unset entries keep
+# the stock arrangement: cloud cage above the centre, beacon A/B at
+# the midfield line (origin.x -+ (W-8)), MM redoubt at +Z. The same
+# resolved layout is carried by the map descriptor, so a match-end
+# rebuild (reset) reproduces the overridden anchors exactly even if
+# the settings were edited mid-match. beacon_a and beacon_b must
+# differ; if both are set to the same spot, beacon B falls back.
+sl_map.cage_pos (Procedural cloud cage position) string
+sl_map.beacon_a_pos (Procedural beacon A position) string
+sl_map.beacon_b_pos (Procedural beacon B position) string
+sl_map.mm_base_pos (Procedural MM redoubt position) string
+
 # Legacy behavior: spawn a fixed budget of monsters once during
 # worldgen around the origin. Off by default — mobs are match
 # entities now: purged at match end, respawned at match start.

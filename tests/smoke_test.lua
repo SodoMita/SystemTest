@@ -677,6 +677,59 @@ io.open = real_io_open
 check(save_ok == true, "current map exports to a handmade map (/sl_map save)")
 check(H.created_schematics["mods/game/sl_modebase/maps/exporttest/map.mts"] ~= nil,
 	"export writes <maps>/<name>/map.mts")
+
+section("PHASE 21 — procedural layout overrides (cloud cage / beacons / MM base)")
+minetest.settings:set("sl_map.cage_pos", "5,5")
+minetest.settings:set("sl_map.beacon_a_pos", "-30,2")
+minetest.settings:set("sl_map.beacon_b_pos", "30,2")
+minetest.settings:set("sl_map.mm_base_pos", "0,40")
+mmap.prepare({ type = "procedural", seed = 4242 })
+local dl = mmap.current
+check(dl.anchor.ghost.x == 5 and dl.anchor.ghost.z == 5,
+	"cloud cage anchored at the configured X,Z")
+check(dl.anchor.beacon_a.x == -30 and dl.anchor.beacon_a.z == 2,
+	"beacon A bastion at the configured position")
+check(dl.anchor.beacon_b.x == 30 and dl.anchor.beacon_b.z == 2,
+	"beacon B bastion at the configured position")
+check(dl.anchor.mm_pad.x == 0 and dl.anchor.mm_pad.z == 40,
+	"MM redoubt at the configured position")
+check(state.ghost_spawn.x == 5 and state.ghost_spawn.z == 5,
+	"ghost cage spawn follows the override")
+check(state.monster_master.base_spawn.x == 0 and state.monster_master.base_spawn.z == 40,
+	"MM base spawn follows the override")
+check(state.teams.beacon_a.spawn.x == -30 and state.teams.beacon_a.spawn.y == dl.anchor.beacon_a.y + 1,
+	"team A spawn follows the override")
+check(H.voxels[H.vhash({ x = -30, y = dl.origin.y + 2, z = 2 })] == "sl_modebase:beacon_a",
+	"beacon node materialized on the override bastion")
+check(H.voxels[H.vhash({ x = 0, y = dl.origin.y + 1, z = 40 })] == "sl_modebase:spawn_mm",
+	"MM pad node materialized at the override redoubt")
+check(dl.minp.x <= -34 and dl.maxp.x >= 34 and dl.minp.z <= -4 and dl.maxp.z >= 44,
+	"reset volume expanded to contain the overridden anchors")
+-- Same-match reset rebuilds the same overridden layout.
+mmap.reset()
+local dr = mmap.current
+check(dr.anchor.beacon_a.x == -30 and dr.anchor.beacon_a.z == 2,
+	"reset rebuild keeps the overridden beacon A")
+check(dr.anchor.mm_pad.x == 0 and dr.anchor.mm_pad.z == 40,
+	"reset rebuild keeps the overridden MM redoubt")
+check(H.voxels[H.vhash({ x = -30, y = dr.origin.y + 2, z = 2 })] == "sl_modebase:beacon_a",
+	"override rebuild materializes beacon A again")
+-- Collision guard: identical positions for both beacons fall back.
+minetest.settings:set("sl_map.beacon_a_pos", "0,40")
+minetest.settings:set("sl_map.beacon_b_pos", "0,40")
+mmap.prepare({ type = "procedural", seed = 4242 })
+local dg = mmap.current
+check(dg.anchor.beacon_a.x == 0 and dg.anchor.beacon_a.z == 40,
+	"beacon A honours the shared override position")
+check(dg.anchor.beacon_b.x ~= 0 or dg.anchor.beacon_b.z ~= 40,
+	"beacon B falls back when both positions collide")
+-- Reset the overrides so the default arrangement holds again.
+minetest.settings:set("sl_map.cage_pos", nil)
+minetest.settings:set("sl_map.beacon_a_pos", nil)
+minetest.settings:set("sl_map.beacon_b_pos", nil)
+minetest.settings:set("sl_map.mm_base_pos", nil)
+mmap.prepare({ type = "procedural", seed = seed_a })
+
 -- Restore the default configuration for any later phases.
 mmap.runtime.type = nil
 mmap.runtime.schematic = nil

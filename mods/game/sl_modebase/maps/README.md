@@ -98,3 +98,23 @@ or persistently via `settingtypes.txt`:
 sl_map.type = schematic
 sl_map.schematic = neon_crossfire
 ```
+
+## Procedural layout overrides
+
+The procedural generator's anchors can be moved with four settings (each an
+`"x,z"` position on the arena floor; Y is derived from the map origin):
+
+```
+sl_map.cage_pos      = 5,5      # cloud cage column (default: arena centre)
+sl_map.beacon_a_pos  = -30,2    # beacon A bastion (default: midfield line)
+sl_map.beacon_b_pos  = 30,2     # beacon B bastion (default: midfield line)
+sl_map.mm_base_pos   = 0,40     # Monster Master redoubt (default: +Z edge)
+```
+
+Unset entries keep the stock arrangement. The resolved layout is carried on
+the map descriptor, so the match-end rebuild (reset) reproduces the
+overridden anchors exactly even if the settings are edited mid-match;
+`/sl_map save` exports whatever is currently standing, overrides included.
+If both beacon positions are set to the same spot, beacon B falls back to
+its default with a warning. The same anchors can be fixed for handmade maps
+via `map.conf` (`beacon_a.pos` / `beacon_b.pos` / `mm.pos` / `ghost.pos`).
