@@ -1,8 +1,14 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-02 (rev 4)
-**Rev 3 adds:** the host hooks, test-stub, tournament mode and weapon audio that rev 2 shipped tests for
-but did not actually include (see §0.3).
+**Date:** 2026-09-02 (rev 5)
+**Rev 4 adds:** the map system and the MM-essence ruling (see §0.4).
+**Rev 5 adds:** the MM essence engine (the §13.3 ruling, shipped): node
+provenance, `groups.sl_essence_value` pricing on the craftable output defs, the
+per-match pool with spawner pool-first spend, the named objective-core +3 craft
+through the button crafting UI, the no-MM ambient-hazard security units at
+thresholds, and the `/sl_state` + spawner-GUI readouts. Covered by the new
+stub-only `tests/essence_test.lua` (61 assertions), wired into the `soak` CI gate
+between the weapons turbo soak and the live-engine soak.
 **Branch:** `arena/01a05980-systemtest`
 **Base:** `master` @ `457ccb9`
 **Purpose:** read every remote branch, the docs, and the full agent mailbox, then
@@ -149,6 +155,7 @@ here is a history merge across roots.
 | `luajit tests/strand_test.lua` | 84/84 |
 | `luajit tests/weapons_test.lua` | 288/288 (was: crash on missing stub `modpaths`, then 6+ real failures) |
 | `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors; map RNG pinned for a deterministic bot stream) |
+| `luajit tests/essence_test.lua` | 61/61 (rev 5: provenance, pricing, pool reset, +3 core craft, ambient hazard thresholds, scoreboard untouched, readouts) |
 | sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 37 textures are 16×16 solid-colour placeholders (art baseline still deferred) |
 
 CI runs the new suites: `agent-mail` workflow (lint + unit tests) and the `soak`
@@ -219,6 +226,8 @@ Drawn from `MASTER_DESIGN_FULL.md` §17 and the assessment snapshot:
    destruction of crew-placed nodes pays `price(node)` to the MM pool, select
    crafts (the objective core, +3) pay directly, essence is **fuel, not score**,
    and points come primarily from killing crew (no farming economy).
+   **Implemented in rev 5** (the essence engine + `tests/essence_test.lua`);
+   the ruling text now carries the pool-reset semantics and the pricing source.
 
 ---
 

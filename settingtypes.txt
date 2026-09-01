@@ -49,6 +49,12 @@ sl_map.mobs (Map mob population) int 6 0 24
 # with its floor at {0,30,0}; the test arena always builds at origin).
 sl_map.origin (Map origin) string
 
+# MM essence engine (§13.3): ambient-hazard thresholds, comma-separated.
+# A match with no Monster Master accrues the essence pool into automated
+# security units spawned from the Node — one at each threshold (default:
+# pool 10, 25 and 50). Empty = the default set.
+sl_essence.thresholds (Essence hazard thresholds) string 10,25,50
+
 # Procedural layout overrides, each an "x,z" position on the arena
 # floor (the Y is derived from the map origin). Unset entries keep
 # the stock arrangement: cloud cage above the centre, beacon A/B at

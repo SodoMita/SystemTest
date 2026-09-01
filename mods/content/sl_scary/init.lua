@@ -729,7 +729,9 @@ minetest.register_node("sl_scary:hide_spot", {
         fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}
     },
 --     tiles = {"hide_spot_top.png", "hide_spot_bottom.png", "hide_spot_side.png"},
-    groups = {cracky = 1},
+    -- sl_essence_value = 2: hideout price paid to the MM pool when a
+    -- crew-placed Shadow Hideout is destroyed (essence ruling §13.3).
+    groups = {cracky = 1, sl_essence_value = 2},
 })
 
 -- minetest.register_entity("sl_scary:codop", {

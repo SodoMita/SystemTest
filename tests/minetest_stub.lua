@@ -875,6 +875,10 @@ function PlayerMeta:set_velocity(v) self._velocity = { x = v.x, y = v.y, z = v.z
 function PlayerMeta:get_armor_groups() return self._armor or {} end
 function PlayerMeta:get_wielded_item() return ItemStack(self._wielded or "") end
 function PlayerMeta:set_wielded_item(s) self._wielded = (type(s) == "table") and s:to_string() or tostring(s or "") end
+-- Engine parity: the inventory formspec the engine shows instead of the
+-- node inventory. sl_gui crafting routes its formspec through this.
+function PlayerMeta:set_inventory_formspec(form) self._inv_formspec = form end
+function PlayerMeta:get_inventory_formspec() return self._inv_formspec end
 
 local function player_get_meta(p)
 	if not p._meta_data then

@@ -505,12 +505,18 @@ function game_mode.spawner_activate(name, pos, variant)
 	local now = game_mode.now()
 	local _, min_essence = spawner_node_settings(meta)
 
-	-- Node setting: minimal resource quantity to spawn.
+	-- The match essence pool is the MM's primary fuel: each creature
+	-- burns one essence pool-first; the unit's feed covers the rest
+	-- (essence ruling §13.3 — the pool is the spawner's feed).
+	local pool = game_mode.essence_pool and game_mode.essence_pool() or 0
 	local in_feed = game_mode.count_feed_essence(feed)
-	if in_feed < min_essence then
+	local fuel = in_feed + pool
+
+	-- Node setting: minimal resource quantity to spawn.
+	if fuel < min_essence then
 		minetest.chat_send_player(name,
-			S("The unit needs at least @1 Monster Essence in the feed to run (has @2).",
-				tostring(min_essence), tostring(in_feed)))
+			S("The unit needs at least @1 essence to run (feed has @2, match pool @3).",
+				tostring(min_essence), tostring(in_feed), tostring(pool)))
 		return false
 	end
 
@@ -536,8 +542,13 @@ function game_mode.spawner_activate(name, pos, variant)
 		return false
 	end
 
-	-- Spawn confirmed: now burn the essence and start the spool-down.
-	feed:remove_item("feed", ItemStack(game_mode.ESSENCE_ITEM .. " 1"))
+	-- Spawn confirmed: now burn the essence (match pool first, then
+	-- the unit's feed) and start the spool-down.
+	if pool > 0 then
+		game_mode.state.monster_master.essence_pool = pool - 1
+	else
+		feed:remove_item("feed", ItemStack(game_mode.ESSENCE_ITEM .. " 1"))
+	end
 	local cooldown = spawner_node_settings(meta)
 	meta:set_int("sl_spawner_ready_at", math.floor(now + cooldown))
 	meta:set_string("infotext",
@@ -565,7 +576,8 @@ local function spawner_formspec(pos, meta)
 		"bgcolor[#120a14ee;true]",
 		"label[0.3,0.2;MONSTER SPAWNER UNIT]",
 		"label[0.3,0.7;Essence in unit: " .. tostring(essence) .. "  (needs "
-			.. tostring(min_essence) .. ", 1 per spawn)]",
+			.. tostring(min_essence) .. ", 1 per spawn)  |  Match pool: "
+			.. tostring(game_mode.essence_pool and game_mode.essence_pool() or 0) .. "]",
 	}
 	local y = 1.3
 	for _, id in ipairs(game_mode.MONSTER_TYPE_ORDER) do
@@ -606,7 +618,9 @@ minetest.register_node(modname .. ":monster_spawner", {
 	tiles = { "sl_monster_spawner.png" },
 	paramtype = "light",
 	light_source = 10,
-	groups = { cracky = 2, oddly_breakable_by_hand = 1 },
+	-- sl_essence_value: price paid to the MM pool when the crew's
+	-- spawner unit is destroyed (essence ruling §13.3 rule 1).
+	groups = { cracky = 2, oddly_breakable_by_hand = 1, sl_essence_value = 4 },
 	is_ground_content = false,
 	selection_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },
 	collision_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },

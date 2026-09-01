@@ -25,6 +25,12 @@ function game_mode.end_match(winner, reason)
 		game_mode.map.reset()
 	end
 
+	-- Essence pool is per-match: nothing carries into the lobby, and
+	-- no provenance survives the reset (ruling §13.3, pool semantics).
+	if game_mode.essence_reset then
+		game_mode.essence_reset()
+	end
+
 	local restored_from_map = game_mode.map and game_mode.map.current
 
 	-- Restore beacons and spawns from persistent storage
@@ -386,6 +392,13 @@ function game_mode.start_new_match(initiator)
 		if ok == false and err then
 			minetest.log("warning", "[game_mode] map prepare: " .. tostring(err))
 		end
+	end
+
+	-- Essence economy: fresh pool, provenance and hazard counter every
+	-- match (per-match state, like every other match state — ruling
+	-- §13.3, pool semantics).
+	if game_mode.essence_reset then
+		game_mode.essence_reset()
 	end
 
 	-- Beacons start every match at full integrity. Without this, damage

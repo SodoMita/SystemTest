@@ -76,6 +76,10 @@ minetest.register_chatcommand("sl_state", {
 
 		table.insert(parts, S("Phase: @1", tostring(pl.phase)))
 		table.insert(parts, S("Points: @1", tostring(pl.points or 0)))
+		if state.match_active then
+			table.insert(parts, S("Essence pool: @1",
+				tostring(state.monster_master.essence_pool or 0)))
+		end
 		if pl.eliminated then
 			table.insert(parts, S("(Eliminated)"))
 		end

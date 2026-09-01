@@ -262,7 +262,14 @@ minetest.register_node(game_mode.modname .. ":objective_core", {
 	mesh = "item.obj", -- Use a mesh for the cube if possible
 	paramtype = "light",
 	light_source = 14,
-	groups = {cracky = 1, oddly_breakable_by_hand = 1},
+	-- sl_essence_value = 5: destroying a delivered/placed core pays the
+	-- MM pool 5 (essence ruling §13.3 rule 1 — the crew's biggest
+	-- statement pays out). sl_craft_in_inventory = 1: this node opts
+	-- out of the "machine required" gate so the named +3 craft (rule 2)
+	-- can actually complete in the button crafting UI until the machine
+	-- chain lands (objective-loop turn).
+	groups = {cracky = 1, oddly_breakable_by_hand = 1,
+		sl_essence_value = 5, sl_craft_in_inventory = 1},
 	is_ground_content = false,
 
 	after_place_node = function(pos, placer)
@@ -319,7 +326,9 @@ minetest.register_node(game_mode.modname .. ":loot_crate", {
 	description = S("Loot Crate"),
 	tiles = {"sl_loot_crate.png"},
 	paramtype2 = "facedir",
-	groups = {choppy = 2, oddly_breakable_by_hand = 1},
+	-- sl_essence_value: price paid to the MM pool when a crew-placed
+	-- crate is destroyed (essence ruling §13.3 rule 1).
+	groups = {choppy = 2, oddly_breakable_by_hand = 1, sl_essence_value = 1},
 	is_ground_content = false,
 	sounds = default and default.node_sound_wood_defaults and default.node_sound_wood_defaults() or nil,
 

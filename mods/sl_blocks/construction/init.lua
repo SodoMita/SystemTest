@@ -24,6 +24,8 @@ minetest.register_node("construction:fire", {
 })
 minetest.register_node("construction:firenode", {
     description = "Firenode",
+    -- sl_essence_value = 1: fortify-block price paid to the MM pool
+    -- when a crew-placed block is destroyed (essence ruling §13.3).
     -- The critical part is the tiles table
     tiles = {{
         name = "forest_fire_30f.png",
@@ -40,7 +42,7 @@ minetest.register_node("construction:firenode", {
 	sunlight_propagates = true,
 	walkable = false,
     -- Standard node properties
-    groups = {cracky = 3, oddly_breakable_by_hand = 3},
+    groups = {cracky = 3, oddly_breakable_by_hand = 3, sl_essence_value = 1},
     is_ground_content = false,
     sounds = default.node_sound_stone_defaults(),
 })
@@ -250,7 +252,7 @@ minetest.register_node("construction:water", {
         }
     }},
     -- Standard node properties
-    groups = {cracky = 3, oddly_breakable_by_hand = 3},
+    groups = {cracky = 3, oddly_breakable_by_hand = 3, sl_essence_value = 1},
     is_ground_content = false,
     sounds = default.node_sound_stone_defaults(),
 })
@@ -292,7 +294,7 @@ minetest.register_node("construction:snowflake2", {
         }
     }},
     -- Standard node properties
-    groups = {cracky = 3, oddly_breakable_by_hand = 3},
+    groups = {cracky = 3, oddly_breakable_by_hand = 3, sl_essence_value = 1},
     is_ground_content = false,
     sounds = default.node_sound_stone_defaults(),
 })
@@ -355,7 +357,7 @@ minetest.register_node("construction:plasma2", {
         }
     }},
     -- Standard node properties
-    groups = {cracky = 3, oddly_breakable_by_hand = 3},
+    groups = {cracky = 3, oddly_breakable_by_hand = 3, sl_essence_value = 2},
     is_ground_content = false,
     sounds = default.node_sound_stone_defaults(),
 })
