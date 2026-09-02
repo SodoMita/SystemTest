@@ -143,31 +143,73 @@ check(mm.essence_provenance[H.vhash({ x = 10, y = 1, z = 5 })] == nil,
 gm.set_monster_master(nil)
 check(state.monster_master.player == nil, "MM cleared for the rest of the suite")
 
+local core_entry
+
 section("PHASE E10 — the machine gate and the named +3 craft")
 H.current_modname = "sl_gui"
 local okc, errc = pcall(dofile, "mods/apis/sl_gui/crafting_system.lua")
 check(okc, "crafting system loads" .. (okc and "" or (" -> " .. tostring(errc))))
 
--- The objective core is a registered node; the gate refuses registered
--- node outputs UNLESS the def opts in (sl_craft_in_inventory).
+-- Registering machine crafting gives the inventory gate its other
+-- half: the Objective Forge runs exactly the recipes the inventory
+-- refuses (output is a registered node).
+H.current_modname = "sl_machine_crafting"
+local okf, errf = pcall(dofile, "mods/game/sl_machine_crafting/init.lua")
+check(okf, "machine crafting loads" .. (okf and "" or (" -> " .. tostring(errf))))
+check(sl_machine ~= nil and sl_machine.start_job ~= nil, "forge API exposed")
+
+-- Placeables are machine-only (§6.5 rule): both of these are
+-- registered nodes, so the inventory UI refuses BOTH. (The objective
+-- core carried a temporary sl_craft_in_inventory opt-in for the
+-- essence turn; the objective-loop turn removed it — the Forge is the
+-- route now.)
 local ainv = alpha:get_inventory()
 ainv:add_item("main", ItemStack("sl_modebase:loot_crate 2"))
 ainv:add_item("main", ItemStack("construction:plasma 5"))
 ainv:add_item("main", ItemStack("construction:fire 5"))
 ainv:add_item("main", ItemStack("construction:sparks 5"))
 
--- Gate regression: a non-opted node output stays machine-gated.
 H.fire_receive_fields("alpha", "crafting_system", { craft_13 = "", qty_13 = "1" })
 check(not ainv:contains_item("main", ItemStack("sl_modebase:monster_spawner")),
 	"machine-gated node output still refused in inventory crafting")
 
 local pool_before_craft = mm.essence_pool
 H.fire_receive_fields("alpha", "crafting_system", { craft_16 = "", qty_16 = "1" })
-check(ainv:contains_item("main", ItemStack("sl_modebase:objective_core 1")),
-	"objective core crafted through the button UI")
-check(mm.essence_pool == pool_before_craft + 3, "objective-core craft credits the pool +3")
-check(not ainv:contains_item("main", ItemStack("sl_modebase:loot_crate 2")),
-	"craft consumed the ingredients")
+check(not ainv:contains_item("main", ItemStack("sl_modebase:objective_core")),
+	"objective core is machine-gated too (no inventory opt-in any more)")
+check(mm.essence_pool == pool_before_craft, "a refused inventory craft credits no essence")
+check(ainv:contains_item("main", ItemStack("sl_modebase:loot_crate 2")),
+	"a refused craft consumes nothing")
+
+-- The machine route: feed the Forge and let it run.
+minetest.settings:set("sl_machine.forge_time", "2")
+local forge_pos = { x = 40, y = 5, z = 40 }
+minetest.set_node(forge_pos, { name = sl_machine.FORGE_NAME })
+minetest.registered_nodes[sl_machine.FORGE_NAME].on_construct(forge_pos)
+local finv = minetest.get_meta(forge_pos):get_inventory()
+for _, entry in ipairs(sl_machine.get_recipes()) do
+	if entry.recipe.output == "sl_modebase:objective_core" then core_entry = entry end
+end
+check(core_entry ~= nil, "the Objective Core is a machine recipe")
+ainv:remove_item("main", ItemStack("sl_modebase:loot_crate 2"))
+ainv:remove_item("main", ItemStack("construction:plasma 5"))
+ainv:remove_item("main", ItemStack("construction:fire 5"))
+ainv:remove_item("main", ItemStack("construction:sparks 5"))
+finv:add_item("src", ItemStack("sl_modebase:loot_crate 2"))
+finv:add_item("src", ItemStack("construction:plasma 5"))
+finv:add_item("src", ItemStack("construction:fire 5"))
+finv:add_item("src", ItemStack("construction:sparks 5"))
+
+local started_job = sl_machine.start_job(forge_pos, core_entry, "alpha")
+check(started_job == true, "forge accepts the core charge")
+check(mm.essence_pool == pool_before_craft, "starting a job credits nothing yet")
+H.advance(sl_machine.forge_time() + 1, 0.5)
+check(finv:contains_item("dst", ItemStack("sl_modebase:objective_core 1")),
+	"objective core produced by the Objective Forge")
+check(mm.essence_pool == pool_before_craft + 3,
+	"objective-core forge run credits the pool +3 (ruling §13.3 rule 2)")
+check(not finv:contains_item("src", ItemStack("sl_modebase:loot_crate 2")),
+	"the forge consumed the charge up front")
 
 -- A non-named craft credits nothing (equipment is not a named craft).
 ainv:add_item("main", ItemStack("sl_modebase:loot_crate 1"))

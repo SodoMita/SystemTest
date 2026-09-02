@@ -150,6 +150,10 @@ end
 
 local FLOOR_NODE = node_or("ground:square_neon", "default:glass")
 local WALL_NODE = node_or("ground:square_neon_opaque", "default:obsidianbrick")
+-- Machine crafting anchor. sl_machine_crafting is an optional
+-- dependency at heart: a game without it simply has no forge, and the
+-- objective chain falls back to "no deliverable core exists".
+local FORGE_NODE = "sl_machine_crafting:objective_forge"
 
 local function emerge_volume(minp, maxp)
 	if not minetest.load_area then return end
@@ -350,6 +354,10 @@ end
 --   beacon_a / beacon_b : the beacon node; player spawn = anchor + 1 up
 --   altar               : the ghost altar node
 --   mm_pad              : spawn_mm node; MM player spawn = anchor + 1 up
+--   forge               : the Objective Forge node (machine crafting —
+--                         the only place a placeable output can be made).
+--                         Optional: a descriptor built before the forge
+--                         existed simply has no forge on that map.
 --   lobby               : player STAND position (not a node anchor)
 local function apply_spawns(anchor)
 	local function spawn_of(pos)
@@ -399,6 +407,12 @@ local function place_anchor_nodes(anchor)
 	if minetest.registered_nodes[game_mode.modname .. ":monster_spawner"] then
 		local sp = { x = anchor.mm_pad.x, y = anchor.mm_pad.y, z = anchor.mm_pad.z + 1 }
 		write_node(sp, game_mode.modname .. ":monster_spawner")
+	end
+	-- The Objective Forge is the machine half of the crafting rule: any
+	-- map that resolves a forge anchor gets one, re-placed (and so
+	-- re-initialized) by every reset.
+	if anchor.forge and minetest.registered_nodes[FORGE_NODE] then
+		write_node(anchor.forge, FORGE_NODE)
 	end
 end
 
@@ -516,6 +530,13 @@ local function build_procedural(opts)
 	ensure_platform({ x = origin.x, y = fy + 1, z = origin.z }, WALL_NODE)
 	anchor.altar = { x = origin.x, y = fy + 1, z = origin.z }
 
+	-- Objective Forge: ONE per arena, on neutral ground a few nodes off
+	-- the midfield altar (MASTER_DESIGN_FULL §6.10 B — "1 per map,
+	-- neutral, loud"). Overridable in X,Z like every other anchor.
+	local forge2 = layout_or("forge", { x = origin.x, z = origin.z + 4 })
+	ensure_platform({ x = forge2.x, y = fy + 1, z = forge2.z }, WALL_NODE)
+	anchor.forge = { x = forge2.x, y = fy + 1, z = forge2.z }
+
 	-- Monster Master redoubt, by default at +Z; overridable X,Z.
 	local mm2 = layout_or("mm_base", { x = origin.x, z = origin.z + W - 6 })
 	for dx = -3, 3 do
@@ -602,6 +623,58 @@ local function build_procedural(opts)
 		i = i + 1
 	end
 
+	-- SALVAGE VEINS — the raw material of the machine chain. The floor
+	-- is square_neon and the perimeter is its opaque twin, so without a
+	-- source for the three exotic neon types the Objective Core chain
+	-- (scavenge -> forge -> deliver) can never run inside a match. Two
+	-- mirrored clusters per type, seeded like the cover blocks; they sit
+	-- ON the floor (y = fy + 1) and never in it, so scavenging never
+	-- punches a hole in the arena.
+	local VEIN_TYPES = {
+		"ground:square_neon",
+		"ground:rhombus_neon",
+		"ground:x_neon",
+		"ground:x2_neon",
+	}
+	local function vein_clear(vx, vz)
+		if math.abs(vx) <= 3 and math.abs(vz) <= 3 then return false end -- altar
+		if math.abs(vx - (forge2.x - origin.x)) <= 2
+			and math.abs(vz - (forge2.z - origin.z)) <= 2 then return false end
+		for _, bp in ipairs({ beacon_a2, beacon_b2 }) do
+			if math.abs(vx - (bp.x - origin.x)) <= 3
+				and math.abs(vz - (bp.z - origin.z)) <= 3 then return false end
+		end
+		if math.abs(vx - (mm2.x - origin.x)) <= 4
+			and math.abs(vz - (mm2.z - origin.z)) <= 4 then return false end
+		return true
+	end
+	local vein_spots = {}
+	local vein_guard = 0
+	local vein_want = #VEIN_TYPES * 2
+	while #vein_spots < vein_want and vein_guard < vein_want * 40 do
+		vein_guard = vein_guard + 1
+		local vx = rng_int(rng, -(W - 5), W - 5)
+		local vz = rng_int(rng, -(W - 5), W - 5)
+		if vein_clear(vx, vz) then
+			local clash = false
+			for _, sp in ipairs(vein_spots) do
+				if math.abs(sp[1] - vx) < 6 and math.abs(sp[2] - vz) < 6 then clash = true end
+			end
+			if not clash then table.insert(vein_spots, { vx, vz }) end
+		end
+	end
+	for i, spot in ipairs(vein_spots) do
+		local vnode = node_or(VEIN_TYPES[((i - 1) % #VEIN_TYPES) + 1], FLOOR_NODE)
+		for _, m in ipairs({ { 1, 1 }, { -1, -1 } }) do
+			local bx, bz = origin.x + spot[1] * m[1], origin.z + spot[2] * m[2]
+			for dx = 0, 1 do
+				for dz = 0, 1 do
+					write_node({ x = bx + dx, y = fy + 1, z = bz + dz }, vnode)
+				end
+			end
+		end
+	end
+
 	map.building = false
 
 	-- Reset box must contain every layout anchor, even when overrides
@@ -609,7 +682,7 @@ local function build_procedural(opts)
 	-- nodes inside it, and outside it the journal restores edits.
 	local minp = { x = origin.x - W - 1, y = fy - 2, z = lz - 7 }
 	local maxp = { x = origin.x + W + 1, y = fy + 6, z = origin.z + W + 2 }
-	for _, a in ipairs({ anchor.beacon_a, anchor.beacon_b, anchor.mm_pad }) do
+	for _, a in ipairs({ anchor.beacon_a, anchor.beacon_b, anchor.mm_pad, anchor.forge }) do
 		minp.x = math.min(minp.x, a.x - 4)
 		minp.z = math.min(minp.z, a.z - 4)
 		maxp.x = math.max(maxp.x, a.x + 4)
@@ -633,6 +706,7 @@ local function build_procedural(opts)
 			beacon_a = { x = anchor.beacon_a.x, z = anchor.beacon_a.z },
 			beacon_b = { x = anchor.beacon_b.x, z = anchor.beacon_b.z },
 			mm_base = { x = anchor.mm_pad.x, z = anchor.mm_pad.z },
+			forge = { x = anchor.forge.x, z = anchor.forge.z },
 		},
 	}
 end
@@ -733,9 +807,11 @@ local function build_schematic(opts)
 		{ x = math.floor(source.size.x / 2), y = 1, z = 2 })
 	anchor.ghost = rel_world("ghost.pos",
 		{ x = math.floor(source.size.x / 2), y = source.size.y + 12, z = math.floor(source.size.z / 2) })
+	anchor.forge = rel_world("forge.pos",
+		{ x = math.floor(source.size.x / 2), y = source.size.y, z = math.floor(source.size.z / 2) + 4 })
 
 	-- Solid ground under every anchor that sits in the air.
-	for _, key in ipairs({ "beacon_a", "beacon_b", "altar", "mm_pad", "lobby" }) do
+	for _, key in ipairs({ "beacon_a", "beacon_b", "altar", "mm_pad", "lobby", "forge" }) do
 		ensure_platform(anchor[key], WALL_NODE)
 	end
 	place_anchor_nodes(anchor)
@@ -817,12 +893,14 @@ local function serialize_descriptor(desc)
 			mm_pad = clean_pos(desc.anchor.mm_pad),
 			lobby = clean_pos(desc.anchor.lobby),
 			ghost = clean_pos(desc.anchor.ghost),
+			forge = clean_pos(desc.anchor.forge),
 		},
 		layout = desc.layout and {
 			cage = clean_pair(desc.layout.cage),
 			beacon_a = clean_pair(desc.layout.beacon_a),
 			beacon_b = clean_pair(desc.layout.beacon_b),
 			mm_base = clean_pair(desc.layout.mm_base),
+			forge = clean_pair(desc.layout.forge),
 		} or nil,
 		mobs = mobs,
 		minp = clean_pos(desc.minp), maxp = clean_pos(desc.maxp),

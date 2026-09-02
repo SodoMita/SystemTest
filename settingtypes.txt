@@ -67,6 +67,13 @@ sl_map.cage_pos (Procedural cloud cage position) string
 sl_map.beacon_a_pos (Procedural beacon A position) string
 sl_map.beacon_b_pos (Procedural beacon B position) string
 sl_map.mm_base_pos (Procedural MM redoubt position) string
+sl_map.forge_pos (Procedural Objective Forge position) string
+
+# Machine crafting (§6.5 / §6.10): the Objective Forge is the only
+# place a placeable output can be made. This is the processing time of
+# one run, in seconds — the run is announced to every player when it
+# starts, so this is how long the whole arena knows where you are.
+sl_machine.forge_time (Objective Forge run time) int 20 1 300
 
 # Legacy behavior: spawn a fixed budget of monsters once during
 # worldgen around the origin. Off by default — mobs are match

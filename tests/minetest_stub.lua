@@ -625,6 +625,76 @@ function minetest.get_meta(pos)
 	return metas[h]
 end
 
+-- ----------------------------------------------------------------
+-- Node timers (engine semantics)
+-- ----------------------------------------------------------------
+-- start(t) arms a timer that fires the node def's on_timer(pos,
+-- elapsed) after t seconds; on_timer returning true re-arms it with
+-- the same interval, returning false (or nil) stops it. Timers are
+-- driven from M.step below, so H.advance() runs them like the engine
+-- does — the machine crafting suite depends on this.
+local node_timers = {}   -- [pos_hash] = { timeout = n, elapsed = n }
+
+local NodeTimerMeta = {}
+NodeTimerMeta.__index = NodeTimerMeta
+function NodeTimerMeta:set(timeout, elapsed)
+	node_timers[self._hash] = {
+		timeout = math.max(0, tonumber(timeout) or 0),
+		elapsed = math.max(0, tonumber(elapsed) or 0),
+	}
+end
+function NodeTimerMeta:start(timeout) self:set(timeout, 0) end
+function NodeTimerMeta:stop() node_timers[self._hash] = nil end
+function NodeTimerMeta:is_started() return node_timers[self._hash] ~= nil end
+function NodeTimerMeta:get_timeout()
+	local t = node_timers[self._hash]
+	return t and t.timeout or 0
+end
+function NodeTimerMeta:get_elapsed()
+	local t = node_timers[self._hash]
+	return t and t.elapsed or 0
+end
+function NodeTimerMeta:get_remaining() return self:get_timeout() end
+
+function minetest.get_node_timer(pos)
+	return setmetatable({ _hash = vhash(pos), _pos = pos }, NodeTimerMeta)
+end
+
+M.node_timer_pos = {}   -- [pos_hash] = pos, so a timer knows its node
+
+function M.run_node_timers(dtime)
+	for hash, timer in pairs(node_timers) do
+		local t = node_timers[hash]
+		if t then
+			t.elapsed = t.elapsed + dtime
+			if t.elapsed >= t.timeout then
+				local elapsed = t.elapsed
+				t.elapsed = 0
+				local pos = M.node_timer_pos[hash]
+				if pos then
+					local name = M.voxels[hash] or "air"
+					local def = minetest.registered_nodes[name]
+					if def and def.on_timer then
+						local keep = def.on_timer(pos, elapsed)
+						if not keep and node_timers[hash] == t then
+							node_timers[hash] = nil
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+-- Remember where each timer was armed: M.run_node_timers needs the
+-- position back from the hash.
+local raw_get_node_timer = minetest.get_node_timer
+minetest.get_node_timer = function(pos)
+	local timer = raw_get_node_timer(pos)
+	M.node_timer_pos[vhash(pos)] = { x = pos.x, y = pos.y, z = pos.z }
+	return timer
+end
+
 -- Entities / items in world: both go through the single rich object
 -- factory below (make_entity_object), so item entities carry the full
 -- ObjectRef surface (get_hp, punch, get_velocity, ...) the same way
@@ -1063,6 +1133,9 @@ M.step = function(dtime)
 		local ok, err = pcall(fn, dtime)
 		if not ok then minetest.log("error", "globalstep: " .. tostring(err)) end
 	end
+	-- Node timers (machine crafting, furnaces, ...): the engine fires
+	-- them once globalsteps have run.
+	M.run_node_timers(dtime)
 	-- Iterate a snapshot: on_step may remove/spawn entities mid-loop
 	-- (mortar explodes, corpse collapses) — the real engine tolerates
 	-- that, so the stub must too.

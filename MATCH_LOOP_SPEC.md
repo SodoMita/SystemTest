@@ -333,6 +333,13 @@ The harness should support deterministic scenarios:
 10. The same match is started again without stale state.
 11. The objective path collects resources, routes them through a machine-only craft step, creates the Objective Core, and wins by delivery.
 
+The machine step is the **Objective Forge** (`sl_machine_crafting`), one per
+map at the neutral `forge` anchor: place the charge in its input slots, run
+it (time-gated, one job at a time, announced to every player with the
+forge's coordinates), collect the output. The charge is consumed up front
+and a run abandoned by the match end is forfeit — the machine owns the
+risk. Placeables cannot be made in the inventory at all.
+
 Headless objective smoke test command, creative mode only:
 
 ```text

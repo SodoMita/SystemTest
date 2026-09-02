@@ -1,14 +1,25 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-02 (rev 5)
+**Date:** 2026-09-02 (rev 6)
 **Rev 4 adds:** the map system and the MM-essence ruling (see §0.4).
 **Rev 5 adds:** the MM essence engine (the §13.3 ruling, shipped): node
 provenance, `groups.sl_essence_value` pricing on the craftable output defs, the
-per-match pool with spawner pool-first spend, the named objective-core +3 craft
-through the button crafting UI, the no-MM ambient-hazard security units at
-thresholds, and the `/sl_state` + spawner-GUI readouts. Covered by the new
-stub-only `tests/essence_test.lua` (61 assertions), wired into the `soak` CI gate
-between the weapons turbo soak and the live-engine soak.
+per-match pool with spawner pool-first spend, the named objective-core +3 craft,
+the no-MM ambient-hazard security units at thresholds, and the `/sl_state` +
+spawner-GUI readouts. Covered by the stub-only `tests/essence_test.lua`, wired
+into the `soak` CI gate.
+**Rev 6 adds:** the **crafting-to-objective loop** (§5.4, the long-standing
+"wedged" item). `sl_machine_crafting` is now a real mod — the **Objective
+Forge**, one per map at the new `forge` anchor, running exactly the recipes the
+inventory UI refuses (same predicate, one recipe registry, no duplication).
+The temporary `sl_craft_in_inventory` opt-in on the Objective Core is **gone**:
+placeables come only from the machine, as §6.5 requires. Salvage veins are
+seeded on the procedural and test arenas — before this, the three exotic neon
+types existed on no map at all, so the chain was literally unwinnable — and the
+refine branch is rebalanced so a full run is five forge runs / twenty dug nodes.
+`game_mode.run_headless_objective_test()` (`/sl_test_objective`) no longer
+*narrates* the steps, it performs them. Covered by the new stub-only
+`tests/objective_loop_test.lua` (99 assertions), wired into the `soak` CI gate.
 **Branch:** `arena/01a05980-systemtest`
 **Base:** `master` @ `457ccb9`
 **Purpose:** read every remote branch, the docs, and the full agent mailbox, then
@@ -155,7 +166,8 @@ here is a history merge across roots.
 | `luajit tests/strand_test.lua` | 84/84 |
 | `luajit tests/weapons_test.lua` | 288/288 (was: crash on missing stub `modpaths`, then 6+ real failures) |
 | `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors; map RNG pinned for a deterministic bot stream) |
-| `luajit tests/essence_test.lua` | 61/61 (rev 5: provenance, pricing, pool reset, +3 core craft, ambient hazard thresholds, scoreboard untouched, readouts) |
+| `luajit tests/essence_test.lua` | 69/69 (rev 5: provenance, pricing, pool reset, +3 core craft — now routed through the Forge, ambient hazard thresholds, scoreboard untouched, readouts) |
+| `luajit tests/objective_loop_test.lua` | 99/99 (rev 6: forge anchor + materialization, salvage veins, inventory refuses every placeable, single-job/time-gated/loud forge runs, refine + core assembly, +3 essence on the core, delivery refusals, winning delivery, reset, forfeit, access control, `/sl_test_objective` performs the chain) |
 | sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 37 textures are 16×16 solid-colour placeholders (art baseline still deferred) |
 
 CI runs the new suites: `agent-mail` workflow (lint + unit tests) and the `soak`
@@ -197,6 +209,11 @@ therefore teed up as the next scoped steps (see §5, the owner decisions).
    wear, every death route, corpse burial/cremation, and tournament scoring all need a
    live soak the way `WEAPONS_SPEC` and `docs/jax_weapon_audit.md` describe. The stub
    suites validate the branch; the live soak is still an open step.
+7. **Two-station Core (rev 6, deferred).** §6.10 B's Assembly Station →
+   `core_frame` → Objective Forge split, plus the remaining four stations
+   (Salvage Bench, Precision Fabricator, Signal Terminal) and the intermediate
+   item set they need. Every machine-gated recipe runs at the single Forge
+   today; splitting it is a content task, not a plumbing task.
 
 ---
 
@@ -210,11 +227,24 @@ Drawn from `MASTER_DESIGN_FULL.md` §17 and the assessment snapshot:
    deterministic `test`; keep `procedural` only if the design docs are revised.
 3. **Weapons integration order** — map lifecycle first, then weapons core, then
    corpse/sentry/grapple/fabricator/tournament in slices, then art.
-4. **Real crafting-to-objective loop** — `objective_core`/machine-gate is still a
-   placeholder; the acceptance test must exercise actual salvage → machine → core →
-   delivery → match end.
+4. ~~**Real crafting-to-objective loop**~~ **— shipped in rev 6.** The Objective
+   Forge is the machine step; salvage veins make the raw material obtainable;
+   `tests/objective_loop_test.lua` exercises the real chain end to end. Still
+   open (smaller): the §6.10 B plan wants **two** stations and a `core_frame`
+   intermediate, which needs an item set (`metal_ingot`, `circuit_board`,
+   `energy_crystal`, `hardened_plate`, `reinforced_glass`) that does not exist
+   as content yet — see §4.7.
 5. **Green web release** — the WASM build fails (exit 77); `gh-pages` is not being
    advanced until it is fixed/made diagnosable.
+
+**Ruled since rev 5 (owner, 2026-09-02):**
+
+8. **The machine chain lands in the objective-loop turn.** Recorded in the
+   code at the point it mattered: `sl_modebase:objective_core` carried
+   `sl_craft_in_inventory = 1` explicitly "until the machine chain lands
+   (objective-loop turn)". Rev 6 built the machine and removed the opt-in,
+   restoring the §6.5 rule that placeables come only from machines. The +3
+   craft credit (ruling 7) is unchanged — it now fires from the Forge.
 
 **Ruled since rev 3 (owner, 2026-09-02):**
 

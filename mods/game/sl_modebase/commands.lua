@@ -79,6 +79,20 @@ minetest.register_chatcommand("sl_state", {
 		if state.match_active then
 			table.insert(parts, S("Essence pool: @1",
 				tostring(state.monster_master.essence_pool or 0)))
+			-- Machine crafting readout: is the Objective Forge busy,
+			-- and with what? (§6.10 B — the run is public knowledge.)
+			if sl_machine and sl_machine.status then
+				local st = sl_machine.status()
+				if st and st.present then
+					if st.running then
+						table.insert(parts, S("Forge: @1 (@2s left)",
+							st.description or st.output or "?",
+							tostring(math.ceil(st.left or 0))))
+					else
+						table.insert(parts, S("Forge: idle"))
+					end
+				end
+			end
 		end
 		if pl.eliminated then
 			table.insert(parts, S("(Eliminated)"))
