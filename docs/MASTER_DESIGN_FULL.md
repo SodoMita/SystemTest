@@ -353,6 +353,20 @@ evil ghost).
 
 ### 6.10 Missing — now specified (this section was a list; here is the design)
 
+> **Authority note (session 2).** Zh'tharr filed `docs/MASTER_DESIGN_FILL.md`
+> (305 lines) covering the same gap independently and in more depth. **His §A–§D
+> are canonical** for the Objective Core, the five stations, the revival kits and
+> the seven reading sets; what follows is kept because it carries four decisions his
+> version does not (stack limit, corpse-lootability, the movement constraint on the
+> forge, and the "paid before you die" framing of the kits), and §6.11 records where
+> the two documents disagree. Adopted from his fill wholesale: the diegetic label
+> **ATTESTATION CARTRIDGE, FORM 4412-B**, the two intermediates
+> (`attestation_spindle`, `containment_lattice`), the **required Signal Terminal
+> reading** before the forge fires, the station file labels and build costs, and
+> **four** revival kits (Stalker / Dredger / Wraith / Brute — Containment stays a
+> sealed-door event, never a kit) in place of the three named below.
+
+
 **A. `sl_modebase:objective_core` — the win item.** Highest priority; without it the
 crafting tree has no destination.
 
@@ -407,6 +421,40 @@ between reports.*
 - **A floor sweep.** Nothing clears dropped item entities at match end; the engine's
   unset `item_entity_ttl` (default 900 s) is currently the only cleanup. See §14.6.
 - **`state.win_conditions.objective`** has a flag and no implementation (§10.1).
+
+### 6.11 Reconciliation of the two fills (three conflicts, resolved)
+
+**R1 — the Core plus the missing floor sweep is a next-match instant win. Blocker.**
+`MASTER_DESIGN_FILL` §A says a dropped core "the §7f sweep clears it at match end."
+It does not: `W.sweep_scene()` (`corpses.lua:489-514`) is a **whitelist** over
+mod-created corpses, deadwalks and traces, and **nothing in the game sweeps item
+entities** — the only cleanup is the engine's unset `item_entity_ttl` (900 s
+default). So a finished Core dropped on death lies on the floor, and a match that
+starts within fifteen minutes can be won by whoever walks over it. Resolution, and
+it promotes a cosmetic item to a Phase-1 blocker:
+
+- the Core registers itself into `W.traces` (or an equivalent whitelist) on drop so
+  the existing match-end sweep destroys it, **and**
+- the general floor sweep of §14.6 lands in the same pass, **and**
+- `item_entity_ttl` is set explicitly rather than inherited.
+
+**R2 — where the Objective Forge stands.** His §B builds all five stations from
+salvage and places them; this document specified the Forge as arena-fixed, neutral
+and loud. A player-built forge can be raised inside a defended room, and then the
+endgame never travels — the Core stops being contestable, which is the property that
+makes it a social object instead of a fetch quest. Resolution: **the Forge is
+arena-fixed and neutral, like the Salvage Bench**; the other four stay player-built.
+If the owner prefers a buildable forge, then completing one must emit a map-wide,
+position-revealing sound in the crack class (§15.1) — the room may be yours, but
+everyone learns where it is.
+
+**R3 — the loaded reading is station state, never player state.** The required
+Signal Terminal reading is an excellent gate: it ties the win to the information
+channel and gives the other side a legible target. One §14 condition on it — the
+"reading loaded" flag lives on the **station**, not on the player who loaded it. A
+per-player flag would be a readout about a living participant (oracle, all three
+questions); a station flag is a fact about a place, and a place can be watched,
+taken, or destroyed.
 
 ## 7. Roles & match composition (who's in the match)
 
