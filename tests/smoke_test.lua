@@ -640,7 +640,10 @@ local list_ok, list_msg = minetest.registered_chatcommands.sl_map.func("alpha", 
 check(list_ok == true and tostring(list_msg):find("mini_test") ~= nil
 	and tostring(list_msg):find("neon_crossfire") ~= nil,
 	"/sl_map lists installed handmade maps")
-H.player_privs.alpha = { server = true } -- stub treats server as admin
+-- The stub answers check_player_privs the way the engine does now: it checks
+-- the privileges the caller actually asked for. /sl_map's admin branch asks
+-- for sl_admin, so hold sl_admin (server alone no longer smuggles through).
+H.player_privs.alpha = { server = true, sl_admin = true }
 H.schematic_placements = {}
 mmap.prepare({ type = "schematic", name = "mini_test", seed = 5 })
 local sd = mmap.current

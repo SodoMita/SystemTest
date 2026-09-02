@@ -48,7 +48,13 @@ def main() -> int:
 
     try:
         lua.execute(f'return dofile("{script.as_posix()}")')
-    except lupa.LuaError as e:
+    except Exception as e:
+        # lupa exposes a *different* LuaError class per runtime
+        # (lupa.LuaError is the default runtime's, lupa.lua51.LuaError is this
+        # one's, and neither subclasses the other), so catching the named class
+        # silently misses every raise from a lua51 script -- including the
+        # intercepted os.exit(). A passing suite then exited 1 with a
+        # traceback, which is how a green run learned to look red.
         if "__script_exit__" not in str(e):
             print(str(e), file=sys.stderr)
             return 1

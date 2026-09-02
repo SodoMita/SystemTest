@@ -493,6 +493,20 @@ function M.fire_punchplayer(player, hitter, time_from_last_punch, tool_capabilit
 	return canceled
 end
 
+-- Drive a chat command the way the engine does: look the definition up,
+-- enforce its declared `privs`, then call func(name, param). Mods must never
+-- call `def.func` themselves for a client-driven action -- that skips the
+-- privilege gate (see tests/security_test.lua and sl_gui's invoke_command).
+function M.fire_chatcommand(name, cmd, param)
+	local def = minetest.registered_chatcommands[cmd]
+	if not def then return false, "command not found: " .. tostring(cmd) end
+	local ok, missing = minetest.check_player_privs(name, def.privs or {})
+	if not ok then
+		return false, "missing privileges: " .. table.concat(missing or {}, ", ")
+	end
+	return def.func(name, param)
+end
+
 function M.fire_receive_fields(name, formname, fields)
 	local player = M.players[name]
 	for _, fn in ipairs(handlers.player_receive_fields) do
@@ -525,9 +539,36 @@ function minetest.get_player_privs(name)
 	return M.player_privs[name]
 end
 function minetest.set_player_privs(name, privs) M.player_privs[name] = privs end
-function minetest.check_player_privs(name, _)
+-- FIDELITY: the engine answers the question that was asked. The old stub
+-- ignored the requested set and answered "does this player hold `server`?",
+-- which makes every privilege gate in the game untestable: an sl_admin-only
+-- command failed for an sl_admin, and a `server`-holding player passed gates
+-- they were never meant to pass. Accepts both spellings the engine accepts
+-- ({ priv = true } and { "priv" }).
+function minetest.check_player_privs(name, ...)
+	-- The engine accepts a player object or a name (core.is_player).
+	if type(name) ~= "string" then
+		if type(name) == "table" and name.is_player and name:is_player() then
+			name = name:get_player_name()
+		else
+			error("minetest.check_player_privs expects a player or playername as argument")
+		end
+	end
 	local privs = minetest.get_player_privs(name)
-	return privs.server == true
+	local requested = { ... }
+	local missing = {}
+	if type(requested[1]) == "table" then
+		for priv, value in pairs(requested[1]) do
+			if value and not privs[priv] then missing[#missing + 1] = priv end
+		end
+	else
+		for _, priv in pairs(requested) do
+			if not privs[priv] then missing[#missing + 1] = priv end
+		end
+	end
+	table.sort(missing)
+	if #missing > 0 then return false, missing end
+	return true, ""
 end
 
 -- Chat
@@ -558,6 +599,17 @@ function minetest.after(seconds, fn)
 end
 
 -- Serialize/deserialize (Lua-source based; enough for spawn tables)
+--
+-- FIDELITY: these mirror the engine contract, not a convenient shorthand.
+-- `core.serialize` returns a CHUNK (its text starts with "local _={}" or
+-- "return"), and `core.deserialize(str, safe)` loadstring()s that text AS-IS
+-- and runs it inside a sandbox env holding only `inf`, `nan` and `loadstring`
+-- (builtin/common/serialize.lua). The previous pair here prepended "return "
+-- on deserialize instead, which is self-consistent but engine-incompatible in
+-- both directions: it accepts a bare expression the engine would reject, and
+-- it hides every "deserialize untrusted input" bug from the headless suites
+-- (a payload chunk runs with the mod's full globals here, and not at all
+-- there). Keep them faithful -- tests/security_test.lua depends on it.
 function minetest.serialize(value)
 	local function ser(v)
 		local t = type(v)
@@ -575,16 +627,34 @@ function minetest.serialize(value)
 		end
 		error("cannot serialize type " .. t)
 	end
-	return ser(value)
+	return "return " .. ser(value)
 end
-function minetest.deserialize(str)
-	if not str or str == "" then return nil end
-	local fn, err = loadstring("return " .. str)
+function minetest.deserialize(str, safe)
+	if str == nil or str == "" then return nil end
+	if type(str) ~= "string" then return nil, "expected a string" end
+	local fn, err = loadstring(str)
 	if not fn then
 		minetest.log("error", "deserialize failed: " .. tostring(err))
-		return nil
+		return nil, err
 	end
-	return fn()
+	-- Engine sandbox: no _G, no minetest, no io/os/string -- only these three.
+	local env = { inf = math.huge, nan = 0 / 0 }
+	if safe then
+		env.loadstring = function() end
+	else
+		env.loadstring = function(inner, ...)
+			local f, e = loadstring(inner, ...)
+			if f then
+				setfenv(f, env)
+				return f
+			end
+			return nil, e
+		end
+	end
+	setfenv(fn, env)
+	local ok, value_or_err = pcall(fn)
+	if ok then return value_or_err end
+	return nil, value_or_err
 end
 
 -- World
