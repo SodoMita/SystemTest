@@ -2,19 +2,26 @@
 """
 tools/texgen_check.py — CI/dev companion for sl_texgen.
 
-The runtime texture generators (mods/apis/sl_texgen/gen/*.lua) replace
-retired stock PNG files.  This tool executes the *same Lua code* under
-an embedded Lua 5.1 runtime (lupa, mirroring tests/run_lua51.py) and:
+The runtime texture pipeline compiles every generated texture to a
+pure "[combine:..." program that the CLIENT renders (see
+mods/apis/sl_texgen/stx.lua).  This tool executes the *same Lua
+generator code* under an embedded Lua 5.1 runtime (lupa, mirroring
+tests/run_lua51.py) and:
 
-  --verify    consistency between the generator registry and the repo:
-                * every registered texture must NOT exist as a file
-                  (they are deleted from the game; runtime supplies them)
-                * every PNG inside the governed texture directories must
-                  be registered (no orphans, nothing forgotten)
-                * every generated PNG is structurally valid
-  --export D  write all generated textures as real PNGs into D (and a
-                contact sheet D/_contact.png) for visual comparison
-  --report    print per-family byte counts of what no longer ships
+  --verify    full consistency gate:
+                * shared base textures (textures/stx_*.png) match a
+                  fresh deterministic regeneration
+                * every compiled program is executed by a reference
+                  interpreter (resize/multiply/opacity/sheet/combine)
+                  and produces an in-bounds image
+                * registered textures must NOT exist as repo files
+                * every PNG inside the governed texture directories
+                  must be registered
+                * game code must reference runtime textures through
+                  sl_texgen.texture()/icon() and declare the dep
+  --export D  execute all programs and write the resulting PNGs into
+              D (+ _contact.png) for visual comparison
+  --report    print program-string accounting
 
 Usage:
   python3 tools/texgen_check.py --verify
@@ -23,8 +30,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import base64
+import base64  # noqa: F401  (kept for parity with older exports)
 import collections
+import re
 import struct
 import sys
 import zlib
@@ -32,6 +40,26 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 TEXGEN = REPO / "mods/apis/sl_texgen"
+
+LUA_PRELUDE = r"""
+ROOT = %r
+textures = {}
+defs = {}
+stub = {}
+stub.get_current_modname = function() return "sl_texgen" end
+stub.get_modpath = function(name)
+  if name == "sl_texgen" then return ROOT .. "/mods/apis/sl_texgen" end
+  return nil
+end
+stub.settings = { get = function() return nil end }
+stub.log = function() end
+stub.register_chatcommand = function() end
+stub.get_dir_list = function() return {} end
+core = stub
+minetest = stub
+dofile(ROOT .. "/mods/apis/sl_texgen/init.lua")
+T = sl_texgen
+"""
 
 # Texture directories governed by the runtime pipeline.  The value is
 # either "*" (whole directory), a filename prefix ("sl_"), or — for a
@@ -42,16 +70,14 @@ GOVERNED = {
     "mods/content/sl_scary/textures": "*",
     "mods/content/workshops/textures": "*",
     "mods/game/sl_weapons/textures": "*",
-    "mods/content/sl_mvp_assets/textures": "*",
-    "mods/content/sl_clothing/textures": "*",
+    "mods/game/sl_modebase/textures": "sl_",
     "mods/apis/sl_formspec/textures": "*",
     "mods/apis/dignodes/textures": "*",
-    # sl_modebase: only the generated sl_* placeholder icons; the
-    # AI-drawn sl_warning_sign.png / sl_objective_core_icon.png stay.
-    "mods/game/sl_modebase/textures": "sl_",
-    # sl_gui: the generated gui_category_* labelled icons; the 16x16
-    # pixel-art tabs/slots/buttons are hand art and stay as files.
     "mods/apis/sl_gui/textures": "gui_category_",
+    # sl_mvp_assets/sl_clothing textures moved fully under the program
+    # pipeline too:
+    "mods/content/sl_mvp_assets/textures": "*",
+    "mods/content/sl_clothing/textures": "*",
 }
 
 # Files inside a claimed prefix that are intentionally NOT generated.
@@ -61,6 +87,11 @@ GOVERNED_EXEMPT = {
         "sl_objective_core_icon.png",
     },
 }
+
+BASES = [
+    "stx_px.png", "stx_glow.png", "stx_ring.png", "stx_noise.png",
+    "stx_noise_rgb.png", "stx_x.png", "stx_rhombus.png", "stx_font.png",
+]
 
 
 def claimed(dir_rel: str, fname: str) -> bool:
@@ -77,73 +108,33 @@ def claimed(dir_rel: str, fname: str) -> bool:
 
 
 # ----------------------------------------------------------------------
-# engine stub + registry dump, executed in embedded Lua 5.1
+# registry dump (embedded Lua)
 # ----------------------------------------------------------------------
 
-LUA_PRELUDE = r"""
-ROOT = %r
-textures = {}
-defs = {}
-stub = {}
-stub.get_current_modname = function() return "sl_texgen" end
-stub.get_modpath = function(name)
-  if name == "sl_texgen" then return ROOT .. "/mods/apis/sl_texgen" end
-  return nil
-end
-stub.settings = { get = function() return nil end }
-stub.log = function() end
-stub.encode_png = nil      -- exercise the pure-Lua fallback here
-stub.encode_base64 = nil
-stub.register_chatcommand = function() end
-stub.get_dir_list = function() return {} end
-core = stub
-minetest = stub
-dofile(ROOT .. "/mods/apis/sl_texgen/init.lua")
-T = sl_texgen
-textures = T.textures
-sheets = {}
-for _, d in ipairs(T.defs) do
-  local c = T.build_canvas(d)
-  sheets[d.name] = { w = c.w, h = c.h, px = c.px }
-end
-"""
-
-
-def build_registry():
+def build_registry() -> dict[str, dict]:
     import lupa.lua51
 
-    # encoding=None so Lua strings arrive as raw bytes (PNG data is binary)
     lua = lupa.lua51.LuaRuntime(unpack_returned_tuples=True, encoding=None)
-    lua.execute((LUA_PRELUDE % str(REPO)))
+    lua.execute(LUA_PRELUDE % str(REPO))
     T = lua.globals().T
-    sheets = lua.globals().sheets
-    textures = lua.globals().textures
     registry = {}
     for i in range(1, len(T.defs) + 1):
         d = T.defs[i]
-        # encoding=None runtime: Lua string values/keys arrive as bytes
-        name = d[b"name"].decode()
+        bname = d[b"name"]
+        name = bname.decode()
         frames = int(d[b"frames"] or 1)
         vertical = bool(d[b"vertical"])
-        sheet = sheets[name.encode()]
-        w = int(sheet[b"w"])
-        h = int(sheet[b"h"])
-        px = bytearray(w * h * 4)
-        for i2 in range(w * h * 4):
-            px[i2] = int(sheet[b"px"][i2 + 1] or 0)
-        tex = textures[name.encode()]
-        assert tex.startswith(b"[png:"), name
+        program = T.textures[bname]
         registry[name] = {
-            "w": w, "h": h, "px": bytes(px),
+            "w": int(d[b"w"]), "h": int(d[b"h"]),
             "frames": frames, "vertical": vertical,
-            "modifier": tex.decode("ascii"),
-            "png": base64.b64decode(tex[5:]),
+            "program": program.decode("ascii"),
         }
     return registry
 
 
 # ----------------------------------------------------------------------
-# PNG output + structural decode (stdlib only)
+# PNG I/O (stdlib only)
 # ----------------------------------------------------------------------
 
 def write_png(path: Path, w: int, h: int, px: bytes) -> None:
@@ -163,7 +154,7 @@ def write_png(path: Path, w: int, h: int, px: bytes) -> None:
 
 
 def read_png(path: Path):
-    """Decode an 8-bit RGBA/palette PNG (stdlib only). Returns (w,h,rgba bytes)."""
+    """Decode an 8-bit RGBA/palette PNG (stdlib only). Returns (w,h,rgba)."""
     data = path.read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n", path
     pos, idat, trns, plte = 8, b"", None, None
@@ -233,32 +224,180 @@ def read_png(path: Path):
     return w, h, bytes(out)
 
 
-def validate_png_bytes(png: bytes, name: str) -> str | None:
-    """Return None if structurally valid, else a reason."""
-    if png[:8] != b"\x89PNG\r\n\x1a\n":
-        return "bad signature"
-    pos = 8
-    seen_ihdr = False
-    while pos + 12 <= len(png):
-        ln = struct.unpack(">I", png[pos:pos + 4])[0]
-        typ = png[pos + 4:pos + 8]
-        cdata = png[pos + 8:pos + 8 + ln]
-        crc = struct.unpack(">I", png[pos + 8 + ln:pos + 12 + ln])[0]
-        if zlib.crc32(typ + cdata) & 0xFFFFFFFF != crc:
-            return f"{typ!r} chunk CRC mismatch"
-        if typ == b"IHDR":
-            seen_ihdr = True
-            w, h = struct.unpack(">II", cdata[:8])
-            if w == 0 or h == 0 or w > 4096 or h > 4096:
-                return f"implausible dims {w}x{h}"
-        pos += 12 + ln
-        if typ == b"IEND":
-            return None
-    return "IEND missing" if seen_ihdr else "no IHDR"
+# ----------------------------------------------------------------------
+# reference [combine interpreter
+# ----------------------------------------------------------------------
+
+def split_unescaped(s: str, sep: str) -> list[str]:
+    parts, cur, i = [], [], 0
+    while i < len(s):
+        c = s[i]
+        if c == "\\":
+            cur.append(c)
+            cur.append(s[i + 1] if i + 1 < len(s) else "")
+            i += 2
+        elif c == sep:
+            parts.append("".join(cur))
+            cur = []
+            i += 1
+        else:
+            cur.append(c)
+            i += 1
+    parts.append("".join(cur))
+    return parts
+
+
+unescape = lambda s: re.sub(r"\\(.)", r"\1", s)
+
+
+def resize_img(img, tw, th):
+    """Box-average resample (w,h,rgba) -> (tw,th,rgba)."""
+    w, h, px = img
+    out = bytearray(tw * th * 4)
+    for y in range(th):
+        sy0, sy1 = y * h // th, max(y * h // th + 1, (y + 1) * h // th)
+        for x in range(tw):
+            sx0, sx1 = x * w // tw, max(x * w // tw + 1, (x + 1) * w // tw)
+            r = g = b = a = n = 0
+            for yy in range(sy0, min(sy1, h)):
+                for xx in range(sx0, min(sx1, w)):
+                    o = (yy * w + xx) * 4
+                    r += px[o]
+                    g += px[o + 1]
+                    b += px[o + 2]
+                    a += px[o + 3]
+                    n += 1
+            o = (y * tw + x) * 4
+            out[o], out[o + 1], out[o + 2], out[o + 3] = (
+                r // n, g // n, b // n, a // n)
+    return tw, th, bytes(out)
+
+
+def apply_term(img, op):
+    """Apply one '^[kind:args' op (unescaped) to an image."""
+    m = re.match(r"^\[([a-z]+):?(.*)$", op)
+    assert m, f"bad op {op!r}"
+    kind, args = m.group(1), m.group(2)
+    w, h, px = img
+    if kind == "resize":
+        tw, th = (int(v) for v in re.match(r"^(\d+)x(\d+)$", args).groups())
+        return resize_img(img, tw, th)
+    if kind == "multiply":
+        r0, g0, b0 = (int(args[i:i + 2], 16) for i in (1, 3, 5))
+        out = bytearray(px)
+        for i in range(w * h):
+            o = i * 4
+            out[o] = px[o] * r0 // 255
+            out[o + 1] = px[o + 1] * g0 // 255
+            out[o + 2] = px[o + 2] * b0 // 255
+        return w, h, bytes(out)
+    if kind == "opacity":
+        n = int(args)
+        out = bytearray(px)
+        for i in range(w * h):
+            out[i * 4 + 3] = px[i * 4 + 3] * n // 255
+        return w, h, bytes(out)
+    if kind == "sheet":
+        m2 = re.match(r"^(\d+)x(\d+):(\d+),(\d+)$", args)
+        tw, th, tx, ty = (int(v) for v in m2.groups())
+        cw, chh = w // tw, h // th
+        out = bytearray(cw * chh * 4)
+        for y in range(chh):
+            so = ((ty * chh + y) * w + tx * cw) * 4
+            o = (y * cw) * 4
+            out[o:o + cw * 4] = px[so:so + cw * 4]
+        return cw, chh, bytes(out)
+    raise AssertionError(f"interpreter: unsupported modifier [{kind}")
+
+
+def over(canvas, img, x, y):
+    cw, ch, cpx = canvas
+    w, h, px = img
+    out = bytearray(cpx)
+    for yy in range(max(0, y), min(ch, y + h)):
+        for xx in range(max(0, x), min(cw, x + w)):
+            so = ((yy - y) * w + (xx - x)) * 4
+            sa = px[so + 3] / 255.0
+            t = (yy * cw + xx) * 4
+            da = out[t + 3] / 255.0
+            oa = sa + da * (1 - sa)
+            if oa <= 0:
+                continue
+            k0, k1 = sa / oa, (da * (1 - sa)) / oa
+            for k in range(3):
+                out[t + k] = int(px[so + k] * k0 + out[t + k] * k1)
+            out[t + 3] = int(oa * 255)
+    return cw, ch, bytes(out)
+
+
+def execute_program(program: str, bases: dict) -> tuple[int, int, bytes]:
+    """Run a compiled sl_texgen program; returns (w,h,rgba)."""
+    finishing = []
+    core = program
+    if core.startswith("("):
+        close = core.index(")")
+        finishing = [unescape(p) for p in re.split(r"(?<!\\)\^", core[close + 1:]) if p]
+        core = core[1:close]
+    m = re.match(r"^\[combine:(\d+)x(\d+):?(.*)$", core, re.S)
+    assert m, f"not a combine program: {program[:80]!r}"
+    w, h = int(m.group(1)), int(m.group(2))
+    canvas = (w, h, bytes(w * h * 4))
+    body = m.group(3)
+    if body:
+        for blit in split_unescaped(body, ":"):
+            mm = re.match(r"^(-?\d+),(-?\d+)=(.+)$", unescape(blit), re.S)
+            assert mm, f"malformed blit {blit[:60]!r}"
+            x, y, term = int(mm.group(1)), int(mm.group(2)), mm.group(3)
+            ops = term.split("^")
+            img = bases[ops[0]]
+            for op in ops[1:]:
+                img = apply_term(img, op)
+            canvas = over(canvas, img, x, y)
+    for f in finishing:
+        canvas = apply_term(canvas, f)
+    return canvas
+
+
+def load_bases() -> dict:
+    return {name: read_png(TEXGEN / "textures" / name) for name in BASES}
 
 
 # ----------------------------------------------------------------------
-# checks
+# base-texture regeneration check (determinism of the shared bases)
+# ----------------------------------------------------------------------
+
+def check_bases() -> list[str]:
+    problems = []
+    sys.path.insert(0, str(REPO / "tools"))
+    import texgen_make_bases as maker
+
+    expected = {
+        "stx_px.png": maker.make_px(),
+        "stx_glow.png": maker.make_glow(),
+        "stx_ring.png": maker.make_ring(),
+        "stx_noise.png": maker.make_noise(rgb=False),
+        "stx_noise_rgb.png": maker.make_noise(rgb=True),
+        "stx_x.png": maker.make_x(),
+        "stx_rhombus.png": maker.make_rhombus(),
+        "stx_font.png": maker.make_font(),
+    }
+    import tempfile
+    for name, (buf, w, h) in expected.items():
+        want_path = TEXGEN / "textures" / name
+        if not want_path.exists():
+            problems.append(f"missing base texture {name}")
+            continue
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+            maker.write_png(Path(tf.name), w, h, bytes(buf))
+            want = Path(tf.name).read_bytes()
+        if want_path.read_bytes() != want:
+            problems.append(f"{name} does not match deterministic regeneration "
+                            "(run tools/texgen_make_bases.py)")
+    return problems
+
+
+# ----------------------------------------------------------------------
+# repo consistency + hygiene
 # ----------------------------------------------------------------------
 
 def governed_pngs():
@@ -274,30 +413,59 @@ def governed_pngs():
 
 
 def cmd_verify() -> int:
-    registry = build_registry()
     fail = 0
 
+    # 0. shared bases are byte-stable
+    problems = check_bases()
+    if problems:
+        fail += 1
+        for p in problems:
+            print(f"FAIL {p}")
+    else:
+        print(f"OK  {len(BASES)} shared base textures match deterministic regeneration")
+
+    registry = build_registry()
+    bases = load_bases()
+
+    # 1. execute every program with the reference interpreter
+    exec_bad = []
+    total = 0
+    for name, info in sorted(registry.items()):
+        total += len(info["program"])
+        try:
+            w, h, px = execute_program(info["program"], bases)
+            iw = info["w"] * (1 if info["vertical"] else info["frames"])
+            ih = info["h"] * (info["frames"] if info["vertical"] else 1)
+            if (w, h) != (iw, ih):
+                exec_bad.append(f"{name}: executed {w}x{h} != sheet {iw}x{ih}")
+        except Exception as e:  # noqa: BLE001
+            exec_bad.append(f"{name}: {e}")
+    if exec_bad:
+        fail += 1
+        for b in exec_bad[:15]:
+            print(f"FAIL {b}")
+    else:
+        print(f"OK  {len(registry)} programs executed by the reference interpreter "
+              f"({total / 1024:.1f} KiB of program strings)")
+
+    # 2. registered textures must not exist as files
     files = governed_pngs()
-    # 1. registered textures must not exist as files
     still_there = [n for n in registry if any(f.name == n for f in files.values())]
     if still_there:
         fail += 1
-        print(f"FAIL {len(still_there)} registered textures still exist as files (delete them):")
-        for n in sorted(still_there)[:20]:
+        print(f"FAIL {len(still_there)} registered textures still exist as files:")
+        for n in sorted(still_there)[:15]:
             print(f"     {n}")
 
-    # 2. every governed PNG must be registered
+    # 3. every governed PNG must be registered
     orphans = sorted(f for f in files.values() if f.name not in registry)
     if orphans:
         fail += 1
         print(f"FAIL {len(orphans)} unregistered PNGs inside governed directories:")
-        for f in orphans[:20]:
+        for f in orphans[:15]:
             print(f"     {f.relative_to(REPO)}")
 
-    # 3. no bare string references to registered names outside sl_texgen
-    #    (they must go through sl_texgen.texture()/icon() so the [png:
-    #    modifier actually reaches clients)
-    import re
+    # 4. hygiene: no bare references, deps declared
     lit = re.compile(r'"([A-Za-z0-9_]+\.png)((?:\^[^"]*)?)"')
     resize_re = re.compile(r"\^\[resize:(\d+)x(\d+)$")
     bare = []
@@ -311,137 +479,101 @@ def cmd_verify() -> int:
                 continue
             ok_ctx = "sl_texgen.texture(\"" in src[max(0, m.start() - 20):m.start() + 1] or \
                 "sl_texgen.icon(\"" in src[max(0, m.start() - 20):m.start() + 1]
-            # composed names (dignodes) are built with .. on both sides
             if not ok_ctx and ".." in src[max(0, m.start() - 3):m.start()]:
                 ok_ctx = True
-            # icon() handles the pure-resize suffix; other suffixes chain
-            # after texture() — both fine
             if not ok_ctx and suf and not resize_re.match(suf):
                 ok_ctx = True
             if not ok_ctx:
                 bare.append((str(path.relative_to(REPO)), base))
+        if "sl_texgen." in src:
+            conf = path.parent / "mod.conf"
+            if not conf.exists() or "sl_texgen" not in conf.read_text():
+                bare.append((str(path.relative_to(REPO)), "(missing mod.conf dep)"))
     if bare:
         fail += 1
-        print(f"FAIL {len(bare)} bare references to runtime textures (wrap in sl_texgen.texture()):")
-        for p, n in bare[:20]:
+        print(f"FAIL {len(bare)} hygiene problems:")
+        for p, n in bare[:15]:
             print(f"     {p}: {n}")
 
-    # 4. mods referencing sl_texgen must declare the dependency
-    for path in sorted(REPO.glob("mods/**/*.lua"), key=str):
-        if "sl_texgen" in path.parts:
-            continue
-        src = path.read_text()
-        if "sl_texgen." not in src:
-            continue
-        conf = path.parent / "mod.conf"
-        if not conf.exists() or "sl_texgen" not in conf.read_text():
-            bare_dep = str(path.relative_to(REPO))
-            if (bare_dep, "") not in [(b, "") for b, _ in bare]:
-                fail += 1
-                print(f"FAIL {bare_dep}: uses sl_texgen but mod.conf does not depend on it")
-
-    # 3. generated PNGs valid
-    bad = []
-    for name, info in registry.items():
-        reason = validate_png_bytes(info["png"], name)
-        if reason:
-            bad.append((name, reason))
-        w, h = info["w"], info["h"]
-        # header dims must match canvas
-        ihdr_w, ihdr_h = struct.unpack(">II", info["png"][16:24])
-        if (ihdr_w, ihdr_h) != (w, h):
-            bad.append((name, f"canvas {w}x{h} != IHDR {ihdr_w}x{ihdr_h}"))
-    if bad:
-        fail += 1
-        print(f"FAIL {len(bad)} generated PNGs invalid:")
-        for n, r in bad[:20]:
-            print(f"     {n}: {r}")
-
     if fail == 0:
-        total = sum(len(i["png"]) for i in registry.values())
-        print(f"OK  {len(registry)} runtime textures, {total / 1024:.1f} KiB generated, "
-              f"{len(files)} stock files correctly absent, registry and repo consistent.")
+        print(f"OK  registry and repo consistent; runtime texture pipeline verified.")
     return 1 if fail else 0
 
 
 def cmd_export(outdir: Path) -> int:
     registry = build_registry()
+    bases = load_bases()
     outdir.mkdir(parents=True, exist_ok=True)
     total = 0
     for name, info in sorted(registry.items()):
-        write_png(outdir / name, info["w"], info["h"], info["px"])
-        write_png(outdir / name, info["w"], info["h"], info["px"]) if False else None
-        total += len(info["png"])
-    # contact sheet: vertical strip of thumbnails, labeled by order
+        w, h, px = execute_program(info["program"], bases)
+        write_png(outdir / name, w, h, px)
+        total += len(info["program"])
+    print(f"executed+exported {len(registry)} textures "
+          f"({total / 1024:.1f} KiB of programs) to {outdir}")
+    return 0
+
+
+def cmd_contact(out: Path) -> int:
+    """Execute all programs and render a labelled review sheet (needs Pillow)."""
+    from PIL import Image, ImageDraw
+
+    registry = build_registry()
+    bases = load_bases()
+    cols, cell, scale = 8, 72, 3
     names = sorted(registry)
-    entries = []
-    for n in names:
-        info = registry[n]
-        # shrink anything wider than 160 px by integer factor
-        w, h, px = info["w"], info["h"], info["px"]
-        f = max(1, w // 160)
-        if f > 1:
-            sw, sh = w // f, h // f
-            sp = bytearray(sw * sh * 4)
-            for y in range(sh):
-                for x in range(sw):
-                    so = ((y * f) * w + x * f) * 4
-                    sp[(y * sw + x) * 4:(y * sw + x) * 4 + 4] = px[so:so + 4]
-            w, h, px = sw, sh, bytes(sp)
-        entries.append((n, w, h, px))
-    pad = 4
-    cell_w = max(w for _, w, _, _ in entries) + 8
-    cell_h = max(h for _, _, h, _ in entries) + 8
-    sheet_h = sum(h + pad for _, _, h, _ in entries) + pad
-    sheet = bytearray((cell_w + pad) * sheet_h * 4)
-    for i in range((cell_w + pad) * sheet_h):
-        sheet[i * 4 + 0] = 26
-        sheet[i * 4 + 1] = 28
-        sheet[i * 4 + 2] = 36
-        sheet[i * 4 + 3] = 255
-    y = pad
-    for n, w, h, px in entries:
-        base = (y * (cell_w + pad) + pad) * 4
-        for yy in range(h):
-            ro = (base + yy * (cell_w + pad) * 4)
-            for xx in range(w):
-                so = (yy * w + xx) * 4
-                a = px[so + 3] / 255.0
-                t = ro + xx * 4
-                for k in range(3):
-                    sheet[t + k] = int(px[so + k] * a + sheet[t + k] * (1 - a))
-                sheet[t + 3] = 255
-        y += h + pad
-    write_png(outdir / "_contact.png", cell_w + pad, sheet_h, bytes(sheet))
-    print(f"exported {len(registry)} PNGs ({total / 1024:.1f} KiB) + _contact.png to {outdir}")
+    rows = (len(names) + cols - 1) // cols
+    out_im = Image.new("RGBA", (cols * cell, rows * (cell + 11)), (24, 24, 30, 255))
+    d = ImageDraw.Draw(out_im)
+    for i, name in enumerate(names):
+        info = registry[name]
+        w, h, px = execute_program(info["program"], bases)
+        im = Image.frombytes("RGBA", (w, h), px)
+        frames = []
+        for f in range(min(info["frames"], 3)):
+            frames.append(im.crop((0, f * info["h"], info["w"], (f + 1) * info["h"]))
+                          if info["vertical"] else
+                          im.crop((f * info["w"], 0, (f + 1) * info["w"], info["h"])))
+        per = min(3, len(frames))
+        grid = Image.new("RGBA", (per * info["w"], info["h"] * ((len(frames) + per - 1) // per)),
+                         (28, 28, 34, 255))
+        for j, fr in enumerate(frames):
+            grid.alpha_composite(fr, ((j % per) * info["w"], (j // per) * info["h"]))
+        grid = grid.resize((grid.width * scale, grid.height * scale), Image.NEAREST)
+        grid.thumbnail((cell, cell))
+        x, y = (i % cols) * cell, (i // cols) * (cell + 11)
+        out_im.alpha_composite(grid, (x + (cell - grid.width) // 2, y + (cell - grid.height) // 2))
+        d.text((x + 2, y + cell - 1), name.replace(".png", "")[:17], fill=(170, 170, 180, 255))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out_im.save(out)
+    print(f"contact sheet with {len(names)} textures -> {out}")
     return 0
 
 
 def cmd_report() -> int:
     registry = build_registry()
-    fams = collections.Counter()
+    total = sum(len(i["program"]) for i in registry.values())
+    biggest = max(registry.items(), key=lambda kv: len(kv[1]["program"]))
+    by_family = collections.Counter()
     for name, info in registry.items():
-        # family guess from old path
-        fams["generated"] += len(info["png"])
-    files = governed_pngs()
-    on_disk = sum(f.stat().st_size for f in files.values())
-    print(f"registered: {len(registry)} textures, {fams['generated'] / 1024:.1f} KiB generated PNG")
-    print(f"stock files matching registry still on disk: {sum(1 for f in files.values() if f.name in registry)} "
-          f"({on_disk / 1024:.1f} KiB)")
-    unreg = [(f, f.stat().st_size) for f in files.values() if f.name not in registry]
-    if unreg:
-        print(f"unregistered (kept as files): {len(unreg)} ({sum(s for _, s in unreg) / 1024:.1f} KiB)")
-        for f, s in unreg:
-            print(f"     {f} ({s} B)")
+        by_family[info["frames"] > 1 and "animated sheets" or "single textures"] += len(info["program"])
+    print(f"registered: {len(registry)} textures -> {total / 1024:.1f} KiB of [combine programs")
+    for k, v in by_family.most_common():
+        print(f"  {k}: {v / 1024:.1f} KiB")
+    print(f"  largest: {biggest[0]} ({len(biggest[1]['program']) / 1024:.1f} KiB)")
     return 0
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--verify", action="store_true", help="check registry/repo consistency")
-    ap.add_argument("--export", metavar="DIR", help="render all generated textures to DIR")
-    ap.add_argument("--report", action="store_true", help="print byte accounting")
+    ap.add_argument("--verify", action="store_true", help="full consistency gate")
+    ap.add_argument("--export", metavar="DIR", help="execute programs and export PNGs")
+    ap.add_argument("--contact", metavar="PNG",
+                    help="execute programs and render a labelled review sheet")
+    ap.add_argument("--report", action="store_true", help="print program accounting")
     args = ap.parse_args()
+    if args.contact:
+        return cmd_contact(Path(args.contact))
     if args.export:
         return cmd_export(Path(args.export))
     if args.report:

@@ -1,122 +1,115 @@
 -- ================================================================
 -- sl_texgen/gen/workshops.lua — workshop node textures
 --
--- Ports the 50 placeholder node textures: palette facade (wood /
--- metal / tech / glass / dark) with a grid accent, styled overlays
--- (front slots/panels, caution diagonals, hazard glyphs, windows)
--- and the item name as a micro-text label — the same recipe as the
--- python generator that made the stock files, now in engine Lua.
+-- Compiles the 50 placeholder node facades (palette base + speckle
+-- noise + accent grid, styled overlays for fronts / caution tape /
+-- hazard signs / windows / pipes / vents, plus the item label from
+-- the shared font atlas) to client-side [combine programs.
 -- ================================================================
-local C = sl_texgen.canvas
-
+local stx = sl_texgen.stx
 local S = 64
 
 local PALETTES = {
-	wood   = { base = { 84, 55, 33 },   accent = { 220, 160, 80 } },
-	metal  = { base = { 46, 50, 55 },   accent = { 150, 180, 210 } },
-	tech   = { base = { 20, 32, 45 },   accent = { 0, 220, 255 } },
-	glass  = { base = { 30, 55, 65 },   accent = { 150, 235, 255 } },
-	dark   = { base = { 18, 18, 25 },   accent = { 110, 120, 150 } },
-	hazard = { base = { 30, 30, 25 },   accent = { 255, 215, 0 } },
+	wood   = { "#54371F",  "#DCA050" },
+	metal  = { "#2E3237",  "#96B4D2" },
+	tech   = { "#142028",  "#00D8FF" },
+	glass  = { "#1E3741",  "#96EBFF" },
+	dark   = { "#12121A",  "#6E7896" },
+	hazard = { "#1E1E19",  "#FFD700" },
 }
 
-local function label_of(name)
-	return (name:gsub("_", " "))
-end
+local ACC_A = 95
+local ACC_B = 70
 
-local function facade(c, R, pal)
-	C.speckle(c, R, pal.base, 0.12)
-	-- accent grid every 16px
+local function facade(p, base, accent)
+	stx.solid(p, 0, 0, S, S, base, 255)
+	stx.noise(p, 0, 0, S, S, 46)
 	for x = 0, S - 1, 16 do
-		C.line(c, x, 0, x, S - 1, { pal.accent[1], pal.accent[2], pal.accent[3], 95 })
+		stx.vline(p, x, 0, S, accent, ACC_A)
 	end
 	for y = 0, S - 1, 16 do
-		C.line(c, 0, y, S - 1, y, { pal.accent[1], pal.accent[2], pal.accent[3], 70 })
+		stx.hline(p, 0, y, S, accent, ACC_B)
 	end
-	C.frame(c, 0, 0, S, S, { pal.accent[1], pal.accent[2], pal.accent[3], 210 })
+	stx.frame(p, 0, 0, S, S, accent, 210)
 end
 
-local function front_slots(c, pal)
+local function front_slots(p, accent)
 	for i = 0, 2 do
-		C.frame(c, 8, 10 + i * 15, 48, 8, { pal.accent[1], pal.accent[2], pal.accent[3], 180 })
-		C.rect(c, 9, 11 + i * 15, 46, 6, { 0, 0, 0, 55 })
+		local y = 10 + i * 15
+		stx.solid(p, 8, y, 48, 8, "#000000", 55)
+		stx.hline(p, 8, y, 48, accent, 180)
 	end
 end
 
-local function caution(c)
-	local yellow = { 255, 205, 0, 190 }
-	C.stripes_diag(c, 1, yellow, { 10, 10, 10, 255 }, 16)
-	C.frame(c, 0, 0, S, S, { 10, 10, 10, 255 })
-	-- re-draw frame thick
-	C.frame(c, 1, 1, S - 2, S - 2, { 10, 10, 10, 255 })
-end
-
-local function glyph_hazard(c)
-	local y = { 255, 215, 0, 255 }
-	-- triangle outline
-	for i = 0, 24 do
-		local wdt = math.floor(i * 0.9)
-		C.line(c, 32 - wdt, 54 - i, 32 + wdt, 54 - i, (i < 2 or i > 22 or math.abs(i - 12) > 10) and y or { 0, 0, 0, 0 })
+local function caution(p)
+	-- alternating hazard bars
+	for i = 0, 7 do
+		local col = (i % 2 == 0) and "#FFCD00" or "#0A0A0A"
+		stx.solid(p, 0, i * 8, S, 8, col, 200)
 	end
-	C.line(c, 31, 22, 33, 40, y)
-	C.rect(c, 31, 44, 3, 3, y)
+	stx.frame(p, 0, 0, S, S, "#0A0A0A", 255)
 end
 
-local function glyph_radiation(c)
-	local y = { 255, 215, 0, 190 }
-	C.thick_ring(c, 32, 32, 17, 3, y)
-	C.disc(c, 32, 32, 5, { 255, 215, 0, 255 })
-	for _, ang in ipairs({ 90, 210, 330 }) do
-		local a = math.rad(ang)
-		local cx, cy = 32 + math.cos(a) * 11, 32 - math.sin(a) * 11
-		C.disc(c, cx, cy, 4, y)
-	end
+local function glyph_hazard(p)
+	local Y = "#FFD700"
+	stx.solid(p, 24, 30, 16, 6, Y, 255)
+	stx.solid(p, 20, 36, 24, 6, Y, 255)
+	stx.solid(p, 16, 42, 32, 6, Y, 255)
+	stx.solid(p, 30, 20, 4, 2, Y, 255)
+	stx.solid(p, 30, 23, 4, 6, Y, 255)
+	stx.solid(p, 30, 30, 4, 2, Y, 255)
 end
 
-local function glyph_bio(c)
-	local g = { 180, 255, 90, 200 }
-	for _, pt in ipairs({ { 32, 20 }, { 22, 39 }, { 42, 39 } }) do
-		C.thick_ring(c, pt[1], pt[2], 7, 2, g)
-	end
-	C.disc(c, 32, 32, 4, g)
+local function glyph_radiation(p)
+	local Y = "#FFD700"
+	stx.ring(p, 32, 32, 34, 220, Y)
+	stx.glow(p, 32, 32, 10, 255, Y)
+	stx.glow(p, 32, 20, 9, 220, Y)
+	stx.glow(p, 22, 39, 9, 220, Y)
+	stx.glow(p, 42, 39, 9, 220, Y)
 end
 
-local function window(c, broken)
-	local glasscol = { 120, 220, 255, 80 }
-	local framecol = { 190, 245, 255, 230 }
-	C.rect(c, 10, 10, 44, 44, glasscol)
-	C.frame(c, 10, 10, 44, 44, framecol)
-	C.frame(c, 11, 11, 42, 42, framecol)
+local function glyph_bio(p)
+	local G = "#B4FF5A"
+	stx.ring(p, 32, 20, 14, 220, G)
+	stx.ring(p, 22, 39, 14, 220, G)
+	stx.ring(p, 42, 39, 14, 220, G)
+	stx.glow(p, 32, 32, 9, 220, G)
+end
+
+local function window(p, broken)
+	stx.solid(p, 10, 10, 44, 44, "#78DCFF", 80)
+	stx.frame(p, 10, 10, 44, 44, "#BEF5FF", 230, 2)
 	if broken then
-		C.line(c, 12, 14, 40, 36, { 230, 255, 255, 250 })
-		C.line(c, 40, 36, 30, 54, { 230, 255, 255, 250 })
-		C.line(c, 52, 20, 35, 37, { 230, 255, 255, 250 })
+		stx.solid(p, 12, 14, 2, 12, "#E6FFFF", 250)
+		stx.solid(p, 22, 24, 2, 10, "#E6FFFF", 250)
+		stx.solid(p, 38, 20, 8, 2, "#E6FFFF", 250)
 	end
 end
 
-local function pipe(c, end_cap)
-	C.rect(c, 20, 0, 24, S, { 70, 80, 95, 255 })
+local function pipe(p, end_cap)
+	stx.solid(p, 20, 0, 24, S, "#46505F", 255)
 	for y = 0, S - 1, 8 do
-		C.line(c, 20, y, 43, y, { 40, 46, 55, 255 })
+		stx.hline(p, 20, y, 24, "#282E37", 255)
 	end
-	C.line(c, 20, 0, 20, S - 1, { 130, 150, 175, 255 })
-	C.line(c, 43, 0, 43, S - 1, { 30, 34, 40, 255 })
+	stx.vline(p, 20, 0, S, "#8296AF", 255)
+	stx.vline(p, 43, 0, S, "#1E2228", 255)
 	if end_cap then
-		C.rect(c, 14, 0, 36, 8, { 90, 100, 118, 255 })
-		C.frame(c, 14, 0, 36, 8, { 140, 160, 185, 255 })
+		stx.solid(p, 14, 0, 36, 8, "#5A6476", 255)
+		stx.frame(p, 14, 0, 36, 8, "#8CA0B9", 255)
 	end
 end
 
-local function vent_grate(c)
-	C.speckle(c, C.rng(9), PALETTES.metal.base, 0.1)
+local function vent_grate(p)
+	stx.solid(p, 0, 0, S, S, "#2E3237", 255)
+	stx.noise(p, 0, 0, S, S, 40)
 	for row = 0, 5 do
-		C.rect(c, 10, 8 + row * 9, 44, 5, { 12, 14, 18, 255 })
-		C.line(c, 10, 8 + row * 9, 53, 8 + row * 9, { 120, 140, 165, 255 })
+		stx.solid(p, 10, 8 + row * 9, 44, 5, "#0C0E12", 255)
+		stx.hline(p, 10, 8 + row * 9, 44, "#788CA5", 255)
 	end
-	C.frame(c, 0, 0, S, S, { 150, 180, 210, 210 })
+	stx.frame(p, 0, 0, S, S, "#96B4D2", 210)
 end
 
--- per-texture spec: palette + optional overlay + label
 local SPECS = {
 	{ "advanced_workbench_top.png", "wood" }, { "advanced_workbench_bottom.png", "wood" },
 	{ "advanced_workbench_side.png", "wood" }, { "advanced_workbench_front.png", "wood", "front" },
@@ -154,42 +147,31 @@ local SPECS = {
 	{ "window_broken.png", "glass", "window_broken" },
 }
 
-local function apply_overlay(c, kind, pal)
-	if kind == "front" then
-		front_slots(c, pal)
-	elseif kind == "caution" then
-		caution(c)
-	elseif kind == "hazard" then
-		glyph_hazard(c)
-	elseif kind == "radiation" then
-		glyph_radiation(c)
-	elseif kind == "bio" then
-		glyph_bio(c)
-	elseif kind == "window" then
-		window(c, false)
-	elseif kind == "window_broken" then
-		window(c, true)
-	elseif kind == "pipe" then
-		pipe(c, false)
-	elseif kind == "pipe_end" then
-		pipe(c, true)
-	elseif kind == "vent" then
-		vent_grate(c)
-	end
-end
+local OVERLAYS = {
+	front = front_slots,
+	caution = caution,
+	hazard = glyph_hazard,
+	radiation = glyph_radiation,
+	bio = glyph_bio,
+	window = function(p) window(p, false) end,
+	window_broken = function(p) window(p, true) end,
+	pipe = function(p) pipe(p, false) end,
+	pipe_end = function(p) pipe(p, true) end,
+	vent = vent_grate,
+}
 
 local defs = {}
 for i, spec in ipairs(SPECS) do
 	local name, palname, overlay = spec[1], spec[2], spec[3]
-	local label = label_of(name:gsub("%.png$", ""))
+	local label = (name:gsub("_", " "):gsub("%.png$", ""))
+	local base, accent = PALETTES[palname][1], PALETTES[palname][2]
 	defs[#defs + 1] = {
 		name = name, w = S, h = S, seed = 500 + i,
-		draw = function(c, R)
-			local pal = PALETTES[palname]
-			facade(c, R, pal)
-			if overlay then apply_overlay(c, overlay, pal) end
-			-- micro label, as the stock placeholders had
-			C.text(c, 3, S - 8, label, { 235, 250, 255, 215 })
+		draw = function(p, R)
+			facade(p, base, accent)
+			if overlay then OVERLAYS[overlay](p) end
+			if label:len() > 12 then label = label:sub(1, 12) end
+			stx.label(p, 3, S - 9, label, "#EBFAFF", 215, 1)
 		end,
 	}
 end

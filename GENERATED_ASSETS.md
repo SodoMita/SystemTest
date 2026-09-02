@@ -6,20 +6,26 @@ This asset pass was generated procedurally for prototype use.  It fills missing 
 
 The procedural *placeholder textures* listed below (effect spritesheets,
 mob strips, workshop/modebase panels, noise, dignodes, formspec skin,
-weapon dithers, clothing/mvp icons) are no longer shipped as PNG files.
-`mods/apis/sl_texgen` renders all of them in Lua at server startup and
-serves them as `[png:` texture modifiers —
-`"[png:" .. core.encode_base64(core.encode_png(w, h, pixels))` — embedded
-directly in the node/item/entity texture strings (see
-https://docs.luanti.org/for-creators/api/texture-modifiers/).  No media
-push, no disk writes at runtime, byte-stable across platforms; the
-client decodes each modifier once into its texture cache.
+weapon textures, clothing/mvp icons) are no longer shipped as PNG files.
+`mods/apis/sl_texgen` compiles all of them at server startup into pure
+**`[combine:` texture-modifier programs** that the CLIENT renders at
+runtime: each program blits a handful of tiny shared base textures
+(`textures/stx_*.png`, ~34 KiB total, shipped as ordinary media) and
+chains `^[resize`/`^[multiply`/`^[opacity`/`^[sheet` ops — see
+https://docs.luanti.org/for-creators/api/texture-modifiers/. The server
+never rasterizes pixels: no PNG encoding, no base64, no media push; the
+program strings ride inside node/item/entity definitions that are
+networked anyway (199 textures ≈ 521 KiB of ASCII programs).
 
 - 199 textures across 12 generator modules (`mods/apis/sl_texgen/gen/`);
   the ~1.4 MB of stock PNG was deleted from the repo.
-- Guards: `tests/texgen_test.lua` (determinism, PNG structure, [png:
-  syntax safety) and `tools/texgen_check.py --verify` (CI: registry ↔
-  repo consistency, bare-reference and dependency checks).
+- Guards: `tests/texgen_test.lua` (Lua 5.1: program syntax, escape
+  roundtrip, `^[sheet` atlas bounds, determinism, stock mode) and
+  `tools/texgen_check.py --verify` (CI: bases match deterministic
+  regeneration; every program executed by a reference `[combine`
+  interpreter; registry ↔ repo consistency; bare-reference and
+  dependency checks). `--contact docs/texgen_samples.png` renders a
+  review sheet of all executed textures.
 - Escape hatch: `sl_texgen.mode = stock` serves plain filenames (restore
   files from git history first). Status: `/sl_texgen`.
 

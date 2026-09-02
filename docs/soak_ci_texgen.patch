@@ -13,10 +13,10 @@
        - name: Headless stub smoke test
          run: luajit tests/smoke_test.lua
 +
-+      - name: Runtime texture generation suite ([png: modifiers)
++      - name: Client-rendered texture suite ([combine programs)
 +        run: |
 +          luajit tests/texgen_test.lua
-+          pip install -q lupa
++          pip install -q lupa pillow
 +          python3 tools/texgen_check.py --verify
  
        - name: Simulacrum Strand stub suite

@@ -1,25 +1,22 @@
 -- ================================================================
--- sl_texgen — runtime procedural texture generation
+-- sl_texgen — runtime texture generation, compiled for the client
 -- ================================================================
--- Many of this game's textures are placeholder art that was rendered
--- offline by python scripts and shipped as PNG files (spritesheets of
--- nodes, mob strips, labelled panels, noise, ...).  That costs repo
--- and download space for pixels a script can reproduce trivially.
+-- Placeholder art in this game is not shipped as PNG files.  Instead
+-- this mod COMPILES each texture into a pure texture-modifier
+-- program — a "[combine:WxH:x,y=term:..." string built from a
+-- handful of tiny grayscale bases (textures/stx_*.png, ~34 KiB
+-- total, texture-packable, media-cached, sent once) — and embeds
+-- that string in the node/item/entity texture fields mods send
+-- anyway (https://docs.luanti.org/for-creators/api/texture-modifiers/).
 --
--- This mod renders those textures *at server startup* and hands them
--- to clients as [png: texture modifiers (base texture generator, see
--- docs.luanti.org/for-creators/api/texture-modifiers):
+-- The program is *executed by the client*: the server never
+-- rasterizes or ships per-texture pixels, and the strings are tiny
+-- (bytes to a few KiB) next to any image payload.  Clients render
+-- them at their own (hi-res) texture scale and cache the results in
+-- the normal texture-modifier cache.
 --
---     "[png:" .. core.encode_base64(core.encode_png(w, h, pixels))
---
--- The modifier is embedded directly in the tile / item / entity
--- texture strings that mods already send in their definitions, so
--- there is no media-push step, no disk I/O and no client media-cache
--- writes; the client decodes each texture once into its modifier
--- cache.  The corresponding PNG files are deleted from the repo.
---
--- Public API (all usable at load time, after depending on sl_texgen):
---   sl_texgen.texture(name)  -> "[png:..." modifier string
+-- Public API (load time, after depending on sl_texgen):
+--   sl_texgen.texture(name)  -> "[combine:..." program string
 --                               (alias: sl_texgen.T)
 --   sl_texgen.icon(name, px) -> texture(name) .. "^[resize:px px"
 --   sl_texgen.sheet(name, frames_w, frame_length)
@@ -28,16 +25,23 @@
 --                            -> tile table with vertical_frames anim
 --   sl_texgen.register(def) / .build_all() / .defs / .textures
 --
--- Modes (setting `sl_texgen.mode`, default "runtime"):
---   runtime — texture(name) yields the [png: modifier; the PNG files
---               must NOT exist in the repo (CI's texgen_check
---               enforces the delete list against the registry).
---   stock   — texture(name) yields the plain filename; generate
---               nothing (dev escape hatch / bisection aid).
+-- def = { name = "file.png", w, h, frames = 1, vertical = false,
+--         seed = int, draw = function(p, R, f) ... end }
+-- draw() paints frame f (1-based) onto the program p with rng R
+-- using stx ops (glow/solid/ring/label/...); frame offsets are
+-- applied automatically for strip layouts.
 --
--- Determinism: generators use only canvas.lua primitives + the seeded
--- rng, so output is byte-stable across runs and platforms.
--- tests/texgen_test.lua and tools/texgen_check.py verify this and the
+-- Modes (setting `sl_texgen.mode`, default "runtime"):
+--   runtime — texture(name) yields the compiled program; the PNG
+--               files must NOT exist in the repo (CI's
+--               texgen_check --verify enforces the delete list).
+--   stock   — texture(name) yields the plain filename (dev escape
+--               hatch / bisection aid).
+--
+-- Determinism: generators use only stx ops + the seeded rng, so
+-- programs are byte-stable across runs and platforms.
+-- tests/texgen_test.lua validates the programs; tools/texgen_check.py
+-- --verify executes them in a reference interpreter and checks the
 -- registry/repo consistency.
 -- ================================================================
 
@@ -45,45 +49,13 @@ local modname = core.get_current_modname()
 local MP = core.get_modpath(modname)
 
 sl_texgen = {
-	_VERSION = "2.0.0",
-	canvas = dofile(MP .. "/canvas.lua"),
-	png = dofile(MP .. "/png.lua"),
-	textures = {},   -- [filename] = "[png:..." modifier string
-	png_bytes = {},  -- [filename] = raw png bytes
+	_VERSION = "3.0.0",
+	stx = dofile(MP .. "/stx.lua"),
+	textures = {},   -- [filename] = compiled "[combine:..." program
+	programs = {},   -- [filename] = { def = def, program = string }
 	defs = {},       -- registry, ordered by filename
 }
-
-local C = sl_texgen.canvas
-
--- ----------------------------------------------------------------
--- encoding: prefer the engine's real-deflate encoder (5.13+), fall
--- back to the pure-Lua one (stored deflate; bigger but correct).
--- ----------------------------------------------------------------
-local function encode_png(c)
-	if core.encode_png then
-		local raw = {}
-		for y = 0, c.h - 1 do
-			local base = y * c.w * 4
-			local row = {}
-			for x = 0, c.w - 1 do
-				local i = base + x * 4
-				row[#row + 1] = string.char(c.px[i + 1] or 0, c.px[i + 2] or 0, c.px[i + 3] or 0, c.px[i + 4] or 0)
-			end
-			raw[#raw + 1] = table.concat(row)
-		end
-		local ok, res = pcall(core.encode_png, c.w, c.h, table.concat(raw), 9)
-		if ok and type(res) == "string" and #res > 8 then return res end
-	end
-	return sl_texgen.png.encode(c)
-end
-
-local function encode_base64(data)
-	if core.encode_base64 then
-		local ok, res = pcall(core.encode_base64, data)
-		if ok and type(res) == "string" then return res end
-	end
-	return sl_texgen.png.encode_base64(data)
-end
+local stx = sl_texgen.stx
 
 -- ----------------------------------------------------------------
 -- registry
@@ -124,36 +96,29 @@ end
 -- build
 -- ----------------------------------------------------------------
 
---- Render one def to a sheet canvas.
-function sl_texgen.build_canvas(def)
-	local frames = {}
-	for f = 1, def.frames do
-		local c = C.new(def.w, def.h)
-		local R = C.rng(def.seed * 7919 + f)
-		def.draw(c, R, f)
-		frames[#frames + 1] = c
-	end
-	if def.frames > 1 then
-		return C.compose(frames, def.vertical)
-	end
-	return frames[1]
-end
-
---- Render one def; caches png bytes and the [png: modifier string.
+--- Compile one def (all frames) to its program string.
 function sl_texgen.build(def)
-	if not sl_texgen.png_bytes[def.name] then
-		local bytes = encode_png(sl_texgen.build_canvas(def))
-		sl_texgen.png_bytes[def.name] = bytes
-		sl_texgen.textures[def.name] = "[png:" .. encode_base64(bytes)
+	if not sl_texgen.programs[def.name] then
+		local sheet_w = def.vertical and def.w or def.w * def.frames
+		local sheet_h = def.vertical and def.h * def.frames or def.h
+		local p = stx.new(sheet_w, sheet_h, { name = def.name, finishing = def._finish })
+		for f = 1, def.frames do
+			p._ox = def.vertical and 0 or (f - 1) * def.w
+			p._oy = def.vertical and (f - 1) * def.h or 0
+			def.draw(p, stx.rng(def.seed * 7919 + f), f)
+		end
+		local program = stx.compile(p)
+		sl_texgen.programs[def.name] = { def = def, program = program }
+		sl_texgen.textures[def.name] = program
 	end
-	return sl_texgen.png_bytes[def.name]
+	return sl_texgen.textures[def.name]
 end
 
---- Render everything (runtime mode only).  Returns png bytes generated.
+--- Compile everything (runtime mode only).  Returns bytes of program.
 function sl_texgen.build_all()
 	local mode = core.settings:get("sl_texgen.mode") or "runtime"
 	if mode == "stock" then
-		core.log("action", ("[sl_texgen] mode=stock: serving %d textures from files, nothing generated")
+		core.log("action", ("[sl_texgen] mode=stock: serving %d textures from files, nothing compiled")
 			:format(#sl_texgen.defs))
 		return 0
 	end
@@ -161,8 +126,8 @@ function sl_texgen.build_all()
 	for _, def in ipairs(sl_texgen.defs) do
 		total = total + #sl_texgen.build(def)
 	end
-	core.log("action", ("[sl_texgen] mode=runtime: generated %d textures, %.1f KiB of PNG "
-		.. "(%.1f KiB as [png: modifiers)"):format(#sl_texgen.defs, total / 1024, total * 4 / 3 / 1024))
+	core.log("action", ("[sl_texgen] mode=runtime: compiled %d textures into %.1f KiB of "
+		.. "[combine programs (client-rendered)"):format(#sl_texgen.defs, total / 1024))
 	return total
 end
 
@@ -174,7 +139,7 @@ local function mode()
 end
 
 --- texture string for a registered name:
----   runtime mode -> "[png:<base64>"  (docs: base texture generator)
+---   runtime mode -> "[combine:..." program (client-rendered)
 ---   stock mode   -> the plain filename
 function sl_texgen.texture(name)
 	if mode() == "runtime" then
@@ -238,7 +203,7 @@ function sl_texgen.stock_present()
 end
 
 -- ----------------------------------------------------------------
--- startup: render
+-- startup: compile
 -- ----------------------------------------------------------------
 sl_texgen.build_all()
 
@@ -255,16 +220,18 @@ end
 core.register_chatcommand("sl_texgen", {
 	description = "sl_texgen: runtime texture generation status",
 	func = function()
-		local png, b64, count = 0, 0, 0
-		for name, data in pairs(sl_texgen.png_bytes) do
+		local bytes, count = 0, 0
+		local biggest, biggest_n = 0, "-"
+		for name, entry in pairs(sl_texgen.programs) do
 			count = count + 1
-			png = png + #data
-			b64 = b64 + #sl_texgen.textures[name]
+			bytes = bytes + #entry.program
+			if #entry.program > biggest then
+				biggest, biggest_n = #entry.program, name
+			end
 		end
-		local present = sl_texgen.stock_present()
-		return true, ("sl_texgen %s: mode=%s, %d textures registered, %d generated "
-			.. "(%.1f KiB png / %.1f KiB base64), %d stock files still present")
-			:format(sl_texgen._VERSION, mode(), #sl_texgen.defs, count,
-				png / 1024, b64 / 1024, #present)
+		return true, ("sl_texgen %s: mode=%s, %d textures compiled into %.1f KiB of client-side "
+			.. "[combine programs (largest: %s at %.1f KiB)")
+			:format(sl_texgen._VERSION, mode(), count, bytes / 1024,
+				biggest_n, biggest / 1024)
 	end,
 })

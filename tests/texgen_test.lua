@@ -1,17 +1,17 @@
 -- ================================================================
 -- tests/texgen_test.lua
 -- Headless suite for mods/apis/sl_texgen (runtime texture
--- generation via [png: texture modifiers).  Runs the real generator
--- modules against a stub engine and verifies:
---   * every registered texture renders and encodes
---   * sl_texgen.texture(name) yields "[png:<base64>" strings whose
---     decoded bytes are structurally valid PNGs with the right
---     dimensions (signature, IHDR, chunk CRCs, zlib stream)
---   * the modifier strings are texture-syntax-safe (no reserved
---     characters in the base64 payload)
---   * helper accessors: icon() chaining, sheet()/vframes() tables
---   * generation is deterministic (rebuild -> byte-identical)
---   * sl_texgen.mode=stock serves plain filenames, generates nothing
+-- generation via client-side [combine programs).  Runs the real
+-- generator modules against a stub engine and verifies:
+--   * programs compile for every registered texture
+--   * programs are pure [combine programs (no [png:, no media refs
+--     beyond the shared stx_* bases), escape-correct, and their
+--     declared sheet size matches the def (frames layout)
+--   * animation params: sheet()/vframes() tables agree with the
+--     compiled program's frame count
+--   * helpers: icon() chaining, texture() error on unknown names
+--   * compilation is deterministic (rebuild -> byte-identical)
+--   * sl_texgen.mode=stock serves plain filenames, compiles nothing
 --   * stock-file detection (files that must stay deleted)
 --   * /sl_texgen chatcommand reports status
 --
@@ -42,7 +42,6 @@ if arg and (arg[0] or arg[1]) then
 	local s = arg[0] or arg[1]
 	ROOT = s:match("^(.*)/tests/texgen_test%.lua$") or s:match("^(.*)/tests$") and s:match("^(.*)/tests$") or "."
 end
-local logs = {}
 local settings = {}
 local fake_dir_list = {}
 local chatcmds = {}
@@ -54,12 +53,7 @@ stub_core.get_modpath = function(name)
 	return nil
 end
 stub_core.settings = { get = function(_, key) return settings[key] end }
-stub_core.log = function(level, msg)
-	logs[#logs + 1] = tostring(level) .. ": " .. tostring(msg)
-end
--- engine-encoder paths intentionally exercised too:
-stub_core.encode_png = nil      -- set later to test the engine path
-stub_core.encode_base64 = nil   -- sl_texgen falls back to its pure-Lua one
+stub_core.log = function() end
 stub_core.register_chatcommand = function(name, def) chatcmds[name] = def end
 stub_core.get_dir_list = function()
 	return fake_dir_list[1] or {}
@@ -68,114 +62,179 @@ end
 _G.core = stub_core
 _G.minetest = stub_core
 
--- load the mod
 dofile(ROOT .. "/mods/apis/sl_texgen/init.lua")
 local T = _G.sl_texgen
+local stx = T.stx
 
 ----------------------------------------------------------------
--- pure-Lua base64 decoder + PNG structural validator
+-- [combine program validator
 ----------------------------------------------------------------
-local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local function b64decode(s)
-	s = s:gsub("=+$", "")
-	local out, acc, bits = {}, 0, 0
-	for i = 1, #s do
-		local v = B64:find(s:sub(i, i), 1, true) - 1
-		acc = acc * 64 + v
-		bits = bits + 6
-		if bits >= 8 then
-			bits = bits - 8
-			out[#out + 1] = string.char(math.floor(acc / 2 ^ bits) % 256)
-			acc = acc % (2 ^ bits)
+local BASES = {
+	["stx_px.png"] = true, ["stx_glow.png"] = true, ["stx_ring.png"] = true,
+	["stx_noise.png"] = true, ["stx_noise_rgb.png"] = true, ["stx_x.png"] = true,
+	["stx_rhombus.png"] = true, ["stx_font.png"] = true,
+}
+
+--- split on unescaped ':' at top level; returns parts (escaped as-is)
+local function split_unescaped(s, sep)
+	local parts = {}
+	local cur = {}
+	local i = 1
+	while i <= #s do
+		local c = s:sub(i, i)
+		if c == "\\" then
+			cur[#cur + 1] = c
+			cur[#cur + 1] = s:sub(i + 1, i + 1)
+			i = i + 2
+		elseif c == sep then
+			parts[#parts + 1] = table.concat(cur)
+			cur = {}
+			i = i + 1
+		else
+			cur[#cur + 1] = c
+			i = i + 1
 		end
 	end
-	return table.concat(out)
+	parts[#parts + 1] = table.concat(cur)
+	return parts
 end
 
-local pngmod = dofile(ROOT .. "/mods/apis/sl_texgen/png.lua")
-
-local function u32(s, i)
-	return s:byte(i) * 16777216 + s:byte(i + 1) * 65536 + s:byte(i + 2) * 256 + s:byte(i + 3)
+local function unescape(s)
+	return (s:gsub("\\(.)", "%1"))
 end
 
-local function validate_png(data, want_w, want_h, label)
-	local ok = true
-	local why = "ok"
-	repeat
-		if not data:find("^\137PNG\r\n\026\n") then ok, why = false, "signature" break end
-		local pos = 9
-		local got_w, got_h
-		while pos + 12 <= #data do
-			local len = u32(data, pos)
-			local ctype = data:sub(pos + 4, pos + 7)
-			local cdata = data:sub(pos + 8, pos + 7 + len)
-			local crc_got = u32(data, pos + 8 + len)
-			local crc_want = pngmod.crc32(ctype .. cdata)
-			if crc_got ~= crc_want then ok, why = false, "crc of " .. ctype break end
-			if ctype == "IHDR" then
-				got_w = u32(cdata, 1)
-				got_h = u32(cdata, 5)
-				local bitd, ct, inter = cdata:byte(9), cdata:byte(10), cdata:byte(13)
-				if bitd ~= 8 or ct ~= 6 or inter ~= 0 then ok, why = false, "IHDR layout" break end
-			elseif ctype == "IEND" then
-				pos = pos + 12 + len
-				break
+--- validate one blit term (unescaped): base must be a known stx
+--- base, modifiers must be from the supported set with sane args
+local function validate_term(term, errs, ctx)
+	local ops = {}
+	for op in term:gmatch("[^\^]+") do
+		ops[#ops + 1] = op
+	end
+	for oi, op in ipairs(ops) do
+		local u = op
+		if oi == 1 then
+			if not BASES[u] then
+				errs[#errs + 1] = ctx .. ": unknown base texture '" .. u .. "'"
 			end
-			pos = pos + 12 + len
+		else
+			local kind, args = u:match("^%[(%a+):?(.*)$")
+			if kind == "resize" then
+				local w, h = args:match("^(%d+)x(%d+)$")
+				if not w then errs[#errs + 1] = ctx .. ": bad resize '" .. u .. "'" end
+			elseif kind == "multiply" then
+				if not args:match("^#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$") then
+					errs[#errs + 1] = ctx .. ": bad multiply color '" .. u .. "'"
+				end
+			elseif kind == "opacity" then
+				local n = tonumber(args)
+				if not n or n < 0 or n > 255 or math.floor(n) ~= n then
+					errs[#errs + 1] = ctx .. ": bad opacity '" .. u .. "'"
+				end
+			elseif kind == "sheet" then
+				local w, h, x, y = args:match("^(%d+)x(%d+):(%d+),(%d+)$")
+				if not w then
+					errs[#errs + 1] = ctx .. ": bad sheet '" .. u .. "'"
+				elseif stx.GLYPH_COUNT and tonumber(y) * 8 + tonumber(x) >= stx.GLYPH_COUNT then
+					errs[#errs + 1] = ctx .. ": sheet index out of atlas '" .. u .. "'"
+				end
+			else
+				errs[#errs + 1] = ctx .. ": unsupported modifier '" .. u .. "'"
+			end
 		end
-		if not ok then break end
-		if not got_w then ok, why = false, "no IHDR" break end
-		if want_w and got_w ~= want_w then ok, why = false, ("width %s ~= %s"):format(got_w, want_w) break end
-		if want_h and got_h ~= want_h then ok, why = false, ("height %s ~= %s"):format(got_h, want_h) break end
-	until true
-	if not ok then print("    (" .. label .. ": " .. why .. ")") end
-	return ok
+	end
 end
 
-local function media_count(t)
-	local n = 0
-	for _ in pairs(t) do n = n + 1 end
-	return n
+--- full program validation; returns list of problems + blit count
+local function validate_program(prog, def)
+	local errs = {}
+	local blits = 0
+	if prog:find("%[png:") then
+		errs[#errs + 1] = "contains [png: (server rasterization is forbidden)"
+	end
+	-- strip grouping parens + finishing modifiers (e.g. "^[multiply:#...")
+	local finishing = {}
+	local core = prog
+	if core:sub(1, 1) == "(" then
+		-- find the matching close paren (programs contain no parens inside)
+		local close = core:find(")", 1, true)
+		if not close then
+			errs[#errs + 1] = "unbalanced grouping paren"
+			return errs, blits
+		end
+		finishing = split_unescaped(core:sub(close + 1), "^")
+		core = core:sub(2, close - 1)
+	end
+	for i, f in ipairs(finishing) do
+		if i > 1 or f ~= "" then
+			local kind, args = f:match("^%[(%a+):?(.*)$")
+			if kind == "multiply" then
+				if not args:match("^#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]$") then
+					errs[#errs + 1] = "bad finishing multiply '" .. f .. "'"
+				end
+			elseif kind == "opacity" then
+				local n = tonumber(args)
+				if not n or n < 0 or n > 255 then errs[#errs + 1] = "bad finishing opacity" end
+			else
+				errs[#errs + 1] = "unsupported finishing modifier '" .. f .. "'"
+			end
+		end
+	end
+	local header, hcap, body = core:match("^%[combine:(%d+)x(%d+):?(.*)$")
+	if not header then
+		errs[#errs + 1] = "not a [combine program"
+		return errs, blits
+	end
+	local W = tonumber(core:match("^%[combine:(%d+)"))
+	local H = tonumber(core:match("^%[combine:%d+x(%d+)"))
+	local want_w = def.vertical and def.w or def.w * def.frames
+	local want_h = def.vertical and def.h * def.frames or def.h
+	if W ~= want_w then errs[#errs + 1] = ("sheet width %s ~= %s"):format(W, want_w) end
+	if H ~= want_h then errs[#errs + 1] = ("sheet height %s ~= %s"):format(H, want_h) end
+	if body ~= "" then
+		for _, blit in ipairs(split_unescaped(body, ":")) do
+			blits = blits + 1
+			local x, y, term = unescape(blit):match("^(-?%d+),(-?%d+)=(.+)$")
+			if not x then
+				errs[#errs + 1] = "malformed blit: " .. unescape(blit):sub(1, 60)
+			else
+				-- the escaped slice must roundtrip, and its unescaped
+				-- term must only use known bases/modifiers
+				local esc = blit:match("=(.+)$")
+				if unescape(esc) ~= term then
+					errs[#errs + 1] = "escape roundtrip mismatch at blit " .. blits
+				else
+					validate_term(term, errs, def.name .. " blit@" .. x .. "," .. y)
+				end
+			end
+			if blits > 2000 then errs[#errs + 1] = "blit count runaway"; break end
+		end
+	end
+	return errs, blits
 end
 
 ----------------------------------------------------------------
-section("registry + render")
+section("registry + compile")
 ----------------------------------------------------------------
 check(T and T._VERSION, "mod loads and exposes sl_texgen")
 check(#T.defs > 0, "generators registered (" .. #T.defs .. " defs)")
-check(media_count(T.png_bytes) == #T.defs, "every def rendered (" .. media_count(T.png_bytes) .. "/" .. #T.defs .. ")")
-check(media_count(T.textures) == #T.defs, "every def has a [png: modifier string")
+local n_prog = 0
+for _ in pairs(T.programs) do n_prog = n_prog + 1 end
+check(n_prog == #T.defs, "every def compiled (" .. n_prog .. "/" .. #T.defs .. ")")
 
-section("texture() -> [png: modifiers")
-local function sheet_dims(def)
-	return def.vertical and def.w or def.w * def.frames,
-		def.vertical and def.h * def.frames or def.h
-end
-local struct_bad, unsafe, name_bad = {}, {}, {}
+section("program validity")
+local all_errs, total_bytes = {}, 0
+local max_blits, max_name = 0, ""
 for _, def in ipairs(T.defs) do
-	local tex = T.texture(def.name)
-	if tex:sub(1, 5) ~= "[png:" then name_bad[#name_bad + 1] = def.name end
-	local b64 = tex:sub(6)
-	-- texture-string safety: base64 payload must not contain modifier syntax
-	if b64:find("[^%w%+%/=]") then unsafe[#unsafe + 1] = def.name end
-	local w, h = sheet_dims(def)
-	if not validate_png(b64decode(b64), w, h, def.name) then
-		struct_bad[#struct_bad + 1] = def.name
-	end
+	local prog = T.textures[def.name]
+	total_bytes = total_bytes + #prog
+	local errs, blits = validate_program(prog, def)
+	if blits > max_blits then max_blits, max_name = blits, def.name end
+	for _, e in ipairs(errs) do all_errs[#all_errs + 1] = def.name .. ": " .. e end
 end
-check(#name_bad == 0, "all texture() results carry the [png: prefix")
-check(#unsafe == 0, "base64 payloads are texture-syntax-safe" ..
-	(#unsafe > 0 and (": " .. table.concat(unsafe, ", ")) or ""))
-check(#struct_bad == 0, "all decoded PNGs structurally valid with correct dims" ..
-	(#struct_bad > 0 and (": " .. table.concat(struct_bad, ", ")) or ""))
-
-local total, total_b64 = 0, 0
-for name, data in pairs(T.png_bytes) do
-	total = total + #data
-	total_b64 = total_b64 + #T.textures[name]
-end
-print(("    (%d textures: %.1f KiB png -> %.1f KiB inside modifier strings)")
-	:format(#T.defs, total / 1024, total_b64 / 1024))
+check(#all_errs == 0, "all programs valid ([combine], dims, bases, escapes)" ..
+	(#all_errs > 0 and ("\n    " .. table.concat(all_errs, "\n    ", 1, math.min(8, #all_errs))) or ""))
+print(("    (%d textures, %.1f KiB of program strings; largest sheet: %s with %d blits)")
+	:format(#T.defs, total_bytes / 1024, max_name, max_blits))
 
 section("helper accessors")
 local probe = T.defs[1].name
@@ -189,35 +248,20 @@ check(sh.name == T.texture("tech_fire_30frames.png")
 local vf = T.vframes("sus_nodes_white_noise_anim_4n.png", 64, 64, 1.2)
 check(vf.animation.type == "vertical_frames"
 	and vf.animation.aspect_w == 64 and vf.animation.aspect_h == 64, "vframes() builds vertical_frames tile table")
-local errored = false
 local ok_err = pcall(function() return T.texture("does_not_exist.png") end)
-errored = not ok_err
-check(errored, "texture() errors on unknown names")
+check(not ok_err, "texture() errors on unknown names")
 check(T.texture(probe) == T.T(probe), "T alias matches texture()")
-
-section("engine encoder path")
-stub_core.encode_png = function(w, h, data)
-	-- pretend-engine encoder: same signature, different bytes (simulate real deflate)
-	return "\137PNG\r\n\026\nENGINE" .. w .. "x" .. h .. ":" .. data
-end
-T.png_bytes, T.textures = {}, {}
-T.build_all()
-local engine_differs = T.png_bytes[probe] ~= nil
-check(engine_differs, "build_all uses core.encode_png when present")
-T.png_bytes, T.textures = {}, {}
-stub_core.encode_png = nil
-T.build_all()
 
 section("determinism")
 local first_pass = {}
-for k, v in pairs(T.png_bytes) do first_pass[k] = v end
-T.png_bytes, T.textures = {}, {}
+for k, v in pairs(T.textures) do first_pass[k] = v end
+T.textures, T.programs = {}, {}
 T.build_all()
 local deterministic = true
-for k, v in pairs(T.png_bytes) do
+for k, v in pairs(T.textures) do
 	if first_pass[k] ~= v then deterministic = false; print("    differs: " .. k) end
 end
-check(deterministic, "rebuild is byte-identical")
+check(deterministic, "recompile is byte-identical")
 
 section("stock-file detection")
 fake_dir_list[1] = { [1] = T.defs[1].name }
@@ -228,18 +272,18 @@ check(#T.stock_present() == 0, "stock_present empty with clean tree")
 
 section("mode=stock")
 settings["sl_texgen.mode"] = "stock"
-T.png_bytes, T.textures = {}, {}
+T.textures, T.programs = {}, {}
 T.build_all()
-check(next(T.png_bytes) == nil, "stock mode generates nothing")
+check(next(T.programs) == nil, "stock mode compiles nothing")
 check(T.texture(probe) == probe, "stock mode serves plain filenames")
 settings["sl_texgen.mode"] = "runtime"
-T.png_bytes, T.textures = {}, {}
+T.textures, T.programs = {}, {}
 T.build_all()
 
 section("chatcommand")
 check(chatcmds["sl_texgen"] ~= nil, "/sl_texgen registered")
 local ok, msg = chatcmds["sl_texgen"].func()
-check(ok and type(msg) == "string" and msg:find("textures registered") ~= nil, "/sl_texgen reports status")
+check(ok and type(msg) == "string" and msg:find("compiled") ~= nil, "/sl_texgen reports status")
 
 ----------------------------------------------------------------
 print(("== texgen_test: %d passed, %d failed"):format(pass_count, fail_count))

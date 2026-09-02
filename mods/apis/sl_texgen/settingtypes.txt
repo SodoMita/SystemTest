@@ -1,0 +1,5 @@
+# Texture pipeline mode for sl_texgen.
+#   runtime (default) = compile client-rendered [combine: programs
+#   stock             = serve plain filenames (restore texture files
+#                       from git history first)
+sl_texgen.mode (string) runtime
