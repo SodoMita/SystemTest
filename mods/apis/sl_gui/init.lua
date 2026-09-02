@@ -28,7 +28,10 @@ dofile(modpath .. "/system_tab.lua")
 -- WP5: Direct Message System + Secure Link UI (cybernetic comms)
 dofile(modpath .. "/dm_system.lua")
 
--- Unified inventory with tabs 📋 (must load AFTER system_tab and dm_system)
+-- WP5: Players roster tab (connected operators, teams, phase, HP)
+dofile(modpath .. "/players_tab.lua")
+
+-- Unified inventory with tabs 📋 (must load AFTER system_tab, dm_system, players_tab)
 dofile(modpath .. "/unified_inventory.lua")
 
 -- Character outfit / appearance menu
@@ -37,4 +40,4 @@ dofile(modpath .. "/character_outfit.lua")
 -- Old broken GUI (disabled)
 -- dofile(modpath .. "/player_gui.lua")
 
-minetest.log("action", "[gui] Custom GUI systems loaded! ✨ (5 tabs + secure link)")
+minetest.log("action", "[gui] Custom GUI systems loaded! ✨ (6 tabs + secure link)")
