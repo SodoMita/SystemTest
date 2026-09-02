@@ -1,16 +1,18 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-02 (rev 8)
-**Rev 8 adds:** the **owner art-gate rulings** (Turn 6 step 1 resolution,
-2026-09-02): no UI restyles except placeholder fills · no blur/AA ·
-strict palettes · content surfaces ≥32px · mobs hi-res + wire-glow. The
-four passes yield **no wholesale port** (per-file triage in
-`docs/art_baseline_survey.md` §10). Ported: `01a04bfa`'s 11 crisp 64×64
-clothing textures (master's were AA mush at 66-92% semi) and
-`01a049ee`'s 16×16 two-colour boxman player-texture fill (master had a
-2×2 placeholder). The `sl_scary` mob strips are re-inked (rev 7 fix) at
-64×64 frames — strict 3-colour wire-glow palettes, binary alpha — via
-`mods/content/sl_scary/pipeline/reink_mobs.py`.
+**Date:** 2026-09-02 (rev 9)
+**Rev 9 (correction of rev 8):** the owner art-gate rulings, re-read
+correctly on 2026-09-02: "no blur/AA" is a **UI-only** rule; other
+surfaces (nodes, mobs, craftitems, world) keep normal rendering and may
+use hi-res textures; **3D-model textures must not be swapped for
+AI-drawn flat art** — attempts ignore how the texture maps onto the
+model (catastrophic on the clothing b3d props and the `SimpleOutlinedBoxman`
+GLB). Rev-8's interim ports of `01a04bfa`'s clothing and
+`01a049ee`'s boxman texture are therefore **reverted** (byte-identical
+to master). The `sl_scary` strips keep the animation fix (rev 7) and
+the 64×64 re-ink — sprites are flat billboards, so hi-res art is safe.
+No wholesale pass port; per-file triage + port list:
+`docs/art_baseline_survey.md` §10.
 **Rev 7 adds:** the **art-baseline survey** (Turn 6 step 1, owner-gated):
 contact sheets + per-branch diff stats vs master + a pick recommendation
 for the four competing art passes — see `docs/art_baseline_survey.md`.

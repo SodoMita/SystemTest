@@ -15,16 +15,17 @@ sprite mobs render their whole 144×16 strip instead of animating it**
 It is unrelated to which art pass wins: all four passes carry the same
 broken strips, so the fix ships here regardless (see §7).
 
-> **Owner gate answered — 2026-09-02 (rev B).** Rulings: UI restyles are
-> removed except fills of nonexistent/placeholder art · no blur/AA
-> anywhere (binary alpha, crisp edges) · strict colour palettes · this
-> game's content surfaces are 32px+ (the 16×16 branch art was off-spec) ·
-> mobs may be higher-resolution and must follow the neon wire-glow theme.
-> Outcome: **nothing else from the four passes survives those rules** — a
-> per-file triage is in §10 — so the only additions to this branch are
-> (1) the mob re-ink at 64×64 (§7), (2) the 11 crisp 64×64 clothing
-> textures from `01a04bfa` and (3) the boxman player texture fill from
-> `01a049ee` (§10). See the rev-B curation note at the top of §1.
+> **Owner gate answered — 2026-09-02 (rev C, corrected).** Rulings:
+> *UI restyles* removed except fills of nonexistent/placeholder art ·
+> **"no blur/AA" applies to UI only** — other surfaces (nodes, mobs,
+> craftitems, world) may keep normal soft/gradient rendering and may use
+> high-resolution textures · **3D-model textures must not be swapped for
+> AI-drawn flat art** — those attempts don't respect how the texture maps
+> onto the model and end up catastrophic (clothing b3d props, the boxman
+> GLB body). Outcome: the branch carries the animation fix plus the mob
+> sprite re-ink at 64×64 (§7) — sprites are flat billboards, so hi-res
+> AI-derived art is safe there. Everything else from the four passes is
+> rejected or reverted (per-file triage §10).
 
 ---
 
@@ -32,9 +33,9 @@ broken strips, so the fix ships here regardless (see §7).
 
 | # | Decision | Detail |
 |---|---|---|
-| 0 | **Rev B (owner gate, 2026-09-02)** | Under the owner's rules — no UI restyles except placeholder fills, no blur/AA, strict palettes, content at 32px+, mobs hi-res + wire-glow — the four passes contain **no wholesale port**. Per-file triage §10. Ported instead: mob re-ink 64×64 (this branch), `01a04bfa`'s 11 crisp clothing textures, `01a049ee`'s boxman fill. |
+| 0 | **Rev C (owner gate, 2026-09-02)** | Rules: UI restyles removed except placeholder fills · no blur/AA is a UI-only rule (content keeps normal rendering + may be hi-res) · **3D-model textures are not AI-swappable**. The four passes contain **no wholesale port**; the interim clothing/boxman fills were **reverted** as AI-on-model nonsense. What stays: animation fix + 64×64 mob sprite re-ink (§7, §10). |
 | 1 | ~~Pick `01a04c31` as the node/content art slice~~ | **Superseded.** Its modebase/workshop tiles are 16×16 where master's surfaces are 64×64 → off-spec under the 32px+ ruling; excluded along with every other 16×16 pass re-author (incl. the beacons it adds for a sky/beacon system master does not have). |
-| 2 | **UI restyles (`01a04bfa` sl_gui/formspec/dignodes) removed** | Master's icons are 1-bit by design; the pass restyle is anti-aliased (semi up to 0.7) → forbidden. Only fills: the 2×2 boxman placeholder (from `01a049ee`, 16×16 2-colour, no AA). |
+| 2 | **UI restyles (`01a04bfa` sl_gui/formspec/dignodes) removed** | UI-only no-blur rule: master's icons are 1-bit by design and stay; the pass restyle is anti-aliased (semi up to 0.7) → forbidden. The interim boxman "fill" was reverted — it textures the player GLB model (owner: no AI flat art on 3D models). |
 | 3 | `01a0487d` (default family) still **deferred** | 241 files; only relevant if the world is re-skinned neon; keep stock unless ruled. |
 | 4 | **Companion fix + mob art on this branch** | Sprite strips now play (§7); mobs re-inked at 64×64 strict palette to match the wire-glow theme. |
 
@@ -176,9 +177,9 @@ walk, 6-7 attack, 8 death. This is the animation this PR turns on.
 **`cs_mobs_v2.png`** (rev B) — old soft 16px frames vs the new 64×64
 strict-palette wire-glow re-ink, per mob, frames 0-8.
 
-**`cs_ported.png`** (rev B) — the only branch fills that survived the
-owner rules: 11 crisp 64×64 clothing textures (`01a04bfa`) and the
-boxman player texture (`01a049ee`), old vs new.
+*(rev B's `cs_ported.png` — clothing/boxman AI fills — was removed in
+rev C: those textures wrap 3D models (b3d clothing props, the boxman
+GLB), and the owner ruled AI-drawn flat art must not be used there.)*
 
 ---
 
@@ -200,7 +201,7 @@ byte-identical across master and all four passes (`9b35b7f3`, `7c65c7e4`,
 `88a44e7f`), and every tree's `init.lua` calls `set_animation` on them.
 No branch ever fixed this, so the fix is pass-independent.
 
-**Fix shipped on this branch (rev B):**
+**Fix shipped on this branch (rev C):**
 
 1. `mods/content/sl_scary/pipeline/transpose_sprite_strip.py` — new,
    pure-stdlib, deterministic block transpose. 144×16 → **vertical**,
@@ -213,17 +214,17 @@ No branch ever fixed this, so the fix is pass-independent.
 3. Loot icons (`dredger_badge`, `containment_shard`, `corrupted_data`)
    used `^[resize:16x16` on the whole strip (a squashed-sheet icon);
    now `^[verticalframe:9:0` — a clean crop of the idle frame.
-4. **Mob art re-ink (owner rev-B ruling):** `pipeline/reink_mobs.py`
-   re-inks each 16×16 frame onto a strict palette — black silhouette +
-   the two spec accent colours (dredger rust `#CC6622`/neon-green
-   `#00FF41`; wraith void-purple `#1A0033`/neon-cyan `#00FFFF`;
-   containment crimson `#8B0000`/neon-amber `#FFBF00`) with **binary
-   alpha, zero anti-aliasing** — and scales 4× nearest to 64×64 frames.
-   Strips are now **64×576**. The soft 16px Seirin frames were exactly
-   the "awful, ignoring wire glow" look: 40-90 gradient colours/frame
-   with AA edges; the re-ink makes every mob read as a clean neon
-   silhouette in-engine (entities already carry `glow` 4-8). Preview:
-   `docs/art_baseline/cs_mobs_v2.png` (old vs new per mob, frame 0-8).
+4. **Mob art re-ink:** `pipeline/reink_mobs.py` re-inks each 16×16
+   frame onto a strict palette — black silhouette + the two spec accent
+   colours (dredger rust `#CC6622`/neon-green `#00FF41`; wraith
+   void-purple `#1A0033`/neon-cyan `#00FFFF`; containment crimson
+   `#8B0000`/neon-amber `#FFBF00`) — and scales 4× nearest to 64×64
+   frames. Strips are now **64×576**. Sprites are flat billboards, so
+   hi-res art is safe here (no UV to respect); the strict binary-alpha
+   palette is a stylistic choice (no-blur is a UI-only rule, and other
+   mob treatments — e.g. smoother AI hi-res sheets — remain open).
+   Preview: `docs/art_baseline/cs_mobs_v2.png` (old vs new per mob,
+   frames 0-8).
 5. `pipeline/README.md` and `GENERATED_ASSETS.md` document the vertical
    layout, the re-ink, and why.
 
@@ -291,12 +292,13 @@ here; flagged so it is not lost).
 
 ---
 
-## 10. Rev-B curation record (owner gate answered, 2026-09-02)
+## 10. Curation record (owner gate: rev C, 2026-09-02)
 
-Owner rulings applied: *UI restyles removed except fills of
-nonexistent/previous placeholders · no blur/AA (binary alpha) · strict
-palettes · content surfaces are 32px+ · mobs hi-res allowed + wire-glow
-theme · pick best per branch.*
+Owner rulings applied (rev C corrections): *UI restyles removed except
+fills of nonexistent/previous placeholders · "no blur/AA" applies to UI
+only; other surfaces keep normal rendering · content surfaces are 32px+
+· mobs/craftitems may use hi-res textures · 3D-model textures must not
+be swapped for AI flat art · pick best per branch.*
 
 Method: per-file byte diff of every branch tree vs master (not
 name-only — earlier "285 modified" counts were tree-skewed because the
@@ -309,12 +311,14 @@ palette ≤ ~12 colours, semi-transparent share ≈ 0.
 
 | File | From | Why |
 |---|---|---|
-| `sl_scary_*_strip.png` (3) | this branch | re-inked 64×576, strict 3-colour + binary alpha (see §7) |
-| `sl_clothing/textures/character_tool_*.png` (11) | `01a04bfa` | master's are 64×64 AA mush (semi 0.66-0.92, 90-172 colours); the pass re-authored them at the same native 64×64 with 6-8 colours, semi 0 → the only crisp, resolution-correct content fill in any pass. |
-| `sl_characters/textures/sl_boxman_neon.png` | `01a049ee` | master file is a 2×2 pixel (4-colour) placeholder used as the player-model texture across sl_gui avatars, boxman ghosts, bot bodies and beacon ghost nodes; 049ee drew a real 16×16 two-colour 1-bit face (no AA). 04bfa's version is AA'd → excluded. |
+| `sl_scary_*_strip.png` (3) | this branch | animation fix + re-ink at 64×64 frames (see §7). Sprites are flat billboards — no UV mapping — so hi-res (and AI-derived) art is safe here, per the owner. |
 
-Preview: `docs/art_baseline/cs_ported.png` (clothing old→new, boxman
-old→new) and `cs_mobs_v2.png` (mob old→new).
+### Reverted after rev B (owner: no AI flat art on 3D models)
+
+| File | From | Why reverted |
+|---|---|---|
+| `sl_clothing/textures/character_tool_*.png` (11) | `01a04bfa` | each file doubles as the material of a B3D clothing prop (`hood.b3d`, `cap.b3d`, … via `_outfit_texture`). AI-drawn flat art does not respect the model's UV mapping → catastrophic; master's originals restored. |
+| `sl_characters/textures/sl_boxman_neon.png` | `01a049ee` | textures the `SimpleOutlinedBoxman.glb` player body (plus ghosts/bots/avatars). The 2×2 master placeholder stays until real UV-aware skinning exists; AI 16×16 swap reverted. |
 
 ### Checked and rejected (all other pass differences)
 
@@ -325,7 +329,7 @@ old→new) and `cs_mobs_v2.png` (mob old→new).
 | `sl_gui` restyle (04bfa) | 117 | UI restyle; master icons are deliberate 1-bit; pass is AA'd (semi ≤ 0.7) |
 | formspec chrome, dignodes icons (04bfa) | 12 | UI restyle, AA'd |
 | construction ambience sheets (04bfa) | 22 | pass replaces master's crisp dark neon frames (semi 0, 0.9-1.0 dark, rich neon) with 2-36 colour near-transparent mush (semi 0.9-1.0) — a regression |
-| clothing/mvp/scary-node restyles by other passes | — | 16×16 (scary hide-spot faces, mvp faces) or AA'd (mvp restyle drops to 1-7 colours w/ semi) — off-spec |
+| clothing / mvp / scary-node restyles (04bfa + others) | — | **3D-model textures** (clothing b3d props, mvp obj/glb skins): AI flat art doesn't respect UV mapping — owner rule, reverted (§above). Scary hide-spot + mvp faces re-authored at 16×16 vs master 64×64 → resolution off-spec. |
 | weapons 37 placeholders | — | no pass contains `sl_weapons` art at all (all predate the mod); nothing to pick — still open (question 3) |
 | default world family (0487d) | 241 | optional world re-skin; untouched pending question 2 |
 
@@ -334,12 +338,13 @@ old→new) and `cs_mobs_v2.png` (mob old→new).
 1. (was: pick a pass) — resolved rev B: no wholesale pass; curation record above.
 2. World-family neon re-skin (`01a0487d`) — defer / rule?
 3. `sl_weapons` 37 icons — still placeholder in every tree; separate slice later?
-4. UI — keep master 1-bit series (recommended, now consistent with the boxman fill).
+4. UI — keep master's 1-bit series (recommended; nothing in the passes is UI-rule compliant).
 
-### Numeric verification (rev B files on this branch)
+### Numeric verification (current branch state)
 
-- `sl_scary_*_strip.png`: 64×576, exactly 3 opaque colours each (black +
-  2 accents), 0 semi-transparent pixels, binary alpha.
-- 11 clothing textures: 64×64, 6-8 colours, semi 0 (one file's 80
-  residual AA pixels re-hardened to binary).
-- `sl_boxman_neon.png`: 16×16, 2 colours, semi 0.
+- `sl_scary_*_strip.png`: 64×576 vertical strips, 9 frames of 64×64,
+  strict per-mob palette (black + 2 spec accents), binary alpha chosen
+  as a sprite style — note AA/blur is only *forbidden* for UI, so this
+  palette is a stylistic option, not a compliance requirement.
+- Clothing (`character_tool_*`) and `sl_boxman_neon.png` reverted to
+  master originals (byte-identical).
