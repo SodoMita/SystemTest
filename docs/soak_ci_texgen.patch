@@ -1,0 +1,23 @@
+# CI wiring for the sl_texgen runtime texture pipeline.
+#
+# The session's push token lacks the GitHub `workflows` permission, so
+# this one-hunk change to .github/workflows/soak.yml could not be
+# pushed. Apply it (or reconnect GitHub in Arena with workflows
+# scope) to gate merges on the texture suite:
+#
+#   git apply docs/soak_ci_texgen.patch
+#
+--- a/.github/workflows/soak.yml
++++ b/.github/workflows/soak.yml
+@@ -33,6 +33,12 @@
+       - name: Headless stub smoke test
+         run: luajit tests/smoke_test.lua
++
++      - name: Runtime texture generation suite ([png: modifiers)
++        run: |
++          luajit tests/texgen_test.lua
++          pip install -q lupa
++          python3 tools/texgen_check.py --verify
+ 
+       - name: Simulacrum Strand stub suite
+         run: luajit tests/strand_test.lua
