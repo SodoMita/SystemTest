@@ -34,7 +34,8 @@ batch.
 
 ## Carried TODOs
 
-- [ ] containment mob: regenerate a dedicated return frame (f2 != f0)
-      for a true 3-frame lurch loop (current sheet loops f0→f1→f0).
+- [ ] containment mob: replace interim ATTACK×2/DEATH rows (currently
+      reused lurch poses) with dedicated claw-slam attack frames and a
+      collapse death frame (2 AI calls, next art batch).
 - [ ] verify every new icon/tile in-engine (soak + visual pass) once the
       engine/lua gates run in CI.

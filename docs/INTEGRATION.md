@@ -1,21 +1,18 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-03 (rev 10)
-**Rev 10 adds (owner direction 2026-09-03):** mobs regenerated at
-**256px frames — 3 frames of animation per sheet** (was 64×64 × 9),
-in the **boxman neon wire-glow style**. The style reference render
-(`docs/art_baseline/boxman_style_render.png`) is produced from the
-actual `SimpleOutlinedBoxman.glb` + its 2×2 material by the committed
-`pipeline/render_boxman_ref.py` (software render — no engine in this
-sandbox). New sheets are 256×768 (3×256 cells), ~150-250 KB each;
-`pipeline/process_sprite.py` (new) keys/grooms AI sticker frames and
-stacks them vertically; all alive states replay the one 3-frame loop at
-different speeds, death freezes; loot icons now `^[verticalframe:3:0`.
-Weapons hi-res textures (owner): **queued** — the AI-image budget is 10
-images/turn and the mob set used it; `docs/art_baseline/weapons_hires_plan.md`
-categories the 37 files (16 item icons + 7 node faces + 2 pad rings +
-3 decals via AI; 9 effects procedural).
-**Rev 9 (correction of rev 8):** the owner art-gate rulings, re-read
+**Date:** 2026-09-03 (rev 11)
+**Rev 11 (owner correction of rev 10):** mob sheets are **9 frames each
+— FRONT, BACK, SIDE, WALK×3, ATTACK×2, DEATH** (256×2304 vertical,
+`spritediv {x=1,y=9}`) — not the rev-10 3-frame loops. `init.lua` maps
+idle→front/back/side turn, chase→walk cycle, melee→2-frame attack,
+death→freeze; loot icons `^[verticalframe:9:0`. `pipeline/build_mob_sheet.py`
+slices multi-panel AI art, keys it, normalises 256px cells and stacks
+the rows. Files: dredger 434 KB, wraith 391 KB, containment 498 KB (< 1
+MB cap). Containment ATTACK×2/DEATH rows are interim (lurch-pose
+reuse) until the next art batch replaces them. Style reference stays
+`docs/art_baseline/boxman_style_render.png`; preview `cs_mobs_v4.png`.
+**Rev 10 (superseded by rev 11):** mobs were 256px 3-frame loops.
+**Rev 9 (correction of rev 8):****Rev 9 (correction of rev 8):** the owner art-gate rulings, re-read
 correctly on 2026-09-02: "no blur/AA" is a **UI-only** rule; other
 surfaces (nodes, mobs, craftitems, world) keep normal rendering and may
 use hi-res textures; **3D-model textures must not be swapped for

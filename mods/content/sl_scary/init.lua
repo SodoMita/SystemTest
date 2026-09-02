@@ -746,31 +746,33 @@ minetest.register_node("sl_scary:hide_spot", {
 --   "Responsibility is horror. The scariest thing is 'I caused this.'"
 -- ============================================================
 
--- Sprite strip frame layout (256×768, 3 frames of 256×256 stacked
--- vertically, one alive-animation loop per mob):
---   Row 0 (y: 0-256):   idle pose   (loop start)
---   Row 1 (y: 256-512): mid-stride / sway / lurch (loop middle)
---   Row 2 (y: 512-768): opposite stride / sway return (loop end)
+-- Sprite strip frame layout (256×2304, 9 frames of 256×256 stacked
+-- vertically; owner 2026-09-03):
+--   Row 0 (y 0-256):     FRONT view    (idle turn pose 1)
+--   Row 1 (y 256-512):   BACK view     (idle turn pose 2)
+--   Row 2 (y 512-768):   SIDE view     (idle turn pose 3)
+--   Rows 3-5 (y 768-1536): walk cycle  (3 frames)
+--   Rows 6-7 (y 1536-2048): attack     (2 frames)
+--   Row 8 (y 2048-2304): death         (1 frame)
 --
 -- Luanti plays `sprite` visuals through `object:set_sprite(...)`, and the
 -- frame animation iterates along the frame *y* position only (see
 -- lua_api.md -> set_sprite).  Sheets must therefore be vertical with
--- `spritediv = {x=1, y=3}`; a horizontal strip renders as one undivided
+-- `spritediv = {x=1, y=9}`; a horizontal strip renders as one undivided
 -- texture, i.e. the whole sheet at once.
 --
--- All alive states reuse the same 3-frame loop at different speeds
--- (owner request: "3 frames of animation per sheet"); death freezes the
--- final frame.  Art is AI-generated at 256px cells in the boxman
--- wire-glow style (owner 2026-09-02: mobs = flat sprites, hires + neon
--- rim; reference render docs/art_baseline/boxman_style_render.png).
--- Frames are post-processed/assembled by
--- mods/content/sl_scary/pipeline/process_sprite.py.
+-- State mapping: idle slowly cycles FRONT→BACK→SIDE (a scanning turn);
+-- chase uses the walk cycle; close combat the 2-frame attack; on death
+-- the entity freezes on the death frame.  Art is AI-generated in the
+-- boxman wire-glow style (reference render
+-- docs/art_baseline/boxman_style_render.png), assembled per sheet by
+-- mods/content/sl_scary/pipeline/build_mob_sheet.py.
 
 local sprite_animations = {
-    idle   = {row = 0, frames = 3, framelength = 0.35},  -- slow drift
-    walk   = {row = 0, frames = 3, framelength = 0.18},  -- stride loop
-    attack = {row = 0, frames = 3, framelength = 0.07},  -- frenzy pulse
-    death  = {row = 2, frames = 1, framelength = 1/6},   -- freeze
+    idle   = {row = 0, frames = 3, framelength = 0.45},  -- slow turn
+    walk   = {row = 3, frames = 3, framelength = 0.18},  -- stride cycle
+    attack = {row = 6, frames = 2, framelength = 0.11},  -- lunge pair
+    death  = {row = 8, frames = 1, framelength = 1/6},   -- frozen
 }
 
 -- Helper: find a player within a cubic range (matches existing codebase API)
@@ -833,7 +835,7 @@ minetest.register_entity("sl_scary:dredger", {
         collisionbox = {-0.4, -0.5, -0.4, 0.4, 0.5, 0.4},
         visual = "sprite",
         textures = {"sl_scary_dredger_strip.png"},
-        spritediv = {x = 1, y = 3},
+        spritediv = {x = 1, y = 9},
         initial_sprite_basepos = {x = 0, y = 0},
         visual_size = {x=1.8, y=1.8, z=1.8},
         static_save = false,
@@ -1047,7 +1049,7 @@ minetest.register_craftitem("sl_scary:dredger_badge", {
     description = "Dredger ID Badge — 'KOWALSKI, F. — Maintenance Tech'\n" ..
                   "Overtime log: 96h continuous before incident.\n" ..
                   "'Exposed to hydraulic fluid. Personality changes noted.'",
-    inventory_image = "sl_scary_dredger_strip.png^[verticalframe:3:0",
+    inventory_image = "sl_scary_dredger_strip.png^[verticalframe:9:0",
     stack_max = 1,
 })
 
@@ -1079,7 +1081,7 @@ minetest.register_entity("sl_scary:containment", {
         collisionbox = {-0.8, -1.0, -0.8, 0.8, 1.0, 0.8},
         visual = "sprite",
         textures = {"sl_scary_containment_strip.png"},
-        spritediv = {x = 1, y = 3},
+        spritediv = {x = 1, y = 9},
         initial_sprite_basepos = {x = 0, y = 0},
         visual_size = {x=3.0, y=3.0, z=3.0},
         static_save = false,
@@ -1195,7 +1197,7 @@ minetest.register_craftitem("sl_scary:containment_shard", {
                   "Security Log 0433: 'Noise reported inside Section 12. Sealed.'\n" ..
                   "Security Log 0420: 'Sealed.'\n" ..
                   "Security Log 0352: 'Section 12 sealed.'",
-    inventory_image = "sl_scary_containment_strip.png^[verticalframe:3:0",
+    inventory_image = "sl_scary_containment_strip.png^[verticalframe:9:0",
     stack_max = 3,
 })
 
@@ -1226,7 +1228,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
         collisionbox = {-0.3, -0.6, -0.3, 0.3, 0.6, 0.3},
         visual = "sprite",
         textures = {"sl_scary_wraith_strip.png"},
-        spritediv = {x = 1, y = 3},
+        spritediv = {x = 1, y = 9},
         initial_sprite_basepos = {x = 0, y = 0},
         visual_size = {x=2.0, y=2.0, z=2.0},
         static_save = false,
@@ -1391,7 +1393,7 @@ minetest.register_craftitem("sl_scary:corrupted_data", {
     description = "Corrupted Data Fragment\n" ..
                   "\"...breach in sector...signal integrity compromised...\"\n" ..
                   "Reliability: UNKNOWN",
-    inventory_image = "sl_scary_wraith_strip.png^[verticalframe:3:0",
+    inventory_image = "sl_scary_wraith_strip.png^[verticalframe:9:0",
     stack_max = 5,
 })
 
