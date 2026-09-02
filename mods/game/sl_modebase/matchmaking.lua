@@ -160,33 +160,74 @@ local function get_matchmaking_formspec(player_name)
 	return table.concat(fs, "")
 end
 
+-- Per-player bot_pool selection. textlist sends "CHG:<index>" in
+-- fields.bot_pool, and clicking REMOVE only sends { bot_remove =
+-- "REMOVE" } — there is no way to recover the selected index from
+-- the REMOVE event alone. Track the index per player so the
+-- REMOVE handler knows which pool row to drop.
+--
+-- This is the same pattern used elsewhere in sl_modebase (see
+-- dm_system.lua's textlist tracking). Keyed by player name; cleared
+-- when the bot is removed so a stale index can't outlive its
+-- target.
+local bot_selection = {}
+
 -- Handle formspec fields
 minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if formname ~= "sl_modebase:matchmaking" then return end
 	local name = player:get_player_name()
+	-- Privilege check: every admin-mutating field below (win
+	-- conditions, settings, bot roster, match lifecycle) requires
+	-- sl_admin or the legacy server priv. The formspec only
+	-- RENDERS the admin widgets when is_admin, but a forged client
+	-- can still send the field. Without this gate, a non-admin
+	-- client could toggle win conditions or add bots by packet.
+	-- Read it once; the per-branch gate is in is_admin.
+	local privs = minetest.get_player_privs(name)
+	local is_admin = privs.sl_admin or privs.server
 
 	if fields.take_mm then
-		game_mode.set_monster_master(name)
-		game_mode.broadcast(S("@1 is now the Monster Master!", name))
-		if achievement_progress then
-			achievement_progress(player, "play_monster_master", 1)
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		else
+			game_mode.set_monster_master(name)
+			game_mode.broadcast(S("@1 is now the Monster Master!", name))
+			if achievement_progress then
+				achievement_progress(player, "play_monster_master", 1)
+			end
 		end
 	elseif fields.leave_mm then
-		game_mode.set_monster_master(nil)
-		game_mode.broadcast(S("Monster Master has resigned."))
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		else
+			game_mode.set_monster_master(nil)
+			game_mode.broadcast(S("Monster Master has resigned."))
+		end
 	elseif fields.cond_elimination then
-		state.win_conditions.elimination = (fields.cond_elimination == "true")
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		else
+			state.win_conditions.elimination = (fields.cond_elimination == "true")
+		end
 	elseif fields.cond_objective then
-		state.win_conditions.objective = (fields.cond_objective == "true")
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		else
+			state.win_conditions.objective = (fields.cond_objective == "true")
+		end
 	elseif fields.save_settings then
-		state.settings.beacon_hp = tonumber(fields.sett_beacon_hp) or 100
-		state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
-		state.settings.auto_start = (fields.sett_auto_start == "true")
-		minetest.chat_send_player(name, S("Match settings updated."))
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		else
+			state.settings.beacon_hp = tonumber(fields.sett_beacon_hp) or 100
+			state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
+			state.settings.auto_start = (fields.sett_auto_start == "true")
+			minetest.chat_send_player(name, S("Match settings updated."))
+		end
 	elseif fields.bot_add then
-		-- The formspec only emits the bots panel in mob mode for admins,
-		-- so the botmatch mod is guaranteed loaded here.
-		if not rawget(_G, "botmatch") or not botmatch.config.mob_mode then
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		elseif not rawget(_G, "botmatch") or not botmatch.config.mob_mode then
 			minetest.chat_send_player(name, "[System Looting] bot match harness not in mob mode")
 		else
 			local bot_name = (fields.bot_add_name or ""):match("^%s*(.-)%s*$") or ""
@@ -203,52 +244,88 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 				end
 			end
 		end
+	elseif fields.bot_pool then
+		-- textlist sends "CHG:<index>" when the user selects a
+		-- row, and "DCL:<index>" on double-click. The formspec
+		-- emits an unkeyed list (entries are the formatted
+		-- "Name | Team | Spawn" strings) so the engine has no
+		-- way to map the index back to a name without our help.
+		-- Resolve the index to a pool entry here and remember it
+		-- so the REMOVE button knows what to drop.
+		if not is_admin then
+			-- Non-admins can still see the list; we just don't
+			-- honor their selection. Silently ignore.
+		else
+			local ev = minetest.explode_textlist_event(fields.bot_pool)
+			if ev.type == "CHG" or ev.type == "DCL" then
+				local pool = get_bot_pool()
+				local entry = pool[ev.index]
+				if entry then
+					bot_selection[name] = entry.name
+				end
+			end
+		end
 	elseif fields.bot_remove then
-		if not rawget(_G, "botmatch") or not botmatch.config.mob_mode then
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		elseif not rawget(_G, "botmatch") or not botmatch.config.mob_mode then
 			minetest.chat_send_player(name, "[System Looting] bot match harness not in mob mode")
 		else
-			-- textlist returns the entry's display name, not its index,
-			-- because we passed an unkeyed list. Split on " | " to get
-			-- the original name.
-			local selected = fields.bot_pool or ""
-			local bot_name = selected:match("^([^|]+)") or ""
-			bot_name = bot_name:match("^%s*(.-)%s*$") or ""
-			if bot_name == "" then
+			-- textlist sends no row payload alongside the REMOVE
+			-- button event, so the only way to know which row to
+			-- drop is the index we cached when the user last
+			-- clicked the list. If the user never clicked
+			-- anything, prompt them to. If the cached index
+			-- points to a row that has since been removed, the
+			-- botmatch.remove_bot call returns its own error.
+			local bot_name = bot_selection[name]
+			if not bot_name or bot_name == "" then
 				minetest.chat_send_player(name, "[System Looting] select a bot first")
 			else
 				local ok, err = botmatch.remove_bot(bot_name)
 				if not ok then
 					minetest.chat_send_player(name, "[System Looting] " .. tostring(err))
 				else
+					bot_selection[name] = nil
 					minetest.chat_send_player(name, "[System Looting] removed bot " .. bot_name)
 				end
 			end
 		end
 	elseif fields.bot_clear then
-		if not rawget(_G, "botmatch") or not botmatch.config.mob_mode then
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
+		elseif not rawget(_G, "botmatch") or not botmatch.config.mob_mode then
 			minetest.chat_send_player(name, "[System Looting] bot match harness not in mob mode")
 		else
 			local ok, err = botmatch.clear_bots()
 			if not ok then
 				minetest.chat_send_player(name, "[System Looting] " .. tostring(err))
 			else
+				-- Every cleared bot was a candidate for selection;
+				-- forget the cache so a REMOVE on the now-empty
+				-- list doesn't try to drop a ghost name.
+				bot_selection[name] = nil
 				minetest.chat_send_player(name, "[System Looting] cleared the bot pool")
 			end
 		end
 	elseif fields.start_match then
 		-- Terminal launch goes through the ready check; creative-mode admins
 		-- (test harness) can bypass it for fast iteration.
-		local ok, msg
-		if minetest.settings:get_bool("creative_mode") then
-			ok, msg = game_mode.start_new_match(name)
+		if not is_admin then
+			minetest.chat_send_player(name, "[System Looting] admin only")
 		else
-			ok, msg = game_mode.begin_ready_check(name)
-		end
-		if not ok and msg then
-			minetest.chat_send_player(name, "[System Looting] " .. msg)
+			local ok, msg
+			if minetest.settings:get_bool("creative_mode") then
+				ok, msg = game_mode.start_new_match(name)
+			else
+				ok, msg = game_mode.begin_ready_check(name)
+			end
+			if not ok and msg then
+				minetest.chat_send_player(name, "[System Looting] " .. msg)
+			end
 		end
 	elseif fields.stop_match then
-		if state.match_active then
+		if is_admin and state.match_active then
 			game_mode.end_match(nil, S("Stopped by @1", name))
 		end
 	end

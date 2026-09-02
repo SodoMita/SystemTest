@@ -109,11 +109,26 @@ check(state.ready_check.countdown_left == 0, "countdown waits for full roster")
 minetest.registered_chatcommands.sl_ready.func("beta", "")
 minetest.registered_chatcommands.sl_ready.func("gamma", "")
 check(state.ready_check.countdown_left > 0, "countdown starts when all players are ready")
-H.advance(7, 0.5)
-check(state.match_active == true, "match starts after countdown")
-check(alpha:get_pos().x == state.teams.beacon_a.spawn.x
-	and alpha:get_pos().z == state.teams.beacon_a.spawn.z, "alpha inserted at beacon A spawn")
-check(beta:get_pos().x == state.teams.beacon_b.spawn.x, "beta inserted at beacon B spawn")
+	H.advance(7, 0.5)
+	check(state.match_active == true, "match starts after countdown")
+	-- After PR #14 (centralised find_spawn_pos) the spawn is no
+	-- longer at the exact team-spawn coordinate: that point is
+	-- inside the bastion pad, so the air-pocket search lands
+	-- the player just outside the pad (typically ring 3-4 from
+	-- the beacon). The relevant invariant is "near the team's
+	-- bastion", not "on top of the beacon node".
+	local function near_beacon(x, z, beacon_x, beacon_z, radius)
+		return math.abs(x - beacon_x) <= radius
+			and math.abs(z - beacon_z) <= radius
+	end
+	check(near_beacon(alpha:get_pos().x, alpha:get_pos().z,
+		state.teams.beacon_a.spawn.x, state.teams.beacon_a.spawn.z, 20),
+		"alpha inserted near beacon A (got "
+			.. tostring(alpha:get_pos().x) .. "," .. tostring(alpha:get_pos().z) .. ")")
+	check(near_beacon(beta:get_pos().x, beta:get_pos().z,
+		state.teams.beacon_b.spawn.x, state.teams.beacon_b.spawn.z, 20),
+		"beta inserted near beacon B (got "
+			.. tostring(beta:get_pos().x) .. "," .. tostring(beta:get_pos().z) .. ")")
 check(state.players.alpha.phase == "alive" and state.players.beta.phase == "alive",
 	"both players alive at insertion")
 
@@ -256,7 +271,19 @@ check(state.match_active == true, "new match active")
 check(state.players.alpha.phase == "alive", "evil-ghost state reset to alive")
 check(state.players.alpha.points == 0, "points reset")
 check(not state.ready_check.active, "no stale ready check")
-check(alpha:get_pos().y == state.teams.beacon_a.spawn.y, "respawned at team spawn")
+-- After PR #14 alpha is inserted at the air-pocket the
+-- game_mode.find_spawn_pos search landed, which is just
+-- outside the bastion pad — NOT at the team-spawn's
+-- beacon-top y. Verify the spawn is "near" the team's beacon
+-- rather than exactly at the team-spawn coordinate.
+local function near_beacon(x, z, beacon_x, beacon_z, radius)
+	return math.abs(x - beacon_x) <= radius
+		and math.abs(z - beacon_z) <= radius
+end
+check(near_beacon(alpha:get_pos().x, alpha:get_pos().z,
+	state.teams.beacon_a.spawn.x, state.teams.beacon_a.spawn.z, 20),
+	"respawned near beacon A (got "
+		.. tostring(alpha:get_pos().x) .. "," .. tostring(alpha:get_pos().z) .. ")")
 check(state.teams.beacon_b.hp == (state.settings.beacon_hp or 100),
 	"beacon HP restored at insertion (no stale damage; was " .. tostring(state.teams.beacon_b.hp) .. ")")
 
@@ -817,38 +844,22 @@ mmap.runtime.schematic = nil
 mmap.runtime.seed = nil
 mmap.prepare({ type = "procedural", seed = seed_a })
 
-section("PHASE 21b — mob spawn search: 2 unclaimed air nodes, no anchor overlap")
+section("PHASE 21b — air-pocket spawn search: 2 unclaimed air nodes, no anchor overlap")
 -- Regression for the "spawning in a node below beacon" report.
--- The previous version used a hard-coded round-robin {x,z} table
--- with y = 1.0, which collided with the procedural 5x5 bastion
--- pads and the altar pad. The fix: find_spawn_pos walks a
--- chebyshev-ring search from the team spawn and only returns a
--- position where
---   * the foot AND the head are both air,
---   * the floor directly below is solid,
---   * the candidate is outside the chebyshev footprint of every
---     structural anchor (beacon bastions, altar, MM pad),
---   * the candidate is not already claimed by another mob body.
---
--- We can't easily observe find_spawn_pos from the stub harness
--- (it's a local), so we do two things: (a) load the module under
--- a fresh stub-built arena and call botmatch.spawn_mob_body for
--- one bot per team, asserting the body lands on a valid air
--- pocket; (b) lock the SOURCE down so a regression to the static
--- round-robin fails the suite.
+-- Originally, game_mode.spawn_player (real players) AND the mob
+-- body spawner (bot bodies) used the static beacon-top
+-- coordinate as the spawn, which collided with the 5x5 bastion
+-- pad and the altar pad. The fix in PR #14 was to centralise
+-- the air-pocket search in sl_modebase/spawn.lua as
+-- game_mode.find_spawn_pos, then have both real players and
+-- bot bodies go through it. This phase exercises the search
+-- directly against a hand-built arena in a clean area, so a
+-- regression to the static spawn fails the suite.
 local saved_gm, saved_bm = game_mode, botmatch
-local stub_bm = {
-	mobs = {},
-	config = { bot_speed = 1.0 },
-	bots = {},
-	modpath = "mods/game/aaa_botmatch",
-}
 -- The spawn search needs the stub harness's get_node / set_node
 -- to behave, and it needs a real-ish game_mode with a map and
 -- teams. Build a minimal one in a clean arena area so the
 -- bastion pads, altar pad, and floor are present.
--- First, stub the boxman mesh so register_entity doesn't bail on
--- missing fields.
 local function build_test_arena(centre)
 	-- Clear a 24x24 region.
 	for x = centre.x - 12, centre.x + 12 do
@@ -900,130 +911,100 @@ local _stub_gm = {
 			},
 		},
 	},
-	get_player_state = function(n) return { phase = "alive", eliminated = false } end,
 }
 _G.game_mode = _stub_gm
-_G.botmatch = stub_bm
-local ok_mob_body, err_mob_body = pcall(dofile, "mods/game/aaa_botmatch/mob_player.lua")
-check(ok_mob_body, "mob_player.lua loads under the test arena stub"
-	.. (ok_mob_body and "" or (" -> " .. tostring(err_mob_body))))
--- The module writes to `botmatch.*` (which is the global) and
--- to `botmatch.mobs` (the spawn table). The test can read both
--- through the same global we set above; do NOT restore the live
--- globals yet, because spawn_mob_body needs them.
-if ok_mob_body then
-	-- The module sets botmatch.spawn_mob_body and botmatch.mobs.
-	-- We use the stub's botmatch (stub_bm) which the module wrote
-	-- to. Re-fetch them.
-	local spawn_fn = stub_bm.spawn_mob_body
-	local mobs_tbl = stub_bm.mobs or {}
-	check(type(spawn_fn) == "function", "mob_player.lua exposes spawn_mob_body")
-	-- Spawn one bot per team. spawn_mob_body expects (name, bot).
-	stub_bm.spawn_mob_body("bot_alpha", { team = "beacon_a" })
-	stub_bm.spawn_mob_body("bot_beta",  { team = "beacon_b" })
-	-- Find the resulting entity records.
-	local function find_entity(name)
-		for _, e in ipairs(H.entity_spawns) do
-			if e.name == "aaa_botmatch:player_mob"
-				and (e.staticdata == name or tostring(e.pos) == name) then
-				return e
-			end
-		end
-		-- Fallback: scan H.luaentities for the spawned body.
-		for _, e in pairs(H.luaentities) do
-			if e.name == "aaa_botmatch:player_mob"
-				and e._staticdata and tostring(e._staticdata) == name then
-				return e
-			end
-		end
-		return nil
-	end
-	-- The stub records the spawn pos in H.entity_spawns. Pull
-	-- the two most recent player_mob entries.
-	local mob_spawns = {}
-	for _, e in ipairs(H.entity_spawns) do
-		if e.name == "aaa_botmatch:player_mob" then
-			table.insert(mob_spawns, e)
-		end
-	end
-	check(#mob_spawns >= 2, "spawn_mob_body spawned two mob bodies (got " .. #mob_spawns .. ")")
-	-- For each spawn, the foot AND the head at (x, y, z) must be
-	-- air, and the floor at (x, y-1, z) must be a walkable node.
-	-- Critically, the spawn must NOT be at the team spawn (which
-	-- sits 1 above the beacon) — that was the original bug.
-	for i, s in ipairs(mob_spawns) do
-		local p = s.pos
-		local foot  = minetest.get_node({ x = p.x, y = p.y,     z = p.z }).name
-		local head  = minetest.get_node({ x = p.x, y = p.y + 1, z = p.z }).name
-		local floor = minetest.get_node({ x = p.x, y = p.y - 1, z = p.z }).name
-		check(foot == "air" or foot == "ignore",
-			"mob spawn " .. i .. " foot is air/ignore (got " .. foot .. ")")
-		check(head == "air" or head == "ignore",
-			"mob spawn " .. i .. " head is air/ignore (got " .. head .. ")")
-		check(floor ~= "air" and floor ~= "ignore" and floor ~= nil,
-			"mob spawn " .. i .. " floor is solid (got " .. tostring(floor) .. ")")
-		-- Must not be ON the team spawn (the original bug: y=1.0
-		-- at a fixed slot landed in the bastion pad). The team
-		-- spawns are at (centre.x±6, 3, centre.z); the actual
-		-- spawn y must be ≠ 3 AND the x must clear the bastion
-		-- footprint.
-		check(p.y ~= 3, "mob spawn " .. i .. " not at team-spawn height (got y=" .. tostring(p.y) .. ")")
-		-- The spawn must clear every structural anchor by the
-		-- documented footprint. The bastions are at x = ±6 from
-		-- centre, z = centre.z. The altar is at (centre, centre).
-		-- The MM pad is at (centre, centre+8). Half-extents are
-		-- 3, 2, 4 respectively, so spawn x must not be within 3
-		-- of (centre.x±6), spawn z must not be within 2 of
-		-- centre.z, and (z - centre.z) must not be within 4 of 8.
-		local off_x = math.abs(p.x - centre.x)
-		local off_z = math.abs(p.z - centre.z)
-		local near_beacon_a = (math.abs(p.x - (centre.x - 6)) <= 3) and (off_z <= 3)
-		local near_beacon_b = (math.abs(p.x - (centre.x + 6)) <= 3) and (off_z <= 3)
-		local near_altar    = (off_x <= 2) and (off_z <= 2)
-		local near_mm_pad   = (off_x <= 4) and (math.abs(p.z - (centre.z + 8)) <= 4)
-		check(not (near_beacon_a or near_beacon_b or near_altar or near_mm_pad),
-			"mob spawn " .. i .. " clears every structural anchor footprint (got x=" .. p.x .. " z=" .. p.z .. ")")
-	end
-	-- Two different spawn positions for the two bots (claims
-	-- ensure they don't share an air pocket).
-	if #mob_spawns >= 2 then
-		local p1, p2 = mob_spawns[1].pos, mob_spawns[#mob_spawns].pos
-		local same = (p1.x == p2.x and p1.y == p2.y and p1.z == p2.z)
-		check(not same, "two mob spawns do not collide on the same air pocket")
-	end
-	-- clear_mob_spawn_claims releases the claim pool.
-	check(type(stub_bm.clear_mob_spawn_claims) == "function",
-		"clear_mob_spawn_claims exported")
-	stub_bm.clear_mob_spawn_claims()
-	-- And a fresh spawn after clearing reuses the original slot.
-	stub_bm.spawn_mob_body("bot_gamma", { team = "beacon_a" })
-	local mob_spawns2 = {}
-	for _, e in ipairs(H.entity_spawns) do
-		if e.name == "aaa_botmatch:player_mob" then
-			table.insert(mob_spawns2, e)
-		end
-	end
-	check(#mob_spawns2 > #mob_spawns, "claim pool release lets a new bot spawn")
+-- game_mode.find_spawn_pos is a closure that captures its
+-- module-level helpers (is_passable, is_ground, candidate_ok,
+-- etc.) and its own claim table. We have to load the real
+-- spawn.lua to get them — but spawn.lua also writes the live
+-- spawn_player, which we don't want to overwrite. Save and
+-- restore the live game_mode around the load, so the search
+-- becomes available on _stub_gm without breaking anything.
+local saved_spawn_player = game_mode.spawn_player
+local ok_spawn, err_spawn = pcall(dofile, "mods/game/sl_modebase/spawn.lua")
+check(ok_spawn, "spawn.lua loads under the test arena stub"
+	.. (ok_spawn and "" or (" -> " .. tostring(err_spawn))))
+-- Restore the live spawn_player that the load just clobbered.
+game_mode.spawn_player = saved_spawn_player
+-- The search now lives on _stub_gm.find_spawn_pos.
+check(type(_stub_gm.find_spawn_pos) == "function",
+	"game_mode.find_spawn_pos is exposed by spawn.lua")
+-- Spawn one position per team.
+local p_a = _stub_gm.find_spawn_pos("beacon_a", "alpha")
+local p_b = _stub_gm.find_spawn_pos("beacon_b", "beta")
+-- The two positions must be distinct (the claim table ensures
+-- they don't share the same air pocket).
+check(not (p_a.x == p_b.x and p_a.z == p_b.z),
+	"two team spawns do not collide on the same air pocket (a="
+		.. p_a.x .. "," .. p_a.z .. " b=" .. p_b.x .. "," .. p_b.z .. ")")
+for i, p in ipairs({ { "beacon_a", p_a }, { "beacon_b", p_b } }) do
+	local tag, pos = p[1], p[2]
+	local foot  = minetest.get_node({ x = pos.x, y = pos.y,     z = pos.z }).name
+	local head  = minetest.get_node({ x = pos.x, y = pos.y + 1, z = pos.z }).name
+	local floor = minetest.get_node({ x = pos.x, y = pos.y - 1, z = pos.z }).name
+	check(foot == "air" or foot == "ignore",
+		tag .. " spawn foot is air/ignore (got " .. foot .. ")")
+	check(head == "air" or head == "ignore",
+		tag .. " spawn head is air/ignore (got " .. head .. ")")
+	check(floor ~= "air" and floor ~= "ignore" and floor ~= nil,
+		tag .. " spawn floor is solid (got " .. tostring(floor) .. ")")
+	-- The spawn must clear every structural anchor by the
+	-- documented footprint. The bastions are at x = ±6 from
+	-- centre, z = centre.z. The altar is at (centre, centre).
+	-- The MM pad is at (centre, centre+8). Half-extents are
+	-- 3, 2, 4 respectively, so spawn x must not be within 3
+	-- of (centre.x±6), spawn z must not be within 2 of
+	-- centre.z, and (z - centre.z) must not be within 4 of 8.
+	local off_x = math.abs(pos.x - centre.x)
+	local off_z = math.abs(pos.z - centre.z)
+	local near_beacon_a = (math.abs(pos.x - (centre.x - 6)) <= 3) and (off_z <= 3)
+	local near_beacon_b = (math.abs(pos.x - (centre.x + 6)) <= 3) and (off_z <= 3)
+	local near_altar    = (off_x <= 2) and (off_z <= 2)
+	local near_mm_pad   = (off_x <= 4) and (math.abs(pos.z - (centre.z + 8)) <= 4)
+	check(not (near_beacon_a or near_beacon_b or near_altar or near_mm_pad),
+		tag .. " spawn clears every structural anchor footprint (got x="
+			.. pos.x .. " z=" .. pos.z .. ")")
 end
--- Lock the source: the static round-robin slot table is gone,
--- the new search is present, and y is no longer hard-coded to 1.
+-- claim release: clear_spawn_claims lets a subsequent call
+-- reuse a previously claimed pocket.
+check(type(_stub_gm.clear_spawn_claims) == "function",
+	"game_mode.clear_spawn_claims is exposed by spawn.lua")
+_stub_gm.clear_spawn_claims()
+local p_a2 = _stub_gm.find_spawn_pos("beacon_a", "alpha")
+check(p_a2 and p_a2.x and p_a2.z,
+	"find_spawn_pos returns a valid position after claim release")
+-- Lock the source: the centralised search lives in
+-- sl_modebase/spawn.lua, and aaa_botmatch/mob_player.lua is a
+-- thin wrapper that delegates to game_mode.find_spawn_pos.
+local spawn_src
+do
+	local f = io.open("mods/game/sl_modebase/spawn.lua", "r")
+	spawn_src = f:read("*a"); f:close()
+end
+check(spawn_src:find("function game_mode.find_spawn_pos") ~= nil,
+	"sl_modebase/spawn.lua defines game_mode.find_spawn_pos")
+check(spawn_src:find("game_mode.spawn_claims") ~= nil
+	and spawn_src:find("function game_mode.clear_spawn_claims") ~= nil,
+	"sl_modebase/spawn.lua owns the shared claim table and clear hook")
+check(spawn_src:find("is_passable") ~= nil
+	and spawn_src:find("is_ground") ~= nil
+	and spawn_src:find("candidate_ok") ~= nil,
+	"sl_modebase/spawn.lua has the air/floor/candidate validators")
 local mob_src
 do
 	local f = io.open("mods/game/aaa_botmatch/mob_player.lua", "r")
 	mob_src = f:read("*a"); f:close()
 end
 check(mob_src:find("local SPAWN_SLOTS%s*=") == nil,
-	"static SPAWN_SLOTS table removed (search replaced it)")
-check(mob_src:find("find_spawn_pos") ~= nil,
-	"mob source defines the new find_spawn_pos search")
+	"static SPAWN_SLOTS table removed from mob_player.lua")
 check(mob_src:find("function%s+next_spawn_pos") == nil,
-	"old next_spawn_pos round-robin function removed")
-check(mob_src:find("is_passable") ~= nil
-	and mob_src:find("is_ground") ~= nil,
-	"mob source has the air/floor node validators")
-check(mob_src:find("mob_spawn_claims") ~= nil
-	and mob_src:find("clear_mob_spawn_claims") ~= nil,
-	"mob source tracks and clears spawn claims")
+	"old next_spawn_pos round-robin function removed from mob_player.lua")
+check(mob_src:find("game_mode.find_spawn_pos") ~= nil,
+	"mob_player.lua delegates to the centralised search")
+check(mob_src:find("local function find_spawn_pos") == nil
+	or mob_src:find("local function find_spawn_pos%(team, name%)") ~= nil,
+	[[mob_player.lua no longer carries the local search (the
+	wrapper is allowed but the heavy logic must be in sl_modebase)]])
 -- Restore the live globals so the harness is unchanged for any
 -- later phases (this test runs near the end of the suite).
 _G.game_mode = saved_gm

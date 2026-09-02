@@ -33,6 +33,14 @@ function game_mode.end_match(winner, reason)
 		game_mode.map.reset()
 	end
 
+	-- Release every spawn-search claim (mods/game/sl_modebase/spawn.lua
+	-- game_mode.find_spawn_pos). The map reset restored the nodes,
+	-- so the next match's spawns can reuse the same air pockets
+	-- without colliding with bodies from the just-ended match.
+	if game_mode.clear_spawn_claims then
+		game_mode.clear_spawn_claims()
+	end
+
 	-- Essence pool is per-match: nothing carries into the lobby, and
 	-- no provenance survives the reset (ruling §13.3, pool semantics).
 	if game_mode.essence_reset then

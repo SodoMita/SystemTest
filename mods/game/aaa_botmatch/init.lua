@@ -433,7 +433,15 @@ function botmatch.add_bot(name, team, live_spawn)
 	-- Default roster ordering: bots are spawned in pool order, so the
 	-- behavior tick's round-robin stays stable across additions.
 	if live_spawn then
-		spawn_one_bot(name)
+		-- BUGFIX: pass `team` so the bot's pl.team is set on
+		-- the player state before the mob body is spawned. Without
+		-- this, pl.team stays nil at spawn time, the body lands
+		-- in the lobby area instead of near the bastion, and
+		-- match.lua's auto-balance runs on the first match
+		-- insertion (it sees pl.team == nil and assigns the bot
+		-- to the OPPOSITE team of the explicit assignment).
+		-- The pool row carries the team; thread it through.
+		spawn_one_bot(name, team)
 	end
 	return true
 end
@@ -464,6 +472,20 @@ function botmatch.set_team(name, team)
 		return false, "cannot retag bots during a match (wait for lobby)"
 	end
 	botmatch.pool[idx].team = team
+	-- BUGFIX: if the bot is currently connected, sync the
+	-- player-state team so the next match insertion honors the
+	-- retag immediately. Without this, /sl_bots team updates
+	-- only the pool row; the live bot's pl.team stays on the
+	-- old team, and the match starts with the bot on the wrong
+	-- side until the next apply_pool call.
+	-- (apply_pool also syncs pl.team for already-spawned bots,
+	-- but apply_pool only runs at start_run and on /sl_bots
+	-- apply — set_team can be called between those without
+	-- touching the live state.)
+	if botmatch.bots[name] and rawget(_G, "game_mode") then
+		local pl = game_mode.get_player_state(name)
+		pl.team = team
+	end
 	return true
 end
 
@@ -666,13 +688,15 @@ function botmatch.hook_game_mode()
 			botmatch.finish_match(winner, reason)
 		end
 		orig_end(winner, reason)
-		-- sl_modebase's clean reset normalises every player's phase
-		-- to alive, so by this point every mob body is on the alive
-		-- path and the spawn search would otherwise reuse the old
-		-- claims. Clear them so the next match re-picks clean air.
-		if botmatch.config.mob_mode and botmatch.clear_mob_spawn_claims then
-			botmatch.clear_mob_spawn_claims()
-		end
+		-- sl_modebase's clean reset (called inside orig_end) now
+		-- releases the spawn-search claim table
+		-- (game_mode.clear_spawn_claims). We don't need to clear
+		-- it from here — the centralised path keeps real players
+		-- and bot bodies on the same bookkeeping. The old local
+		-- botmatch.clear_mob_spawn_claims call is now a no-op
+		-- shim that forwards to game_mode.clear_spawn_claims;
+		-- leaving the call in is harmless but adds an extra
+		-- function hop. Removed.
 		botmatch.schedule_next()
 	end
 
