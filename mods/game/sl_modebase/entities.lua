@@ -276,21 +276,32 @@ minetest.register_entity(MONSTER_NAME, {
 			})
 				self.object:set_rotation(vector.dir_to_rotation(dir))
 
-				-- Attack logic (never during the lobby stage)
-				if state.match_active and dist < 2.5 and self.attack_timer >= 1.2 then
-					self.attack_timer = 0
-					if self.current_target.type == "player" then
-						local p = minetest.get_player_by_name(self.current_target.name)
-						if p then
-							p:punch(self.object, 1.0, {
-								full_punch_interval = 1.0,
-								damage_groups = { fleshy = self.attack_damage or 4 },
-							}, nil)
-						end
-					else
-						-- Attack Beacon (uses state directly for unloaded nodes)
-						game_mode.damage_beacon(self.current_target.team_id, 5, "A Monster")
+			-- Attack logic (never during the lobby stage)
+			if state.match_active and dist < 2.5 and self.attack_timer >= 1.2 then
+				self.attack_timer = 0
+				if self.current_target.type == "player" then
+					local p = minetest.get_player_by_name(self.current_target.name)
+					if p then
+						p:punch(self.object, 1.0, {
+							full_punch_interval = 1.0,
+							damage_groups = { fleshy = self.attack_damage or 4 },
+						}, nil)
 					end
+				else
+					-- Attack Beacon (uses state directly for unloaded
+					-- nodes). Pass the monster's owner so the +1000
+					-- beacon-destruction credit and the MM's essence
+					-- pool both land on the Monster Master, not on a
+					-- literal "A Monster" string. The owner field is
+					-- nil for hazards (essence.lua) and the soak-loop
+					-- test_harness spawns, in which case we fall back
+					-- to the no-credit path.
+					local attacker = self.monster_owner
+					if not attacker or attacker == "" then
+						attacker = "A Monster"
+					end
+					game_mode.damage_beacon(self.current_target.team_id, 5, attacker)
+				end
 					
 					minetest.sound_play("monster_chase", {
 						pos = pos,

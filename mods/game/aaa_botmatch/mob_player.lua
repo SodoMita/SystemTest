@@ -29,23 +29,60 @@ for i = 1, 8 do EVIL_TEX[i] = NEON .. "^[colorize:#ff00ff:120" end
 
 local PLAYER_BOX = { -0.3, 0.0, -0.3, 0.3, 1.75, 0.3 }
 
+-- Visual size matches the real player's boxman (see spawn.lua and
+-- mods/content/sl_characters/model_boxman.lua). The mob used to
+-- render at 1x and looked like a tiny figurine; now it matches.
+local VISUAL_SCALE = { x = 10, y = 10 }
+
+-- SimpleOutlinedBoxman.glb animation ranges.
+--
+-- IMPORTANT — these are the SAME ranges declared for real players in
+-- mods/content/sl_characters/model_boxman.lua, expressed as
+-- frame_index / 60 (seconds along the animation track). The mob is
+-- a luaentity, so player_api.globalstep does NOT touch it (it only
+-- iterates connected real players); the mob has to call
+-- set_animation itself with the canonical ranges so it stays in
+-- visual sync with the player_api's frame of reference.
+--
+-- The third arg of set_animation is frame_loop_blend — a NUMBER,
+-- not a boolean. 0 means "play the range once and hold the last
+-- frame" (no blend into a loop). A previous version of this file
+-- passed `true` here, which Luanti silently accepted on the first
+-- call but rejected on the next phase transition with
+-- "bad argument #3 to set_animation (number expected, got boolean)".
+local ANIM_STAND     = { x = 0,         y = 0 }            -- rest pose
+local ANIM_WALK      = { x = 1/60,      y = 40/60 }        -- frames 1..40
+local ANIM_MINE      = { x = 41/60,     y = 60/60 }        -- frames 41..60
+local ANIM_WALK_MINE = { x = 61/60,     y = 99/60 }        -- frames 61..99
+local ANIM_SPEED_STAND = 2  -- matches model_boxman.lua: animation_speed = 2
+local ANIM_SPEED_WALK  = 2
+local ANIM_NO_LOOP_BLEND = 0  -- third arg MUST be a number, never a boolean
+
 local function apply_phase_props(self, phase, pl)
 	local obj = self.object
 	if phase == "alive" then
 		obj:set_properties({
-			visual_size = { x = 1, y = 1 },
+			visual_size = VISUAL_SCALE,
 			textures = NEON_TEX,
 			collisionbox = PLAYER_BOX,
 			selectionbox = PLAYER_BOX,
 			physical = true,
+			collide_with_objects = false, -- players pass through bots
 		})
+		obj:set_animation(ANIM_STAND, ANIM_SPEED_STAND, ANIM_NO_LOOP_BLEND)
 	elseif phase == "evil_ghost" and not (pl and pl.eliminated) then
+		-- Evil ghosts are PURGEABLE by the living: keep the
+		-- selectionbox so they can be targeted, but make the mesh
+		-- fully invisible (visual_size 0) so they don't render as
+		-- solid figures flying around the arena. No animation call
+		-- there is nothing to animate.
 		obj:set_properties({
-			visual_size = { x = 1.2, y = 1.2 },
+			visual_size = { x = 0, y = 0 },
 			textures = EVIL_TEX,
 			collisionbox = { 0, 0, 0, 0, 0, 0 },
 			selectionbox = PLAYER_BOX, -- purgeable by the living
 			physical = false,
+			collide_with_objects = false,
 		})
 		obj:set_velocity({ x = 0, y = 0, z = 0 })
 	else
@@ -55,9 +92,11 @@ local function apply_phase_props(self, phase, pl)
 			collisionbox = { 0, 0, 0, 0, 0, 0 },
 			selectionbox = { 0, 0, 0, 0, 0, 0 },
 			physical = false,
+			collide_with_objects = false,
 		})
 		obj:set_velocity({ x = 0, y = 0, z = 0 })
 	end
+	self.anim_walking = false
 end
 
 -- Walk one step along an A* path toward the behavior nav target.
@@ -74,7 +113,45 @@ local function pathfind_walk(self, bot, dtime)
 	local need_path = (not self.path) or now >= (self.repath_at or 0)
 		or (self.path[#self.path] and vector.distance(pos, self.path[#self.path]) < 1.0)
 	if need_path then
-		self.path = minetest.find_path(pos, target, 64, 1, 2, "A*_single")
+		-- minetest.find_path tuning for the botmatch arena:
+		--   searchdistance = 80: the auto-arena scales with
+		--     sl_botmatch.beacon_spacing (default 24, turbo 4).
+		--     A spacing of 24 puts the beacons 24 nodes apart, plus
+		--     ~6 nodes of midfield per side, so the worst-case
+		--     point-to-point distance is ~36 nodes. 80 is a
+		--     comfortable ceiling for the largest layout AND for
+		--     future handmade maps whose bastions are 30+ apart.
+		--   max_jump = 1: bots are full-size player entities
+		--     (collisionbox 1.75 tall, half-width 0.3) and can't
+		--     step over the 2-block-tall cobble cover that
+		--     build_arena drops in the midfield; routing AROUND is
+		--     the right behavior. If a future map needs bots that
+		--     jump 2+, the caller can override via
+		--     sl_botmatch.path_max_jump.
+		--   max_drop = 2: the team spawn is at y = 2 (beacon top)
+		--     and the arena floor is at y = 0, so the bot must
+		--     drop 2 to reach the floor. 2 is the minimum that
+		--     works on every current layout; bumping it is fine.
+		--   algorithm = "A*": the engine accepts "A*" (pre-fetch
+		--     variant), "A*_noprefetch" (default), and "Dijkstra".
+		--     The previous value "A*_single" is NOT a valid
+		--     algorithm name and find_path silently returned nil
+		--     for it, which made the bot fall through to the
+		--     straight-line fallback every tick. "A*" matches
+		--     what mods/content/sl_scary/init.lua uses for the
+		--     horror mobs, so the arena's pathfinder surface is
+		--     uniform.
+		-- The searchdistance, max_jump, and max_drop can be
+		-- overridden via sl_botmatch.path_searchdistance /
+		-- .path_max_jump / .path_max_drop in minetest.conf for
+		-- bespoke handmade maps. Defaults here are tuned for the
+		-- build_arena auto-arena.
+		local cfg = botmatch.config
+		local searchdist = (cfg and cfg.path_searchdistance) or 80
+		local max_jump   = (cfg and cfg.path_max_jump)       or 1
+		local max_drop   = (cfg and cfg.path_max_drop)       or 2
+		self.path = minetest.find_path(pos, target,
+			searchdist, max_jump, max_drop, "A*")
 		self.path_i = 2
 		self.repath_at = now + 1.5
 		if not self.path or #self.path < 2 then
@@ -110,6 +187,17 @@ local function pathfind_walk(self, bot, dtime)
 	obj:set_velocity({ x = dir.x * speed, y = obj:get_velocity().y, z = dir.z * speed })
 	if dir.x ~= 0 or dir.z ~= 0 then
 		obj:set_yaw(math.atan2(-dir.x, dir.z))
+		-- Switch from stand to walk only on the rising edge so we don't
+		-- hammer set_animation every tick. See the ANIM_* comment
+		-- block at the top of this file for the type contract on
+		-- the third arg (frame_loop_blend MUST be a number).
+		if not self.anim_walking then
+			obj:set_animation(ANIM_WALK, ANIM_SPEED_WALK, ANIM_NO_LOOP_BLEND)
+			self.anim_walking = true
+		end
+	elseif self.anim_walking then
+		obj:set_animation(ANIM_STAND, ANIM_SPEED_STAND, ANIM_NO_LOOP_BLEND)
+		self.anim_walking = false
 	end
 end
 
@@ -136,13 +224,25 @@ minetest.register_entity(MOB_NAME, {
 		visual = "mesh",
 		mesh = "SimpleOutlinedBoxman.glb",
 		textures = NEON_TEX,
+		visual_size = VISUAL_SCALE,
 		physical = true,
-		collide_with_objects = true,
+		-- Bots are unwalkable: real players pass through them so the
+		-- admin isn't pushed off course when a bot body happens to be
+		-- between them and the beacon. Selectionbox stays, so the bot
+		-- is still punchable.
+		collide_with_objects = false,
 		collisionbox = PLAYER_BOX,
 		selectionbox = PLAYER_BOX,
 		hp_max = 20,
 		makes_footstep_sound = true,
 		static_save = false,
+		-- The mob body shows its name in-world so the admin can
+		-- tell which bot is which. The default sl_modebase
+		-- spawn_player path hides player nametags; we override
+		-- that with a bright yellow tag in on_activate so mob
+		-- bots stand out from real players. (Stub bots have no
+		-- body and so are invisible in-world by design — they're
+		-- a headless harness, not a presence.)
 		nametag = "",
 	},
 
@@ -158,6 +258,18 @@ minetest.register_entity(MOB_NAME, {
 		if self.bot_name then
 			botmatch.mobs[self.bot_name] = self.object
 			self.object:set_armor_groups({ immortal = 1 }) -- damage flows through handlers, not entity HP
+			-- Show the display name in-world so the admin can
+			-- distinguish bots from real players at a glance.
+			-- The [mob] tag matches the /sl_bots list output
+			-- (see botmatch.display_name).
+			if botmatch.display_name then
+				self.object:set_nametag_attributes({
+					color = { a = 255, r = 255, g = 220, b = 80 },
+				})
+				self.object:set_properties({
+					nametag = botmatch.display_name(self.bot_name),
+				})
+			end
 		end
 	end,
 
@@ -206,10 +318,44 @@ minetest.register_entity(MOB_NAME, {
 	end,
 })
 
+-- ================================================================
+-- Mob spawn position: thin wrapper around game_mode.find_spawn_pos.
+--
+-- The real air-pocket search lives in sl_modebase/spawn.lua
+-- (game_mode.find_spawn_pos) so that both real players AND bot
+-- mob bodies use the same claim table. Real players
+-- (game_mode.spawn_player) and bot bodies (this file's
+-- spawn_mob_body) both walk the same spiral and add claims to
+-- the same game_mode.spawn_claims map, so a real player landing
+-- on beacon_a's bastion can't have a bot body later snap on top
+-- of them, and vice versa.
+--
+-- If game_mode.find_spawn_pos is missing (e.g. a test that loads
+-- mob_player.lua without sl_modebase), the wrapper falls back
+-- to the team spawn's static position. The fallback is the same
+-- one the previous local find_spawn_pos used, so a missing
+-- dependency surfaces as "spawned on the beacon" rather than
+-- "crashed in setup".
+-- ================================================================
+local function find_spawn_pos(team, name)
+	if rawget(_G, "game_mode") and game_mode.find_spawn_pos then
+		return game_mode.find_spawn_pos(team, name)
+	end
+	-- Fallback path: best-effort team spawn. (Used only when
+	-- mob_player.lua is loaded in isolation by a headless test
+	-- that does not initialize game_mode.)
+	local st = (rawget(_G, "game_mode") and game_mode.state) or {}
+	local ts
+	if st.teams and st.teams[team or ""] then
+		ts = st.teams[team].spawn
+	end
+	ts = ts or st.lobby_spawn or { x = 0, y = 1, z = 0 }
+	return { x = ts.x, y = ts.y, z = ts.z }
+end
+
 -- Spawn (or reuse) the body for a bot and wire the teleport hook.
 function botmatch.spawn_mob_body(name, bot)
-	local state = game_mode.state
-	local pos = { x = state.lobby_spawn.x, y = state.lobby_spawn.y + 1, z = state.lobby_spawn.z }
+	local pos = find_spawn_pos(bot and bot.team, name)
 	local obj = minetest.add_entity(pos, MOB_NAME, name)
 	if not obj then
 		minetest.log("error", "[botmatch][BUG] failed to spawn mob body for " .. name)
@@ -221,5 +367,16 @@ function botmatch.spawn_mob_body(name, bot)
 		local body = botmatch.mobs[ref:get_player_name()]
 		if body then body:set_pos({ x = p.x, y = p.y, z = p.z }) end
 	end
-	minetest.log("action", "[botmatch] mob body spawned for " .. name)
+	minetest.log("action", "[botmatch] mob body spawned for " .. name
+		.. " at (" .. string.format("%d,%d,%d", pos.x, pos.y, pos.z) .. ")")
+end
+
+-- Backward-compat shim for callers (and the old end_match
+-- wrapper in init.lua) that still call clear_mob_spawn_claims.
+-- The real claim table is game_mode.spawn_claims; this just
+-- forwards.
+function botmatch.clear_mob_spawn_claims()
+	if rawget(_G, "game_mode") and game_mode.clear_spawn_claims then
+		game_mode.clear_spawn_claims()
+	end
 end

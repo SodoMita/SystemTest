@@ -14,6 +14,14 @@ function game_mode.end_match(winner, reason)
 	state.match_active = false
 	state.match_ended_at = minetest.get_us_time() / 1000000
 
+	-- Score the match: survival + victory bonuses. Done BEFORE the
+	-- clean reset (which is below) because that normalizes every
+	-- player's phase to "alive" — we'd lose the alive/eliminated
+	-- distinction the survival bonus depends on.
+	if game_mode.award_match_end_points then
+		game_mode.award_match_end_points(winner, state.players)
+	end
+
 	-- Clean reset: cancel any pending ready check and neutralize live sabotages.
 	game_mode.cancel_ready_check()
 	game_mode.clear_all_sabotage()
@@ -23,6 +31,14 @@ function game_mode.end_match(winner, reason)
 	-- beacons, spawns), purge every mob and any match residue.
 	if game_mode.map and game_mode.map.reset then
 		game_mode.map.reset()
+	end
+
+	-- Release every spawn-search claim (mods/game/sl_modebase/spawn.lua
+	-- game_mode.find_spawn_pos). The map reset restored the nodes,
+	-- so the next match's spawns can reuse the same air pockets
+	-- without colliding with bodies from the just-ended match.
+	if game_mode.clear_spawn_claims then
+		game_mode.clear_spawn_claims()
 	end
 
 	-- Essence pool is per-match: nothing carries into the lobby, and
@@ -112,17 +128,36 @@ function game_mode.end_match(winner, reason)
 		pl.eliminated = false
 		pl.ghost_summoned_by = nil
 		pl.ghost_summon_pos = nil
+		pl.last_puncher = nil
+		-- Per-match score counters reset here (lifetime points / kills /
+		-- deaths are owned by the per-player state and persist across
+		-- matches; the awarded flag only prevents double-credit within
+		-- one match).
+		pl.kills = 0
+		pl.deaths = 0
+		-- pl.points and pl.earned_points are explicitly NOT reset
+		-- here: the result screen reads them before this point and
+		-- the tournament banking reads pl.earned_points just below.
+		-- They are zeroed at lobby-spawn time instead (see
+		-- spawn_player) so the next match starts from a clean slate.
+	end
+	if game_mode.clear_match_end_points_awarded then
+		game_mode.clear_match_end_points_awarded(state.players)
 	end
 
 	-- Tournament bookkeeping (v1.3.5): the tournament runs a fixed number
-	-- of matches. Each finished match banks its points into the roster's
-	-- season score; when the last planned match ends, the ranking form
-	-- pops out and one clean reset follows (see end_tournament).
+	-- of matches. Each finished match banks its EARNED points (kills +
+	-- objective completions) into the roster's season score. End-of-match
+	-- survival and victory bonuses are NOT banked — they show up on the
+	-- per-match result screen via pl.points but the season rank is
+	-- driven by play (kills + objectives), per the §13.3 owner ruling.
+	-- When the last planned match ends, the ranking form pops out and
+	-- one clean reset follows (see end_tournament).
 	if state.tournament then
 		for name, pl in pairs(state.players) do
 			if state.tournament_roster[name] then
 				state.tournament_scores[name] =
-					(state.tournament_scores[name] or 0) + (pl.points or 0)
+					(state.tournament_scores[name] or 0) + (pl.earned_points or 0)
 			end
 		end
 		state.tournament_matches_left = math.max(0,
@@ -191,6 +226,8 @@ local function reset_players_for_new_match()
 		pl.eliminated = false
 		pl.phase = "alive"
 		pl.points = 0
+		pl.earned_points = 0
+		pl.end_match_bonus = 0
 		pl.ghost_summoned_by = nil
 		pl.last_death_pos = nil
 
@@ -674,12 +711,39 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 	if not state.match_active then
 		return true -- Block damage in lobby
 	end
-	
+
 	if hitter and hitter:is_player() then
 		local hname = hitter:get_player_name()
 		local hpl = game_mode.get_player_state(hname)
 		if hpl and (hpl.phase == "ghost" or hpl.phase == "evil_ghost") then
 			return true -- Ghosts cannot directly attack players
+		end
+		-- Track the last non-ghost puncher so on_dieplayer can credit
+		-- the kill (used by the K/D-weighted point formula). Cleared
+		-- at end_match so a previous-match hit doesn't bleed across.
+		if player and player.get_player_name then
+			local vpl = game_mode.get_player_state(player:get_player_name())
+			if vpl then vpl.last_puncher = hname end
+		end
+	elseif hitter and hitter.get_luaentity then
+		-- A monster (or any luaentity hitter) is the source of the
+		-- damage. If the monster was summoned by a Monster Master,
+		-- credit the MM with the kill, not the player. The MM's
+		-- monsters (sl_modebase/entities.lua spawn_monster) carry
+		-- `monster_owner` on the luaentity; sl_scary horror mobs
+		-- spawned via game_mode.spawn_monster do too.
+		local lua = hitter:get_luaentity()
+		if lua and lua.monster_owner then
+			local owner_name = lua.monster_owner
+			-- Resolve the owner through game_mode so the
+			-- "Monster Master" redoubt's identity is whatever the
+			-- player_state.role says right now (the MM can change
+			-- mid-match if a new player takes the role).
+			if state.monster_master.player == owner_name
+				and player and player.get_player_name then
+				local vpl = game_mode.get_player_state(player:get_player_name())
+				if vpl then vpl.last_puncher = owner_name end
+			end
 		end
 	end
 end)
@@ -729,6 +793,15 @@ minetest.register_on_dieplayer(function(player, reason)
 
 	if not state.match_active then
 		return
+	end
+
+	-- Credit the killer: last_puncher is set by the on_punchplayer
+	-- handler above and is only valid for non-ghost, non-suicide
+	-- kills during an active match. award_kill_points is its own
+	-- gatekeeper, so this call is safe even if last_puncher is nil
+	-- (e.g. environmental death, like falling off the arena).
+	if game_mode.award_kill_points then
+		game_mode.award_kill_points(pl.last_puncher, name)
 	end
 
 	if pl.role == "monster_master" then
