@@ -106,64 +106,67 @@ MM) lets a whisper happen.
 
 ---
 
-## 5. DECISION — First-pass point values + the balance model (Phase 4)
+## 5. DECISION — Point economy, LOCKED to the three-path structure (Phase 4)
 
 **Tension.** We have no values yet — all scores read 0. The balance model is a
-constraint/optimization problem (per ROADMAP Phase 5). **I've stopped guessing and started
-deriving** — these are now pulled from the game's actual math, via
-`tools/point_economy_model.py` (reusable, runnable). The values are *derived*, not felt;
-I still need soak deltas to validate the *scale*, but the *relative ordering* is now
-principled.
+constraint/optimization problem (per ROADMAP Phase 5). **The derivation is done** via
+`tools/point_economy_model.py` (reusable, runnable), and the 76.9% it surfaced was the
+*symptom* of two disconnected economies — cured by the three-path structure. This section
+is the LOCKED starting point; the meeting's word is on **scale**, not ordering (which is
+already derived), and on whether points ride the strand ledger.
 
-### 5.1 Derived per-action values (from game math, not vibes)
+> **Status after glitch's votes (2026-09-02):** all six agenda decisions endorsed. The
+> remaining open word is (a) confirm the SCALE once soak deltas exist, (b) confirm
+> points-as-strand-events (glitch §8), (c) the exact negative-contract + floor-sweep items
+> from carmack/jax.
 
-The model sets points ∝ **win-progress created/denied** = (base time for the action) ×
-(its leverage against a kill). Grounded constants: player HP 20, combat blade 6 dmg/0.8s,
-energy blade 12 dmg/0.6s, beacon HP 100, beacon punch 5 dmg, sabotage corrosion 2 dmg/sec
-(up to 60 HP if uncleared), match 600s.
+### 5.1 Derived values (three-path, delivery-as-jackpot)
 
-| Action class | Derived value | Base time | Leverage | Why |
-|---|---|---|---|---|
-| Eliminate a living player | **+4** | 3.0s | 1.0 | Baseline. Removes one contributor. |
-| Repair a sabotaged system/beacon | **+6** | 0.8s | 6.0 | **Highest — one punch denies up to 60 beacon HP** (6× a 10-HP unit). Rewards the counterplay loop the GDD makes central. |
-| Beacon pressure | **+2 / 10 HP** | 1.6s | 1.0 | Scales with objective; capped so it can't dwarf a kill. |
-| Objective action (toward Core) | **+20 / step** | 8.0s | 2.0 | The headline win path. Highest per-step. |
-| Survive a sabotage | **+1** | 1.0s | 0.5 | Low direct win-progress. |
-| Monster Master income | **+1 / monster kill it commands**, +1 per survivor >30 s | — | — | Asymmetric; ties MM to monster *activity*. |
-| Evil Ghost | **forfeit all; earn +0** | — | — | The sacrifice, enforced (already in code). |
+Points ∝ **win-progress created/denied** = (base time) × (leverage against a kill).
+Grounded constants: player HP 20, combat blade 6/0.8s, energy blade 12/0.6s, beacon HP 100,
+beacon punch 5, sabotage corrosion 2 dmg/sec (up to 60 HP), match 600s. Run
+`python3 tools/point_economy_model.py` to reproduce.
 
-> **The important correction from the previous version:** I had kill at +1 and repair at
-> +2. The math says that under-values repair badly. One punch *denies* up to 60 beacon HP;
-> a kill removes one 20-HP contributor. So repair > kill per unit effort is the model's
-> clearest signal — and it lines up with the GDD's "detect, prevent, recover" emphasis.
+| Action | Value | Path | Base | Lev | Why |
+|---|---|---|---|---|---|
+| Eliminate a living player | **+4** | — | 3.0s | 1.0 | Baseline. Points come *primarily from killing crew* (owner rule). |
+| Repair a sabotaged system | **+6** | Shroud | 0.8s | 6.0 | Highest per effort — one punch denies up to 60 HP. |
+| Beacon pressure | **+2 / 10 HP** | Breach | 1.6s | 1.0 | Scales with objective. |
+| Gather data | **+2** | Signal | 2.0s | 1.0 | Cheap, repeatable, risky (the info channel). |
+| **Forge the Core** | **+19** | Signal | 10.0s | 1.5 | The readable build/commit moment. |
+| **Deliver the Core** | **+50** | Signal | 4.0s | 2.0 | THE WIN — a single fast climax, huge reward. |
+| Breach (crack enemy beacon) | **+6** | Breach | 4.0s | 1.3 | Aggressive win-progress. |
+| Deny (seal/corrupt) | **+4** | Shroud | 2.0s | 1.5 | Defensive denial. |
+| Survive a sabotage | **+1** | — | 1.0s | 0.5 | Low direct progress. |
+| Evil Ghost | **forfeit all; +0** | — | — | — | The sacrifice, enforced in code. |
+| MM essence | **not a score** | — | — | — | Owner rule: essence ≠ points; the core pays +3 essence. |
 
-### 5.2 What the model audits (and what it surfaced)
+### 5.2 Per-path audit (the honest test — does any path dominate or grind?)
 
-Run `python3 tools/point_economy_model.py` to reproduce. It solves an integer set and
-audits it against **realistic match frequencies** (2 kills, 4×10 beacon HP, 5 objective
-steps, 2 repairs, 2 survives = 130 pts):
+```
+signal   total  54 pts  |  dominant forge  at 35.2%   <- under the bar, good
+breach   total  58 pts  |  dominant breach at 51.7%   <- aggressive commit, fine
+shroud   total  48 pts  |  dominant deny   at 41.7%   <- defensive commit, fine
+```
 
-| Action | ×freq | Pts | Share |
-|---|---|---|---|
-| kill | ×2 | 8 | 6.2% |
-| beacon10 | ×4 | 8 | 6.2% |
-| **objective** | **×5** | **100** | **76.9%** |
-| repair | ×2 | 12 | 9.2% |
-| survive | ×2 | 2 | 1.5% |
+**What this means:** the forge is the Signal team's win-commitment but it's **under 40%** —
+not a grind. Delivery is a real climax (+50, short base). All three paths draw the **same
+pool**, so a team cannot do all three; committing starves the others, which is the decision
+*and* the enemy's read. kill-only supplies too few points to top the board — a killer must
+commit to a path.
 
-**What the model DECIDES for us:** 'kill-only' supplies only 6.2% → a killer **cannot** top
-the board without the Core (ROADMAP Phase-5 intent met). No negative sinks. repair:kill =
-6:4.
+### 5.3 Points are strand events (glitch §8) — the three free constraints
 
-**What the model CANNOT decide — the real meeting question:** objective dominates at
-**76.9%** of a full-match total. Is the Core the MVP, or a 1-dimensional scoreboard?
-- **(A) Core = MVP:** the builder IS the story; teammates are support. Simplest.
-- **(B) Split the Core (recommend):** give the *crafter* delivery points, give the
-  *defenders* beacon-pressure + survive + repair the rest, so every role shows on the
-  board. The GDD's "no single action >40%" intent is that every ROLE is visible — a 2v2
-  where only "who crafted" reads is a flat scoreboard.
+Emit point events onto the existing append-only, hash-chained ledger (`settle_run` at
+close). Three constraints come free:
 
-### 5.3 Constraints the model must respect
+1. **No score edits** — the result screen is the checksum readout; admin griefing can
+   append a lie, never rewrite a score.
+2. **No mid-run scoreboard** — a mid-run score is an *activity oracle* (a sudden +2 tells
+   the node someone is crafting). Don't build a read surface for unsettled events.
+3. **No-negative-sinks** becomes a one-line validation on the emitter.
+
+### 5.4 Constraints the model must respect
 - **Win-rate band:** side bias stays ~45–55% (no inherent team A/B advantage).
 - **K/D band per role:** no role pushes an impossible K/D (keeps the game from being
   "which side has the better slayer").
@@ -178,7 +181,7 @@ the board without the Core (ROADMAP Phase-5 intent met). No negative sinks. repa
 per-match point deltas + win rate; tune the SCALE constant (not the ratios) if a strong
 match lands too high or too low.
 
-### 5.4 What I need to finish this
+### 5.5 What I need to finish this
 The soak harness to emit **per-action point deltas** (it currently emits win rate, side
 bias, K/D, beacon damage, event counters — **not** per-action point deltas). Add that to
 the capture list in §7. With it I can lock the scale; the *ordering* is already derived.
