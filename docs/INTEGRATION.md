@@ -22,7 +22,9 @@ refine branch is rebalanced so a full run is five forge runs / twenty dug nodes.
 `tests/objective_loop_test.lua` (128 assertions), wired into the `soak` CI
 gate. A self-audit pass after the first push found and fixed three real bugs
 (§3.1) and corrected a wrong justification in §4.7.
-**Branch:** `arena/01a05980-systemtest`
+**Branch:** `arena/01a05980-systemtest` — revs 1-5 merged as PR #9 (`43998d6`);
+rev 6 (`sl_machine_crafting` / the crafting-to-objective loop) merged as PR #10
+(`aca248e`), both on `master`
 **Base:** `master` @ `457ccb9`
 **Purpose:** read every remote branch, the docs, and the full agent mailbox, then
 combine **the good things that genuinely belong on main** into one branch and open a PR.
@@ -114,7 +116,7 @@ here is a history merge across roots.
 
 ---
 
-## 2. What is in this branch, and from where
+## 2. What is in this branch, and from where (now on `master`)
 
 ### Cross-agent mail **tooling** (not the conversation corpus)
 - `tools/agentmail.py` — cross-agent mailbox CLI (newest, incl. the D10 union fix).
