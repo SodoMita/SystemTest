@@ -19,7 +19,9 @@ types existed on no map at all, so the chain was literally unwinnable — and th
 refine branch is rebalanced so a full run is five forge runs / twenty dug nodes.
 `game_mode.run_headless_objective_test()` (`/sl_test_objective`) no longer
 *narrates* the steps, it performs them. Covered by the new stub-only
-`tests/objective_loop_test.lua` (99 assertions), wired into the `soak` CI gate.
+`tests/objective_loop_test.lua` (128 assertions), wired into the `soak` CI
+gate. A self-audit pass after the first push found and fixed three real bugs
+(§3.1) and corrected a wrong justification in §4.7.
 **Branch:** `arena/01a05980-systemtest`
 **Base:** `master` @ `457ccb9`
 **Purpose:** read every remote branch, the docs, and the full agent mailbox, then
@@ -167,7 +169,7 @@ here is a history merge across roots.
 | `luajit tests/weapons_test.lua` | 288/288 (was: crash on missing stub `modpaths`, then 6+ real failures) |
 | `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors; map RNG pinned for a deterministic bot stream) |
 | `luajit tests/essence_test.lua` | 69/69 (rev 5: provenance, pricing, pool reset, +3 core craft — now routed through the Forge, ambient hazard thresholds, scoreboard untouched, readouts) |
-| `luajit tests/objective_loop_test.lua` | 99/99 (rev 6: forge anchor + materialization, salvage veins, inventory refuses every placeable, single-job/time-gated/loud forge runs, refine + core assembly, +3 essence on the core, delivery refusals, winning delivery, reset, forfeit, access control, `/sl_test_objective` performs the chain) |
+| `luajit tests/objective_loop_test.lua` | 128/128 (rev 6: forge anchor + materialization, salvage veins on **both** the test and procedural arenas, inventory refuses every placeable, single-job/time-gated/loud forge runs, refine + core assembly, +3 essence on the core, delivery refusals, winning delivery, reset, forfeit, access control, `/sl_test_objective` performs the chain, hardening regressions, the Core survives death, output spill, stations as forge outputs) |
 | sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 37 textures are 16×16 solid-colour placeholders (art baseline still deferred) |
 
 CI runs the new suites: `agent-mail` workflow (lint + unit tests) and the `soak`
@@ -211,9 +213,33 @@ therefore teed up as the next scoped steps (see §5, the owner decisions).
    suites validate the branch; the live soak is still an open step.
 7. **Two-station Core (rev 6, deferred).** §6.10 B's Assembly Station →
    `core_frame` → Objective Forge split, plus the remaining four stations
-   (Salvage Bench, Precision Fabricator, Signal Terminal) and the intermediate
-   item set they need. Every machine-gated recipe runs at the single Forge
-   today; splitting it is a content task, not a plumbing task.
+   (Salvage Bench, Signal Terminal). Every machine-gated recipe runs at the
+   single Forge today.
+
+   *Correction to the first draft of this entry:* it claimed the split is
+   blocked on an intermediate item set "that does not exist as content yet".
+   That is wrong — `metal_ingot`, `circuit_board`, `energy_crystal`,
+   `hardened_plate` and `reinforced_glass` are all registered craftitems
+   (`sl_modebase/content.lua`). The real blocker is **supply**: those items
+   are produced by *nothing* except `MONSTER_LOOT` (and `hardened_plate` /
+   `reinforced_glass` have no source at all). Re-authoring the Core over
+   them would move the win condition from scavenging to hunting — a
+   balance decision, not a plumbing one. See §4.8.
+
+8. **Two machine implementations (rev 6, known debt).** `sl_machine_crafting`
+   (the Forge — generic, drives its list from the shared recipe registry,
+   node-timer jobs) and `sl_weapons/fabricator.lua` (the Precision
+   Fabricator — specialist, its own `W.FAB_RECIPES` table and a globalstep
+   job queue) now coexist with duplicated job plumbing. They do not
+   conflict (disjoint recipe sets), and unifying them is deliberately
+   deferred: the Fabricator carries the 288-assertion weapons suite.
+   Unify on the Forge's node-timer engine when that suite can be re-pinned.
+
+9. **Handmade maps must author their own salvage (rev 6).** A schematic map
+   gets a forge anchor (`forge.pos`) but no salvage veins — the procedural
+   and test arenas seed theirs, a schematic is the author's content. A
+   handmade map without all four raw neon types cannot run the objective
+   loop. Documented in `mods/game/sl_modebase/maps/README.md`.
 
 ---
 
@@ -231,9 +257,8 @@ Drawn from `MASTER_DESIGN_FULL.md` §17 and the assessment snapshot:
    Forge is the machine step; salvage veins make the raw material obtainable;
    `tests/objective_loop_test.lua` exercises the real chain end to end. Still
    open (smaller): the §6.10 B plan wants **two** stations and a `core_frame`
-   intermediate, which needs an item set (`metal_ingot`, `circuit_board`,
-   `energy_crystal`, `hardened_plate`, `reinforced_glass`) that does not exist
-   as content yet — see §4.7.
+   intermediate — see §4.7 for what actually blocks it (supply, not
+   plumbing).
 5. **Green web release** — the WASM build fails (exit 77); `gh-pages` is not being
    advanced until it is fixed/made diagnosable.
 
@@ -260,6 +285,31 @@ Drawn from `MASTER_DESIGN_FULL.md` §17 and the assessment snapshot:
    the ruling text now carries the pool-reset semantics and the pricing source.
 
 ---
+
+### 3.1 Self-audit: three real bugs found after the first push
+
+Found by re-reading the new code against engine semantics rather than
+against the stub, and each one pinned by a test that fails when the
+fix is reverted:
+
+1. **`on_dig` emptied the charge even when `can_dig` refused.** `can_dig`
+   is a Lua-level convention — the engine calls `on_dig` regardless. A
+   player punching the forge mid-match (dig refused) would still have had
+   the input slots spilled: the crew loses the charge to a punch that did
+   nothing. `on_dig` now checks `can_dig` first.
+2. **The mid-run slot lock only blocked one direction.** Moving items
+   *into* `src` during a run was still allowed, so an announced job could
+   be topped up. Both directions are blocked now.
+3. **The payout could silently delete a win-condition item.** It trusted
+   `add_item`'s return value, which the headless stub does not model. The
+   output capacity is now computed explicitly (`put_or_spill`), so an
+   over-full output slot spills at the foot of the machine in both the
+   stub and the engine.
+
+Also swept: the forge's `src`/`dst` are now emptied and its timer stopped
+at match end, so last match's charge cannot survive into the next one on
+arenas that are journal-restored instead of rebuilt (external/adopted
+maps).
 
 ## 6. Commit list (from `master`)
 

@@ -84,7 +84,10 @@ step that fails.
   MM, objective mode off, no active match), the winning delivery, reset,
   match-end forfeit, access control (both entry points), and
   `/sl_test_objective`.
-- **`tests/essence_test.lua` 61 → 69.** Phase E10 was rewritten: it now
+- **`tests/objective_loop_test.lua` 99 → 128.** Audit pass added:
+  refused-dig / slot-lock / match-end-sweep hardening, procedural-arena
+  veins, the Core surviving death, output spill, and stations as forge
+  outputs (O13–O17). Phase E10 was rewritten: it now
   asserts the Core is refused in the inventory and routes the +3 through
   the Forge. The +3 assertion itself is unchanged — only the route
   moved, which is exactly what Turn 1's "until the machine chain lands"
@@ -100,7 +103,7 @@ Golden ladder after the change:
 | `luajit tests/strand_test.lua` | 84/84 |
 | `luajit tests/weapons_test.lua` | 288/288 |
 | `luajit tests/essence_test.lua` | 69/69 |
-| `luajit tests/objective_loop_test.lua` | 99/99 |
+| `luajit tests/objective_loop_test.lua` | 128/128 |
 | `luajit tests/soak_stub_turbo.lua` | PASS |
 | LuaJIT `-bl` syntax gate over `mods/**/*.lua` | clean |
 
@@ -119,6 +122,74 @@ Core via `core_frame` — needs an intermediate item set
 (`metal_ingot`, `circuit_board`, `energy_crystal`, `hardened_plate`,
 `reinforced_glass`) that is not content yet; it is filed in
 `INTEGRATION.md` §4.7 rather than faked.
+
+## Self-audit pass (after the first push)
+
+Re-reading the new code against **engine** semantics rather than against
+the stub turned up three real bugs and one wrong sentence in the docs.
+Each bug is now pinned by a test that fails when the fix is reverted
+(verified by reverting them one at a time).
+
+**Bugs fixed**
+
+1. **`on_dig` emptied the charge even when `can_dig` refused.** `can_dig`
+   is a Lua-level convention — the engine calls `on_dig` regardless of
+   what it would say. A player punching the forge mid-match would have
+   had the input slots spilled and the dig then refused: the crew loses
+   the charge to a punch that did nothing. `on_dig` now checks `can_dig`
+   first and touches nothing when it says no.
+2. **The mid-run slot lock only blocked one direction.**
+   `allow_metadata_inventory_move` blocked moving items *out of* `src`
+   while a job ran, but not *into* it — so an already-announced job
+   could be topped up. Both directions are blocked now.
+3. **The payout could silently delete a win-condition item.** It trusted
+   `add_item`'s return value, which the headless stub does not model
+   (its `add_item` always succeeds). Output capacity is now computed
+   explicitly (`sl_machine.put_or_spill`), so an over-full output slot
+   spills at the foot of the machine under both the stub and the engine.
+
+Also: the forge's `src`/`dst` are emptied and its node timer stopped at
+match end, so last match's charge cannot survive into the next one on
+arenas that are journal-restored instead of rebuilt.
+
+**Doc corrections**
+
+* I wrote that §6.10 B's two-station Core is blocked on an intermediate
+  item set "that does not exist as content yet". **Wrong** —
+  `metal_ingot`, `circuit_board`, `energy_crystal`, `hardened_plate`
+  and `reinforced_glass` are all registered craftitems in
+  `sl_modebase/content.lua`. The real blocker is **supply**: nothing
+  *makes* them except `MONSTER_LOOT`, and `hardened_plate` /
+  `reinforced_glass` have no source at all. Re-authoring the Core over
+  them would turn the win condition from scavenging into hunting — a
+  balance call, not a plumbing one. Corrected in INTEGRATION §4.7,
+  MASTER_DESIGN_FULL §6.10 and the mod README.
+
+**Things the audit found that are true but not this turn's problem**
+
+* **Two machine implementations now coexist.** `sl_weapons/fabricator.lua`
+  (Precision Fabricator) already had its own job engine — its own
+  `W.FAB_RECIPES` table and a globalstep queue — before this mod
+  landed, and I did not notice it while building the Forge. They do not
+  conflict (disjoint recipe sets; the Fabricator's outputs are not in
+  the shared registry), but the job plumbing is duplicated. Filed as
+  INTEGRATION §4.8; unifying carries the cost of re-pinning the
+  288-assertion weapons suite, so it was not done here.
+* **Dead recipes resurrected, for free.** `sl_weapons:fabricator` and
+  `sl_modebase:ghost_altar` are registered nodes with
+  `register_craft_recipe` entries, so the inventory gate had already
+  made them unobtainable — stations with no way to build them. They are
+  Forge outputs now. Asserted in the suite (O17).
+* **Handmade maps get a forge but no salvage.** A schematic map seeds no
+  veins, so it cannot run the objective loop unless the author places
+  all four raw neon types. Documented in `maps/README.md` rather than
+  papered over with a hidden fallback.
+* **Only one engine grid recipe exists** (`sl_modebase:scanner`), and it
+  is a non-placeable information item — so the §6.5 rule is not being
+  bypassed anywhere. Checked.
+* `stack_max = 1` stops the Core stacking in one slot but does not stop
+  a player filling spare slots with several Cores. Not exploited in
+  practice (the charge is scarce), left as-is on purpose.
 
 ## CI wiring — NOT committed (needs a token with `workflows: write`)
 

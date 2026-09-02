@@ -60,6 +60,7 @@ beacon_a.pos = 6,2,24     # beacon A node; players spawn on top
 beacon_b.pos = 42,2,24
 altar.pos = 24,2,24       # ghost altar node
 mm.pos = 24,2,41          # Monster Master spawn pad
+forge.pos = 24,2,28       # Objective Forge node (machine crafting)
 lobby.pos = 24,1,4        # lobby player STAND position (not a node)
 ghost.pos = 24,12,24      # cloud cage anchor
 
@@ -72,9 +73,14 @@ mobs.2 = 36,2,12,scout
 
 Rules of thumb:
 
-* The beacons, altar and MM pad **nodes** are placed by the game at the
-  anchor positions — you build the structures around them, not the
-  nodes themselves.
+* The beacons, altar, MM pad and **Objective Forge** nodes are placed by
+  the game at the anchor positions — you build the structures around
+  them, not the nodes themselves.
+* **You must author your own salvage.** The procedural and test arenas
+  seed their own veins of `ground:square_neon`, `ground:rhombus_neon`,
+  `ground:x_neon` and `ground:x2_neon`; a schematic map seeds nothing,
+  because the schematic is your content. Without a source for all four
+  raw neon types the Objective Core chain cannot run on your map.
 * Anchors that end up floating in the air get an automatic 3x3 pad
   underneath; still, placing them on your own structures looks better.
 * Missing keys fall back to sensible defaults on top of the schematic
@@ -109,6 +115,7 @@ sl_map.cage_pos      = 5,5      # cloud cage column (default: arena centre)
 sl_map.beacon_a_pos  = -30,2    # beacon A bastion (default: midfield line)
 sl_map.beacon_b_pos  = 30,2     # beacon B bastion (default: midfield line)
 sl_map.mm_base_pos   = 0,40     # Monster Master redoubt (default: +Z edge)
+sl_map.forge_pos     = 0,4      # Objective Forge (default: 4 nodes +Z of centre)
 ```
 
 Unset entries keep the stock arrangement. The resolved layout is carried on
@@ -117,4 +124,5 @@ overridden anchors exactly even if the settings are edited mid-match;
 `/sl_map save` exports whatever is currently standing, overrides included.
 If both beacon positions are set to the same spot, beacon B falls back to
 its default with a warning. The same anchors can be fixed for handmade maps
-via `map.conf` (`beacon_a.pos` / `beacon_b.pos` / `mm.pos` / `ghost.pos`).
+via `map.conf` (`beacon_a.pos` / `beacon_b.pos` / `mm.pos` / `forge.pos` /
+`ghost.pos`).

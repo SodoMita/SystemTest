@@ -396,13 +396,13 @@ inventory recipes.
 > refine branch is batched so a full Core costs five forge runs / twenty dug
 > nodes. **Still to do here:** the five-station table above collapses to one
 > station today, and the two-step Core (`core_frame` at an Assembly Station,
-> then the Forge) needs the intermediate item set — `metal_ingot`,
-> `circuit_board`, `energy_crystal`, `hardened_plate`, `reinforced_glass` —
-> which is not content yet. Tracked in `docs/INTEGRATION.md` §4.7.
-
-**C. Form items (revival forms).** One craftitem per underground form, consumed on
-use in the cloud cage, mutually exclusive per death:
-`form_key_stalker`, `form_key_scout`, `form_key_brute`. Cost: monster spoils only,
+> then the Forge) is not built. The blocker is **supply, not content**:
+> `metal_ingot`, `circuit_board`, `energy_crystal`, `hardened_plate` and
+> `reinforced_glass` all exist as craftitems, but nothing *makes* them —
+> they come only from `MONSTER_LOOT`, and `hardened_plate` /
+> `reinforced_glass` have no source at all. Routing the win condition
+> through them turns the Core from a scavenging objective into a hunting
+> one. Tracked in `docs/INTEGRATION.md` §4.7.
 so a form is paid for by the living player *before* they die — a bet, not a menu.
 Evil Ghost stays the fourth option and keeps its points forfeit.
 

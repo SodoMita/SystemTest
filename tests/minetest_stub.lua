@@ -504,6 +504,15 @@ function M.fire_joinplayer(p)
 	for _, fn in ipairs(handlers.joinplayer) do fn(p) end
 end
 
+-- Deaths normally come from set_hp(0); this fires the dieplayer chain
+-- directly, for suites that need to observe the death fountain without
+-- modelling damage.
+function M.fire_dieplayer(p, reason)
+	for _, fn in ipairs(handlers.dieplayer) do
+		fn(p, reason or { type = "unknown" })
+	end
+end
+
 function M.run_mods_loaded()
 	for _, fn in ipairs(handlers.mods_loaded) do fn() end
 end

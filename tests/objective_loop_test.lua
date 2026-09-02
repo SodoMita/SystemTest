@@ -549,5 +549,160 @@ end
 check(logged_core, "the diagnostic reached a forged Objective Core")
 check(not state.match_active, "the diagnostic's delivery ended its match")
 
+-- ----------------------------------------------------------------
+section("PHASE O13 — hardening: a refused dig must not eat the charge")
+-- can_dig is a Lua-level convention: the engine calls on_dig whether
+-- or not can_dig would refuse. A naive on_dig would spill the charge
+-- and then have the dig refused — the crew loses the charge to a
+-- punch that did nothing.
+local started4 = gm.start_new_match("objective loop suite")
+check(started4 == true, "fourth match starts")
+fpos = gm.map.current.anchor.forge
+forge_def.on_construct(fpos)
+finv = minetest.get_meta(fpos):get_inventory()
+finv:add_item("src", ItemStack("ground:x_neon 4"))
+forge_def.on_dig(fpos, minetest.get_node(fpos), alpha)
+check(finv:contains_item("src", ItemStack("ground:x_neon 4")),
+	"a dig refused by can_dig leaves the charge in the slots")
+check(H.voxels[H.vhash(fpos)] == FORGE, "and the forge is still standing")
+
+-- Inputs lock in BOTH directions while a job runs.
+finv:add_item("src", ItemStack("ground:x_neon 4"))
+local move_entry = recipe_for("construction:plasma")
+sl_machine.start_job(fpos, move_entry, "alpha")
+check(forge_def.allow_metadata_inventory_move(fpos, "main", 1, "src", 1, 4, alpha) == 0,
+	"nothing can be moved INTO the input slots mid-run either")
+check(forge_def.allow_metadata_inventory_move(fpos, "src", 1, "main", 1, 4, alpha) == 0,
+	"nothing can be moved OUT of the input slots mid-run")
+
+gm.end_match("beacon_a", "objective loop suite sweep")
+H.advance(1, 0.5)
+check(not finv:contains_item("src", ItemStack("ground:x_neon")),
+	"the match-end sweep leaves the forge slots empty")
+check(minetest.get_meta(fpos):get_string("job_output") == "", "and idle")
+
+-- Outside a match the forge can be mined, and the charge spills
+-- rather than being deleted with the machine.
+finv:add_item("src", ItemStack("ground:x_neon 4"))
+local drops_before = #H.item_drops
+forge_def.on_dig(fpos, minetest.get_node(fpos), alpha)
+check(#H.item_drops > drops_before, "mining a cold forge spills its charge on the floor")
+
+-- ----------------------------------------------------------------
+section("PHASE O14 — the production arena feeds the same loop")
+-- The test arena is deterministic; the procedural arena is what
+-- players actually load. It must seed the same salvage veins — before
+-- this turn the exotic neon types existed on no map at all.
+gm.map.prepare({ type = "procedural", seed = 424242, origin = { x = 0, y = 30, z = 0 } })
+local pd = gm.map.current
+check(pd ~= nil and pd.type == "procedural", "procedural arena built")
+check(pd.anchor.forge ~= nil, "the procedural arena resolves a forge anchor")
+check(H.voxels[H.vhash(pd.anchor.forge)] == FORGE, "the procedural arena materializes the forge")
+local pv = {}
+for _, t in ipairs({ "ground:square_neon", "ground:rhombus_neon",
+	"ground:x_neon", "ground:x2_neon" }) do
+	pv[t] = count_in_box(t,
+		{ x = pd.minp.x, y = pd.origin.y + 1, z = pd.minp.z },
+		{ x = pd.maxp.x, y = pd.origin.y + 1, z = pd.maxp.z })
+end
+check(pv["ground:square_neon"] >= 8, "procedural square veins (" .. pv["ground:square_neon"] .. " nodes)")
+check(pv["ground:rhombus_neon"] >= 4, "procedural rhombus veins (" .. pv["ground:rhombus_neon"] .. " nodes)")
+check(pv["ground:x_neon"] >= 4, "procedural x veins (" .. pv["ground:x_neon"] .. " nodes)")
+check(pv["ground:x2_neon"] >= 4, "procedural x2 veins (" .. pv["ground:x2_neon"] .. " nodes)")
+
+-- Stations are placeables, so they are Forge outputs too. These were
+-- dead recipes before this turn: registered nodes, already refused by
+-- the inventory gate, with no machine anywhere to run them.
+local machine_outputs2 = {}
+for _, entry in ipairs(sl_machine.get_recipes()) do
+	machine_outputs2[entry.recipe.output] = true
+end
+check(machine_outputs2["sl_modebase:ghost_altar"] == true,
+	"the Ghost Altar is reachable at the forge (it was a dead recipe)")
+check(machine_outputs2["sl_modebase:monster_spawner"] == true,
+	"the Monster Spawner Unit is reachable at the forge")
+
+-- ----------------------------------------------------------------
+section("PHASE O15 — the Core is a story object, not a resource")
+-- 6.10 A: nothing may consume it, and dying with it must hand it to
+-- somebody else rather than deleting it.
+local consumers = 0
+for _, recipe in ipairs(get_crafting_recipes()) do
+	for item, _ in pairs(recipe.ingredients) do
+		if item == "sl_modebase:objective_core" then consumers = consumers + 1 end
+	end
+end
+check(consumers == 0, "no recipe consumes the Objective Core (groups.objective)")
+
+-- Dying with it: the core system is absent here, so the death fountain
+-- drops it on the floor; with sl_weapons loaded it lands in the corpse
+-- instead. Either way it changes hands — it is never destroyed.
+local started5 = gm.start_new_match("objective loop suite")
+check(started5 == true, "fifth match starts")
+minetest.settings:set("creative_mode", "false")
+ainv:add_item("main", ItemStack("sl_modebase:objective_core 1"))
+check(ainv:contains_item("main", ItemStack("sl_modebase:objective_core 1")), "carrier holds the Core")
+alpha:set_pos({ x = 0, y = 1, z = 0 })
+alpha:set_hp(0)
+local core_dropped = false
+for _, d in ipairs(H.item_drops) do
+	if d.name == "sl_modebase:objective_core" then core_dropped = true end
+end
+check(core_dropped, "dying with the Core drops it for someone else to take")
+check(not ainv:contains_item("main", ItemStack("sl_modebase:objective_core")),
+	"and it leaves the dead player's inventory")
+
+-- ----------------------------------------------------------------
+section("PHASE O16 — a full output slot spills, it does not delete")
+fpos = gm.map.current.anchor.forge
+forge_def.on_construct(fpos)
+finv = minetest.get_meta(fpos):get_inventory()
+-- Fill the output slot with something inert, then run a job into it.
+local dst_size = finv:get_size("dst")
+for i = 1, dst_size do
+	finv:set_stack("dst", i, ItemStack("sl_modebase:loot_crate 1"))
+end
+local spill_before = #H.item_drops
+finv:add_item("src", ItemStack("ground:x_neon 4"))
+sl_machine.start_job(fpos, recipe_for("construction:plasma"), "alpha")
+H.advance(sl_machine.forge_time() + 1, 0.5)
+check(#H.item_drops > spill_before, "a full output slot spills the product on the floor")
+local spilled_plasma = false
+for _, d in ipairs(H.item_drops) do
+	if d.name == "construction:plasma" then spilled_plasma = true end
+end
+check(spilled_plasma, "the spilled product is what the run made")
+
+-- ----------------------------------------------------------------
+section("PHASE O17 — stations are placeables, so the Forge builds them")
+-- Loaded last on purpose: sl_weapons wraps the match lifecycle, and
+-- nothing in this suite runs after this point.
+gm.end_match("beacon_a", "objective loop suite sweep")
+H.advance(1, 0.5)
+H.modpaths.sl_weapons = "mods/game/sl_weapons"
+H.current_modname = "sl_weapons"
+local okw, errw = pcall(dofile, "mods/game/sl_weapons/init.lua")
+check(okw, "sl_weapons loads for the station check" .. (okw and "" or (" -> " .. tostring(errw))))
+if okw then
+	H.run_mods_loaded()
+	local machine_outputs3 = {}
+	for _, entry in ipairs(sl_machine.get_recipes()) do
+		machine_outputs3[entry.recipe.output] = true
+	end
+	check(minetest.registered_nodes["sl_weapons:fabricator"] ~= nil,
+		"the Precision Fabricator is a registered node (a placeable)")
+	check(machine_outputs3["sl_weapons:fabricator"] == true,
+		"the Precision Fabricator is a forge output (its inventory recipe was dead)")
+	check(machine_outputs3["sl_modebase:ghost_altar"] == true,
+		"the Ghost Altar is a forge output")
+	-- The Fabricator's OWN products are its private table, not the
+	-- shared registry: the two machines must not fight over recipes.
+	local overlap = 0
+	for id, r in pairs(sl_weapons.FAB_RECIPES or {}) do
+		if machine_outputs3[r.item] then overlap = overlap + 1 end
+	end
+	check(overlap == 0, "the Fabricator's recipe table and the Forge's do not overlap")
+end
+
 print(string.format("\nRESULT: %d passed, %d failed", pass_count, fail_count))
 if fail_count > 0 then os.exit(1) end

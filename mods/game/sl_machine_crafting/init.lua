@@ -158,6 +158,49 @@ local function can_operate(name)
 	return true
 end
 
+local function stack_max_of(name)
+	local def = minetest.registered_items[name] or minetest.registered_nodes[name]
+	local n = def and tonumber(def.stack_max)
+	if n and n > 0 then return n end
+	return 99
+end
+
+-- Capacity of the output list for one item type.
+local function output_room(inv, name, smax)
+	local room = 0
+	for i = 1, inv:get_size("dst") do
+		local s = inv:get_stack("dst", i)
+		if s:is_empty() then
+			room = room + smax
+		elseif s:get_name() == name then
+			room = room + math.max(0, smax - s:get_count())
+		end
+	end
+	return room
+end
+
+-- Pay out into the output slot, spilling whatever does not fit at the
+-- foot of the machine. The capacity is computed HERE rather than read
+-- off add_item's return value: the headless stub's add_item always
+-- succeeds, and "silently deleted" is the one failure mode a
+-- win-condition item must never have.
+local function put_or_spill(pos, inv, stack)
+	local name, count = stack:get_name(), stack:get_count()
+	if name == "" or count <= 0 then return 0 end
+	local smax = stack_max_of(name)
+	local fits = math.min(count, output_room(inv, name, smax))
+	if fits > 0 then
+		inv:add_item("dst", ItemStack(name .. " " .. fits))
+	end
+	local spill = count - fits
+	if spill > 0 then
+		minetest.add_item({ x = pos.x, y = pos.y + 1, z = pos.z },
+			ItemStack(name .. " " .. spill))
+	end
+	return spill
+end
+sl_machine.put_or_spill = put_or_spill
+
 local function finish_job(pos, meta)
 	meta = meta or minetest.get_meta(pos)
 	local output = meta:get_string("job_output")
@@ -170,14 +213,7 @@ local function finish_job(pos, meta)
 	local inv = meta:get_inventory()
 	inv:set_size("src", 8)
 	inv:set_size("dst", 4)
-	local leftover
-	-- `room_for_item` is engine API; the headless stub does not model
-	-- it, so the payout path must not depend on it existing.
-	if inv.room_for_item then
-		leftover = inv:add_item("dst", ItemStack(output .. " " .. count))
-	else
-		inv:add_item("dst", ItemStack(output .. " " .. count))
-	end
+	local spilled = put_or_spill(pos, inv, ItemStack(output .. " " .. count))
 
 	-- Essence ruling §13.3 rule 2: named crafts credit the MM pool on
 	-- completion (the Objective Core is the named +3 craft). The hook
@@ -197,8 +233,7 @@ local function finish_job(pos, meta)
 
 	-- Output slot full: the work is not lost, it is spilled at the
 	-- forge for anyone to grab (more drama, never a silent delete).
-	if leftover and not leftover:is_empty() then
-		minetest.add_item({ x = pos.x, y = pos.y + 1, z = pos.z }, leftover)
+	if spilled and spilled > 0 then
 		if game_mode and game_mode.broadcast then
 			game_mode.broadcast(S("The forge output is full — @1 spills onto the floor.",
 				(desc ~= "" and desc) or output))
@@ -430,28 +465,44 @@ minetest.register_node(sl_machine.FORGE_NAME, {
 	-- nothing behind but the input it was fed.
 	-- The charge is physical: whatever sits in the input slots is
 	-- spilled on the floor rather than deleted with the machine.
+	-- can_dig is a Lua-level convention (the engine calls on_dig
+	-- regardless), so it is checked HERE, first: otherwise a refused
+	-- dig would still empty the slots and the crew would lose the
+	-- charge to a punch that did nothing.
 	on_dig = function(pos, node, digger)
-		local meta = minetest.get_meta(pos)
-		local inv = meta:get_inventory()
-		if inv then
-			for _, listname in ipairs({ "src", "dst" }) do
-				for _, stack in ipairs(inv:get_list(listname) or {}) do
-					if not stack:is_empty() then
-						minetest.add_item(pos, stack)
+		local def = minetest.registered_nodes[node.name]
+		local may_dig = true
+		if def and def.can_dig then
+			may_dig = def.can_dig(pos, digger) ~= false
+		end
+		if may_dig then
+			local meta = minetest.get_meta(pos)
+			local inv = meta:get_inventory()
+			if inv then
+				for _, listname in ipairs({ "src", "dst" }) do
+					for _, stack in ipairs(inv:get_list(listname) or {}) do
+						if not stack:is_empty() then
+							minetest.add_item(pos, stack)
+						end
 					end
+					inv:set_list(listname, {})
 				end
-				inv:set_list(listname, {})
 			end
 		end
 		if minetest.node_dig then return minetest.node_dig(pos, node, digger) end
+		if not may_dig then return false end
 		minetest.remove_node(pos)
 		return true
 	end,
 
 	allow_metadata_inventory_move = function(pos, from_list, from_index, to_list, to_index, count, player)
 		-- Inputs are locked while a job runs: no swapping the charge
-		-- out from under a run that was already announced.
-		if from_list == "src" and job_running(minetest.get_meta(pos)) then return 0 end
+		-- out from under a run that was already announced, and no
+		-- topping it up either (both directions, or the lock leaks).
+		if job_running(minetest.get_meta(pos))
+			and (from_list == "src" or to_list == "src") then
+			return 0
+		end
 		return count
 	end,
 
@@ -520,10 +571,25 @@ if game_mode and game_mode.end_match then
 		local anchor = game_mode.map and game_mode.map.current
 			and game_mode.map.current.anchor
 		if anchor and anchor.forge then
-			local meta = minetest.get_meta(anchor.forge)
-			if job_running(meta) then
-				abandon_job(anchor.forge, meta,
+			local pos = anchor.forge
+			local meta = minetest.get_meta(pos)
+			local abandoned = job_running(meta)
+			if abandoned then
+				abandon_job(pos, meta,
 					S("The match ended mid-run — the forge charge is lost."))
+			end
+			-- Sweep the slots too. A rebuilt map re-places the node
+			-- (on_construct resets it), but an external/adopted arena
+			-- is only journal-restored — without this sweep, last
+			-- match's charge would survive into the next one.
+			local inv = meta:get_inventory()
+			if inv then
+				for _, listname in ipairs({ "src", "dst" }) do
+					inv:set_list(listname, {})
+				end
+			end
+			if minetest.get_node_timer then
+				minetest.get_node_timer(pos):stop()
 			end
 		end
 		return orig_end(...)
