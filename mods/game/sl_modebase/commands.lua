@@ -37,14 +37,26 @@ function game_mode.set_monster_master(name)
 	local player = minetest.get_player_by_name(name)
 	if player then
 		game_mode.spawn_player(player)
-		-- Gift the summoning tool
 		local inv = player:get_inventory()
-		if not inv:contains_item("main", game_mode.modname .. ":summon_monster") then
-			inv:add_item("main", game_mode.modname .. ":summon_monster")
-		end
-		-- Gift a starter stack of Monster Essence (spawner fuel)
-		if game_mode.ESSENCE_ITEM and not inv:contains_item("main", game_mode.ESSENCE_ITEM) then
-			inv:add_item("main", game_mode.ESSENCE_ITEM .. " 10")
+		-- The kit is role equipment, handed out ONCE per match cycle.
+		-- SECURITY: the guard used to be `not inv:contains_item(...)`, which
+		-- only proves the items are not in the inventory *right now*. Claim
+		-- the role, pocket (drop) the starter essence, resign -- a GUI button
+		-- any client can forge -- and claim again: monster essence minted from
+		-- nothing, as often as the client can send packets. The marker below
+		-- keys the gift to the match number instead of to the inventory.
+		-- (match.lua re-hands the kit after the match-start inventory reset,
+		-- which is the one legitimate re-grant in a cycle.)
+		local cycle = state.match_count or 0
+		if pl.mm_kit_cycle ~= cycle then
+			pl.mm_kit_cycle = cycle
+			if not inv:contains_item("main", game_mode.modname .. ":summon_monster") then
+				inv:add_item("main", game_mode.modname .. ":summon_monster")
+			end
+			if game_mode.ESSENCE_ITEM
+				and not inv:contains_item("main", game_mode.ESSENCE_ITEM) then
+				inv:add_item("main", game_mode.ESSENCE_ITEM .. " 10")
+			end
 		end
 	end
 end
@@ -164,11 +176,45 @@ minetest.register_chatcommand("sl_tournament", {
 	end,
 })
 
+-- Who may take the doctrine without an admin's hand.
+-- SECURITY: a chat command is the one door every client can walk through, and
+-- the engine enforces nothing here beyond `privs` (this command declares
+-- none). Ungated, any player could self-appoint the moment the slot was
+-- empty -- mid-match, which hands one operator the summoning tool, the
+-- essence economy and the 1000-point beacon kills, and locks the role in for
+-- the next match's start (match.lua keeps an existing MM instead of
+-- auto-assigning). Volunteering in the lobby stays open; during a match it is
+-- an admin decision (/sl_assign), which is exactly how matchmaking.lua's
+-- take_mm button already treats it.
+function game_mode.may_claim_monster_master(name)
+	if not minetest.get_player_by_name(name) then
+		return false, S("Player not found.")
+	end
+	if minetest.check_player_privs(name, { sl_admin = true }) then
+		return true
+	end
+	if state.match_active then
+		return false, S("A match is running: an admin assigns the Monster Master (/sl_assign).")
+	end
+	local pl = game_mode.get_player_state(name)
+	if pl.phase == "ghost" or pl.phase == "evil_ghost" or pl.eliminated then
+		return false, S("The cage cannot hold the doctrine.")
+	end
+	return true
+end
+
 minetest.register_chatcommand("sl_be_monster_master", {
-	description = S("Become the monster master (if none exists yet)"),
+	description = S("Volunteer as monster master in the lobby (if none exists yet)"),
 	func = function(name)
 		if state.monster_master.player and state.monster_master.player ~= name then
 			return false, S("Monster master is already @1", state.monster_master.player)
+		end
+
+		local allowed, why = game_mode.may_claim_monster_master(name)
+		if not allowed then
+			minetest.log("action", "[game_mode] refused /sl_be_monster_master for "
+				.. name .. ": " .. tostring(why))
+			return false, why
 		end
 
 		game_mode.set_monster_master(name)
@@ -199,12 +245,40 @@ minetest.register_chatcommand("sl_mm_return", {
 	end,
 })
 
+-- Convenience spawning for the Monster Master. Unlike the spawner UNIT
+-- (content.lua's spawner_activate) this path costs no essence, so it needs
+-- its own discipline or it is an unlimited entity tap: SECURITY: a client can
+-- send chat commands as fast as it can write packets, and every one of these
+-- used to create up to five physics-enabled, pathing, animated mobs -- no
+-- cooldown, no cost, no population cap. Forty commands in a loop put 200 live
+-- monsters in the world; the server step then spends its whole budget on
+-- them and every player on the box starts rubber-banding.
+local MM_SPAWN_COOLDOWN = 3.0     -- seconds between convenience spawns
+local MM_LIVE_MONSTER_CAP = 12    -- monsters this MM may have alive at once
+
+-- Monsters this operator owns that are still alive and in the world.
+function game_mode.count_owned_monsters(name)
+	local n = 0
+	for _, lua in pairs(minetest.luaentities or {}) do
+		if lua and lua.monster_owner == name and not lua._removed then
+			n = n + 1
+		end
+	end
+	return n
+end
+
 minetest.register_chatcommand("sl_mm_spawn", {
 	params = "[count]",
-	description = S("Monster master: spawn basic monsters near you"),
+	description = S("Monster master: spawn basic monsters near you (cooldown @1 s, cap @2 alive)",
+		tostring(MM_SPAWN_COOLDOWN), tostring(MM_LIVE_MONSTER_CAP)),
 	func = function(name, param)
 		if not game_mode.is_monster_master(name) then
 			return false, S("You are not the monster master.")
+		end
+
+		-- Monsters belong to a match: outside one this only litters the lobby.
+		if not state.match_active and not minetest.settings:get_bool("creative_mode") then
+			return false, S("Monsters are match creatures: no match is running.")
 		end
 
 		local player = minetest.get_player_by_name(name)
@@ -213,7 +287,24 @@ minetest.register_chatcommand("sl_mm_spawn", {
 		end
 
 		local count = tonumber(param) or 1
-		count = math.max(1, math.min(count, 5))
+		if count ~= count then count = 1 end -- NaN from "0/0" and friends
+		count = math.max(1, math.min(math.floor(count), 5))
+
+		local pl = game_mode.get_player_state(name)
+		local now = game_mode.now()
+		if now < (pl.mm_spawn_ready_at or 0) then
+			return false, S("Your hands are still busy. (@1 s)",
+				tostring(math.ceil(pl.mm_spawn_ready_at - now)))
+		end
+
+		local alive = game_mode.count_owned_monsters(name)
+		local room = MM_LIVE_MONSTER_CAP - alive
+		if room <= 0 then
+			return false, S("You already command @1 creatures (cap @2).",
+				tostring(alive), tostring(MM_LIVE_MONSTER_CAP))
+		end
+		count = math.min(count, room)
+		pl.mm_spawn_ready_at = now + MM_SPAWN_COOLDOWN
 
 		local pos = player:get_pos()
 		if not pos then
@@ -234,6 +325,9 @@ minetest.register_chatcommand("sl_mm_spawn", {
 			end
 		end
 
+		if spawned < count then
+			return true, S("Spawned @1 of @2 monster(s).", tostring(spawned), tostring(count))
+		end
 		return true, S("Spawned @1 monster(s).", tostring(spawned))
 	end,
 })
