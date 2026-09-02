@@ -78,6 +78,18 @@ reconcile in Turn 6).
 
 ## Turn 1 — MM essence engine (the unshipped ruling; top priority)
 
+> **DONE — PR #9 merged (`43998d6`), 2026-09-02.** Node provenance,
+> `groups.sl_essence_value` pricing, the per-match pool with spawner
+> pool-first spend, the ambient-hazard security units, the `/sl_state` +
+> spawner-GUI readouts, `tests/essence_test.lua`, and the `soak.yml` step.
+> **Note for whoever runs the essence suite next:** the named +3 craft is
+> no longer reachable through the inventory UI — Turn 2 removed the
+> `sl_craft_in_inventory` opt-in and the +3 now fires from the Objective
+> Forge. The assertion is unchanged; only the route moved.
+> **Known remaining gap:** Turn 1's `sl_essence_value` pricing pass covers
+> the outputs that existed then. Machine-crafting outputs added since
+> (and the forge itself) have values; `construction:*` components do not.
+
 **Ruling (recorded, `MASTER_DESIGN_FULL.md` §13.3):** the MM's essence is
 earned by **destruction of crew-placed nodes, scaled by node price**
 (`essence = price(node)`); some crafts pay directly (**objective core +3**);
@@ -137,6 +149,37 @@ semantics to the ruling text.
 
 ## Turn 2 — Crafting-to-objective loop, end-to-end acceptance
 
+> **DONE — PR #10 merged (`aca248e`), 2026-09-02.** `sl_machine_crafting`
+> is a real mod (the Objective Forge, one per map at the `forge` anchor);
+> salvage veins seeded on the procedural + test arenas; the Core is
+> machine-only again; `/sl_test_objective` performs the chain instead of
+> narrating it; `tests/objective_loop_test.lua` (128 assertions).
+>
+> **What it changed that this plan does not yet reflect:**
+> * the whole salvage branch was dead — every salvage recipe outputs a
+>   registered node, which the inventory gate refuses. It runs at the
+>   Forge now, and the refine yields are batched (4 neon -> 8 components)
+>   so a full Core is 5 runs / 20 dug nodes;
+> * **the item set this turn's text calls "missing" is not missing** —
+>   `metal_ingot` / `circuit_board` / `energy_crystal` / `hardened_plate`
+>   / `reinforced_glass` all exist as craftitems. What's missing is
+>   *supply*: nothing produces them except `MONSTER_LOOT`, and two have
+>   no source at all. Re-read `INTEGRATION` §4.7 before acting on it;
+> * `sl_weapons/fabricator.lua` is a **second** machine implementation
+>   with its own job engine (`INTEGRATION` §4.8) — read it before adding
+>   a third one;
+> * `sl_weapons:fabricator` and `sl_modebase:ghost_altar` had dead
+>   inventory recipes (registered nodes, gate-refused). They are Forge
+>   outputs now, i.e. **the Forge is how crew build stations**;
+> * the house-rule list above needs one more line: **never trust
+>   `add_item`'s return value in the stub** (it always succeeds) and
+>   **never assume `can_dig` gated your `on_dig`** — both cost real bugs.
+>
+> **Still open from this turn:** the `soak.yml` step for
+> `tests/objective_loop_test.lua` is **not committed** (the agent token
+> cannot write `.github/workflows/**`). It is written out in
+> `INTEGRATION.md` and in the PR #10 body — apply it first chance.
+
 **Gap (INTEGRATION §5.4, "Wedged on this":** `objective_core` node +
 `deliver_objective` work (nodes.lua:255–310), the recipe exists
 (crafting_system.lua:441), but the chain salvage → machine → core →
@@ -144,7 +187,9 @@ delivery → match end has never run, and `sl_machine_crafting` is a stub.
 
 **Deliverable:** PR `feat(objective): salvage-to-delivery loop + acceptance test`.
 
-1. Write `tests/objective_loop_test.lua` FIRST (stub): build map →
+1. ~~Write `tests/objective_loop_test.lua` FIRST (stub)~~ **— shipped.**
+   (The item below is kept for the reasoning, not as a to-do.)
+   build map →
    `sl_map.type = test`, objective win condition on → salvage grant →
    craft via `crafting_system` handler → core in inventory → place within 8
    of own beacon → `end_match(team, "delivered the Objective Core")`.
@@ -168,6 +213,10 @@ delivery → match end has never run, and `sl_machine_crafting` is a stub.
 ---
 
 ## Turn 3 — Full-game procedural sound sets (G1 fix)
+
+> **Not started.** One note from Turn 2: the Objective Forge plays
+> `minetest.sound_play("alert", ...)`, a name `sl_modebase` already
+> uses, so it adds no new entries to the missing-sound inventory.
 
 **Gap:** weapons audio is done (39 `.ogg` via `generate_sounds.py`); the rest
 of the game still calls `sound_play("hit")`, `"menu"` etc. from MTG/legacy
