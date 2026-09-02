@@ -2,7 +2,7 @@
 core.register_node("ground:square_neon", {
 -- 	description = S("Neon square ground"),
 	drawtype = "glasslike",
-	tiles = { "square_neon.png" }, -- A mostly white/grey texture works best
+	tiles = { sl_texgen.texture("square_neon.png") }, -- A mostly white/grey texture works best
 
 	-- This color is multiplied with the texture's color.
 	-- Format is 0xRRGGBB (Red, Green, Blue in hexadecimal)
@@ -21,7 +21,7 @@ core.register_node("ground:square_neon", {
 core.register_node("ground:square_neon_opaque", {
 	description = "Neon square ground (opaque)",
 	drawtype = "normal",
-	tiles = { "square_neon_opaque.png" },
+	tiles = { sl_texgen.texture("square_neon_opaque.png") },
 	light_source = 14,
 	paramtype = "light",
 	paramtype2 = "facedir",
@@ -33,7 +33,7 @@ core.register_node("ground:square_neon_opaque", {
 core.register_node("ground:rhombus_neon", {
 -- 	description = S("Neon square ground"),
 	drawtype = "glasslike",
-	tiles = { "rhombus_neon.png" }, -- A mostly white/grey texture works best
+	tiles = { sl_texgen.texture("rhombus_neon.png") }, -- A mostly white/grey texture works best
 
 	-- This color is multiplied with the texture's color.
 	-- Format is 0xRRGGBB (Red, Green, Blue in hexadecimal)
@@ -50,7 +50,7 @@ core.register_node("ground:rhombus_neon", {
 core.register_node("ground:x_neon", {
 -- 	description = S("Neon square ground"),
 	drawtype = "glasslike",
-	tiles = { "x_neon.png" }, -- A mostly white/grey texture works best
+	tiles = { sl_texgen.texture("x_neon.png") }, -- A mostly white/grey texture works best
 
 	-- This color is multiplied with the texture's color.
 	-- Format is 0xRRGGBB (Red, Green, Blue in hexadecimal)
@@ -67,7 +67,7 @@ core.register_node("ground:x_neon", {
 core.register_node("ground:x2_neon", {
 -- 	description = S("Neon square ground"),
 	drawtype = "glasslike",
-	tiles = { "x2_neon.png" }, -- A mostly white/grey texture works best
+	tiles = { sl_texgen.texture("x2_neon.png") }, -- A mostly white/grey texture works best
 
 	-- This color is multiplied with the texture's color.
 	-- Format is 0xRRGGBB (Red, Green, Blue in hexadecimal)

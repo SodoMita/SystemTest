@@ -4,7 +4,7 @@ minetest.register_node("construction:fire", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_fire_30frames.png",
+        name = sl_texgen.texture("tech_fire_30frames.png"),
         animation = {
             type = "sheet_2d",
 
@@ -28,7 +28,7 @@ minetest.register_node("construction:firenode", {
     -- when a crew-placed block is destroyed (essence ruling §13.3).
     -- The critical part is the tiles table
     tiles = {{
-        name = "forest_fire_30f.png",
+        name = sl_texgen.texture("forest_fire_30f.png"),
         animation = {
             type = "sheet_2d",
 
@@ -53,7 +53,7 @@ minetest.register_node("construction:smoke", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_smoke_30frames.png",
+        name = sl_texgen.texture("tech_smoke_30frames.png"),
         animation = {
             type = "sheet_2d",
 
@@ -78,7 +78,7 @@ minetest.register_node("construction:smoke2", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_smoke_30frames.png",
+        name = sl_texgen.texture("tech_smoke_30frames.png"),
         animation = {
             type = "sheet_2d",
 
@@ -103,7 +103,7 @@ minetest.register_node("construction:smoke3", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "forest_smoke_30f.png",
+        name = sl_texgen.texture("forest_smoke_30f.png"),
         animation = {
             type = "sheet_2d",
 
@@ -129,7 +129,7 @@ minetest.register_node("construction:bubbles", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_bubbles_30frames.png",
+        name = sl_texgen.texture("tech_bubbles_30frames.png"),
         animation = {
             type = "sheet_2d",
 
@@ -154,7 +154,7 @@ minetest.register_node("construction:bubbles2", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "cave_bubbles_30f.png",
+        name = sl_texgen.texture("cave_bubbles_30f.png"),
         animation = {
             type = "sheet_2d",
 
@@ -178,7 +178,7 @@ minetest.register_node("construction:sparks", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_sparks_30frames.png",
+        name = sl_texgen.texture("tech_sparks_30frames.png"),
         animation = {
             type = "sheet_2d",
 
@@ -199,7 +199,7 @@ minetest.register_node("construction:sparks2", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_sparks_50frames_loop.png",
+        name = sl_texgen.texture("tech_sparks_50frames_loop.png"),
         animation = {
             type = "sheet_2d",
 
@@ -220,7 +220,7 @@ minetest.register_node("construction:sparks3", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_sparks_15frames_loop.png",
+        name = sl_texgen.texture("tech_sparks_15frames_loop.png"),
         animation = {
             type = "sheet_2d",
 
@@ -241,7 +241,7 @@ minetest.register_node("construction:water", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "forest_water_30f.png",
+        name = sl_texgen.texture("forest_water_30f.png"),
         animation = {
             type = "sheet_2d",
 
@@ -262,7 +262,7 @@ minetest.register_node("construction:snowflake", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_ice_30frames.png",
+        name = sl_texgen.texture("tech_ice_30frames.png"),
         animation = {
             type = "sheet_2d",
 
@@ -283,7 +283,7 @@ minetest.register_node("construction:snowflake2", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "spinning_snowflake_30f.png",
+        name = sl_texgen.texture("spinning_snowflake_30f.png"),
         animation = {
             type = "sheet_2d",
 
@@ -304,7 +304,7 @@ minetest.register_node("construction:plasma1", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "forest_plasma_8f.png",
+        name = sl_texgen.texture("forest_plasma_8f.png"),
         animation = {
             type = "sheet_2d",
 
@@ -325,7 +325,7 @@ minetest.register_node("construction:plasma", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "cave_plasma_30f.png",
+        name = sl_texgen.texture("cave_plasma_30f.png"),
         animation = {
             type = "sheet_2d",
 
@@ -346,7 +346,7 @@ minetest.register_node("construction:plasma2", {
 
     -- The critical part is the tiles table
     tiles = {{
-        name = "tech_plasma_30frames.png",
+        name = sl_texgen.texture("tech_plasma_30frames.png"),
         animation = {
             type = "sheet_2d",
 

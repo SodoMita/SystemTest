@@ -48,17 +48,17 @@ function W.node_impact(user, hit, def, origin)
 	if team and game_mode and game_mode.damage_beacon then
 		local attacker = user and user.get_player_name and user:get_player_name()
 		game_mode.damage_beacon(team, def.beacon_dmg or 1, attacker)
-		W.impact_fx(pos, "sl_weapons_spark.png")
+		W.impact_fx(pos, sl_texgen.texture("sl_weapons_spark.png"))
 		return
 	end
 
 	if game_mode and game_mode.is_possessed and game_mode.is_possessed(pos) then
 		W.possession_shot(pos, user)
-		W.impact_fx(pos, "sl_weapons_spark.png")
+		W.impact_fx(pos, sl_texgen.texture("sl_weapons_spark.png"))
 		return
 	end
 
-	W.impact_fx(pos, def.impact_texture or "sl_weapons_spark.png")
+	W.impact_fx(pos, def.impact_texture or sl_texgen.texture("sl_weapons_spark.png"))
 end
 
 function W.impact_fx(pos, texture)
@@ -69,7 +69,7 @@ function W.impact_fx(pos, texture)
 		expirationtime = 0.4,
 		size = 2,
 		collisiondetection = false,
-		texture = texture or "sl_weapons_spark.png",
+		texture = texture or sl_texgen.texture("sl_weapons_spark.png"),
 		glow = 10,
 	})
 end
@@ -87,7 +87,7 @@ function W.tracer_fx(from, to)
 			expirationtime = 0.15,
 			size = 1.5,
 			collisiondetection = false,
-			texture = "sl_weapons_tracer.png",
+			texture = sl_texgen.texture("sl_weapons_tracer.png"),
 			glow = 12,
 		})
 	end
@@ -127,7 +127,7 @@ function W.fire_hitscan(user, def)
 			local dist = vector.distance(eye, hit_pos or eye)
 			W.punch_object(user, hit_obj, def.damage, def.cause, dist)
 			W.tracer_fx(eye, hit_pos or eye)
-			W.impact_fx(hit_pos or eye, "sl_weapons_hit.png")
+			W.impact_fx(hit_pos or eye, sl_texgen.texture("sl_weapons_hit.png"))
 		else
 			W.tracer_fx(eye, hit_pos or endpoint)
 		end

@@ -173,3 +173,9 @@ sl_botmatch.turbo (Turbo soak profile) bool false
 # = same match outcomes; the regression harness uses this to
 # replay failing runs.
 sl_botmatch.seed (Soak PRNG seed) int 20260827
+
+# How generated placeholder textures are served by sl_texgen.
+# runtime = render at server startup and embed in [png: texture
+# modifiers (no texture files shipped); stock = serve the plain PNG
+# filenames from mod textures/ directories (they must be restored).
+sl_texgen.mode (Generated texture mode) enum runtime runtime,stock

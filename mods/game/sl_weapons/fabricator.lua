@@ -166,8 +166,8 @@ end
 
 minetest.register_node(W.modname .. ":fabricator", {
 	description = S("Precision Fabricator"),
-	tiles = { "sl_weapons_fabricator_top.png", "sl_weapons_fabricator_base.png",
-		"sl_weapons_fabricator_side.png" },
+	tiles = { sl_texgen.texture("sl_weapons_fabricator_top.png"), sl_texgen.texture("sl_weapons_fabricator_base.png"),
+		sl_texgen.texture("sl_weapons_fabricator_side.png") },
 	paramtype2 = "facedir",
 	light_source = 6,
 	-- Digging destroys the station: nobody carries the monopoly home.

@@ -30,7 +30,7 @@ minetest.register_entity("sl_scary:mob", {
 --         mesh = "scary_mob.glb",
 --         mesh = "female_zombie.glb",
         mesh = "Codop.glb",
---         textures = {"scary_mob_texture.png"},
+--         textures = {sl_texgen.texture("scary_mob_texture.png")},
         pointable = true,
         static_save = false, -- Save this entity between server restarts
         visual_size = {x=1,y=1,z=1},
@@ -303,7 +303,7 @@ minetest.register_entity("sl_scary:nerobot", {
         collisionbox = {-0.35, -0.5, -0.35, 0.35, 0.5, 0.35},
         visual = "mesh",
         mesh = "polytest.glb",
-        textures = {"scary_mob_texture.png"},
+        textures = {sl_texgen.texture("scary_mob_texture.png")},
         hp_max = 32767,
     },
 
@@ -728,7 +728,7 @@ minetest.register_node("sl_scary:hide_spot", {
         type = "fixed",
         fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}
     },
---     tiles = {"hide_spot_top.png", "hide_spot_bottom.png", "hide_spot_side.png"},
+--     tiles = {sl_texgen.texture("hide_spot_top.png"), sl_texgen.texture("hide_spot_bottom.png"), sl_texgen.texture("hide_spot_side.png")},
     -- sl_essence_value = 2: hideout price paid to the MM pool when a
     -- crew-placed Shadow Hideout is destroyed (essence ruling §13.3).
     groups = {cracky = 1, sl_essence_value = 2},
@@ -824,7 +824,7 @@ minetest.register_entity("sl_scary:dredger", {
         collide_with_objects = true,
         collisionbox = {-0.4, -0.5, -0.4, 0.4, 0.5, 0.4},
         visual = "sprite",
-        textures = {"sl_scary_dredger_strip.png"},
+        textures = {sl_texgen.texture("sl_scary_dredger_strip.png")},
         visual_size = {x=1.8, y=1.8, z=1.8},
         static_save = false,
         glow = 4,
@@ -1037,7 +1037,7 @@ minetest.register_craftitem("sl_scary:dredger_badge", {
     description = "Dredger ID Badge — 'KOWALSKI, F. — Maintenance Tech'\n" ..
                   "Overtime log: 96h continuous before incident.\n" ..
                   "'Exposed to hydraulic fluid. Personality changes noted.'",
-    inventory_image = "sl_scary_dredger_strip.png^[resize:16x16",
+    inventory_image = sl_texgen.icon("sl_scary_dredger_strip.png", 16),
     stack_max = 1,
 })
 
@@ -1068,7 +1068,7 @@ minetest.register_entity("sl_scary:containment", {
         collide_with_objects = true,
         collisionbox = {-0.8, -1.0, -0.8, 0.8, 1.0, 0.8},
         visual = "sprite",
-        textures = {"sl_scary_containment_strip.png"},
+        textures = {sl_texgen.texture("sl_scary_containment_strip.png")},
         visual_size = {x=3.0, y=3.0, z=3.0},
         static_save = false,
         glow = 6,
@@ -1183,7 +1183,7 @@ minetest.register_craftitem("sl_scary:containment_shard", {
                   "Security Log 0433: 'Noise reported inside Section 12. Sealed.'\n" ..
                   "Security Log 0420: 'Sealed.'\n" ..
                   "Security Log 0352: 'Section 12 sealed.'",
-    inventory_image = "sl_scary_containment_strip.png^[resize:16x16",
+    inventory_image = sl_texgen.icon("sl_scary_containment_strip.png", 16),
     stack_max = 3,
 })
 
@@ -1213,7 +1213,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
         collide_with_objects = false,
         collisionbox = {-0.3, -0.6, -0.3, 0.3, 0.6, 0.3},
         visual = "sprite",
-        textures = {"sl_scary_wraith_strip.png"},
+        textures = {sl_texgen.texture("sl_scary_wraith_strip.png")},
         visual_size = {x=2.0, y=2.0, z=2.0},
         static_save = false,
         glow = 8,
@@ -1377,7 +1377,7 @@ minetest.register_craftitem("sl_scary:corrupted_data", {
     description = "Corrupted Data Fragment\n" ..
                   "\"...breach in sector...signal integrity compromised...\"\n" ..
                   "Reliability: UNKNOWN",
-    inventory_image = "sl_scary_wraith_strip.png^[resize:16x16",
+    inventory_image = sl_texgen.icon("sl_scary_wraith_strip.png", 16),
     stack_max = 5,
 })
 

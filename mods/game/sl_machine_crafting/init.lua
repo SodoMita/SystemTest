@@ -383,7 +383,7 @@ local FORMEXPR = "^sl_machine_crafting:forge:([-]?%d+),([-]?%d+),([-]?%d+)$"
 -- ----------------------------------------------------------------
 minetest.register_node(sl_machine.FORGE_NAME, {
 	description = S("Objective Forge"),
-	tiles = { "terminal_texture.png" },
+	tiles = { sl_texgen.texture("terminal_texture.png") },
 	paramtype = "light",
 	light_source = 12,
 	-- A forge placed by the map never pays essence when destroyed

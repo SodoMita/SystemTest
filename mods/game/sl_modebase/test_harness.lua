@@ -158,7 +158,7 @@ local function register_ai_entity()
 		initial_properties = {
 			physical = true, collide_with_objects = true,
 			collisionbox = {-0.35, 0, -0.35, 0.35, 1.7, 0.35},
-			visual = "mesh", mesh = "player.obj", textures = {"player_texture.png"},
+			visual = "mesh", mesh = "player.obj", textures = {sl_texgen.texture("player_texture.png")},
 			visual_size = {x=1, y=1}, static_save = false,
 		},
 		team = "beacon_a", target = nil, action_timer = 0,

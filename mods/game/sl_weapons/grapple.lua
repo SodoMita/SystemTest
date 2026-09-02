@@ -30,7 +30,7 @@ minetest.register_entity(W.modname .. ":lash_hook", {
 	sl_weapon_fx = true,
 		initial_properties = {
 		visual = "sprite",
-		textures = { "sl_weapons_lash_hook.png" },
+		textures = { sl_texgen.texture("sl_weapons_lash_hook.png") },
 		visual_size = { x = 0.8, y = 0.8 },
 		physical = false,
 		collide_with_objects = false,
@@ -148,7 +148,7 @@ end
 
 minetest.register_tool(W.modname .. ":grapple", {
 	description = S("Grapple Lash\n(A lasso of light. Expensive. Dangerous.)"),
-	inventory_image = "sl_weapons_grapple.png",
+	inventory_image = sl_texgen.texture("sl_weapons_grapple.png"),
 	groups = { weapon = 1, not_in_crafting_guide = 1 },
 
 	on_use = function(itemstack, user)
@@ -243,7 +243,7 @@ minetest.register_globalstep(function(dtime)
 						acceleration = { x = 0, y = 0, z = 0 },
 						expirationtime = 0.2,
 						size = 2,
-						texture = "sl_weapons_lash_line.png",
+						texture = sl_texgen.texture("sl_weapons_lash_line.png"),
 						glow = 14,
 					})
 				end

@@ -4,9 +4,9 @@
 -- -- Advanced Workbench - for complex crafting
 -- minetest.register_node("workshops:advanced_workbench", {
 -- 	description = "Advanced Workbench",
--- 	tiles = {"advanced_workbench_top.png", "advanced_workbench_bottom.png",
--- 	         "advanced_workbench_side.png", "advanced_workbench_side.png",
--- 	         "advanced_workbench_front.png", "advanced_workbench_front.png"},
+-- 	tiles = {sl_texgen.texture("advanced_workbench_top.png"), sl_texgen.texture("advanced_workbench_bottom.png"),
+-- 	         sl_texgen.texture("advanced_workbench_side.png"), sl_texgen.texture("advanced_workbench_side.png"),
+-- 	         sl_texgen.texture("advanced_workbench_front.png"), sl_texgen.texture("advanced_workbench_front.png")},
 -- 	paramtype2 = "facedir",
 -- 	groups = {cracky = 2},
 -- 	is_ground_content = false,
@@ -27,8 +27,8 @@
 -- -- Precision Anvil - for tool/weapon upgrades
 -- minetest.register_node("workshops:precision_anvil", {
 -- 	description = "Precision Anvil",
--- 	tiles = {"precision_anvil_top.png", "precision_anvil_bottom.png",
--- 	         "precision_anvil_side.png"},
+-- 	tiles = {sl_texgen.texture("precision_anvil_top.png"), sl_texgen.texture("precision_anvil_bottom.png"),
+-- 	         sl_texgen.texture("precision_anvil_side.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -59,8 +59,8 @@
 -- -- Assembly Table - for building mechanisms
 -- minetest.register_node("workshops:assembly_table", {
 -- 	description = "Assembly Table",
--- 	tiles = {"assembly_table_top.png", "assembly_table_bottom.png",
--- 	         "assembly_table_side.png"},
+-- 	tiles = {sl_texgen.texture("assembly_table_top.png"), sl_texgen.texture("assembly_table_bottom.png"),
+-- 	         sl_texgen.texture("assembly_table_side.png")},
 -- 	paramtype2 = "facedir",
 -- 	groups = {cracky = 2},
 -- 	is_ground_content = false,
@@ -81,7 +81,7 @@
 -- -- Tool Rack - decorative storage
 -- minetest.register_node("workshops:tool_rack", {
 -- 	description = "Tool Rack",
--- 	tiles = {"tool_rack_top.png", "tool_rack_top.png", "tool_rack_side.png"},
+-- 	tiles = {sl_texgen.texture("tool_rack_top.png"), sl_texgen.texture("tool_rack_top.png"), sl_texgen.texture("tool_rack_side.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -106,8 +106,8 @@
 -- -- Chemical Station - for potions/experiments
 -- minetest.register_node("workshops:chemical_station", {
 -- 	description = "Chemical Station",
--- 	tiles = {"chemical_station_top.png", "chemical_station_bottom.png",
--- 	         "chemical_station_side.png"},
+-- 	tiles = {sl_texgen.texture("chemical_station_top.png"), sl_texgen.texture("chemical_station_bottom.png"),
+-- 	         sl_texgen.texture("chemical_station_side.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -139,9 +139,9 @@
 -- -- Blueprint Drawer - stores knowledge
 -- minetest.register_node("workshops:blueprint_drawer", {
 -- 	description = "Blueprint Drawer",
--- 	tiles = {"blueprint_drawer_top.png", "blueprint_drawer_top.png",
--- 	         "blueprint_drawer_side.png", "blueprint_drawer_side.png",
--- 	         "blueprint_drawer_front.png", "blueprint_drawer_front.png"},
+-- 	tiles = {sl_texgen.texture("blueprint_drawer_top.png"), sl_texgen.texture("blueprint_drawer_top.png"),
+-- 	         sl_texgen.texture("blueprint_drawer_side.png"), sl_texgen.texture("blueprint_drawer_side.png"),
+-- 	         sl_texgen.texture("blueprint_drawer_front.png"), sl_texgen.texture("blueprint_drawer_front.png")},
 -- 	paramtype2 = "facedir",
 -- 	groups = {choppy = 2, oddly_breakable_by_hand = 2},
 -- 	is_ground_content = false,
@@ -170,8 +170,8 @@
 -- -- Metal Locker - tall storage
 -- minetest.register_node("workshops:metal_locker", {
 -- 	description = "Metal Locker",
--- 	tiles = {"metal_locker_top.png", "metal_locker_top.png", "metal_locker_side.png",
--- 	         "metal_locker_side.png", "metal_locker_front.png", "metal_locker_front.png"},
+-- 	tiles = {sl_texgen.texture("metal_locker_top.png"), sl_texgen.texture("metal_locker_top.png"), sl_texgen.texture("metal_locker_side.png"),
+-- 	         sl_texgen.texture("metal_locker_side.png"), sl_texgen.texture("metal_locker_front.png"), sl_texgen.texture("metal_locker_front.png")},
 -- 	paramtype2 = "facedir",
 -- 	groups = {cracky = 2},
 -- 	is_ground_content = false,
@@ -198,9 +198,9 @@
 -- -- Filing Cabinet
 -- minetest.register_node("workshops:filing_cabinet", {
 -- 	description = "Filing Cabinet",
--- 	tiles = {"filing_cabinet_top.png", "filing_cabinet_top.png",
--- 	         "filing_cabinet_side.png", "filing_cabinet_side.png",
--- 	         "filing_cabinet_front.png", "filing_cabinet_front.png"},
+-- 	tiles = {sl_texgen.texture("filing_cabinet_top.png"), sl_texgen.texture("filing_cabinet_top.png"),
+-- 	         sl_texgen.texture("filing_cabinet_side.png"), sl_texgen.texture("filing_cabinet_side.png"),
+-- 	         sl_texgen.texture("filing_cabinet_front.png"), sl_texgen.texture("filing_cabinet_front.png")},
 -- 	paramtype2 = "facedir",
 -- 	groups = {cracky = 2},
 -- 	is_ground_content = false,
@@ -227,9 +227,9 @@
 -- -- Metal Desk
 -- minetest.register_node("workshops:metal_desk", {
 -- 	description = "Metal Desk",
--- 	tiles = {"metal_desk_top.png", "metal_desk_bottom.png",
--- 	         "metal_desk_side.png", "metal_desk_side.png",
--- 	         "metal_desk_front.png", "metal_desk_back.png"},
+-- 	tiles = {sl_texgen.texture("metal_desk_top.png"), sl_texgen.texture("metal_desk_bottom.png"),
+-- 	         sl_texgen.texture("metal_desk_side.png"), sl_texgen.texture("metal_desk_side.png"),
+-- 	         sl_texgen.texture("metal_desk_front.png"), sl_texgen.texture("metal_desk_back.png")},
 -- 	paramtype2 = "facedir",
 -- 	groups = {cracky = 2},
 -- 	is_ground_content = false,
@@ -239,7 +239,7 @@
 -- -- Laboratory Shelf
 -- minetest.register_node("workshops:lab_shelf", {
 -- 	description = "Laboratory Shelf",
--- 	tiles = {"lab_shelf_top.png", "lab_shelf_bottom.png", "lab_shelf_side.png"},
+-- 	tiles = {sl_texgen.texture("lab_shelf_top.png"), sl_texgen.texture("lab_shelf_bottom.png"), sl_texgen.texture("lab_shelf_side.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -264,9 +264,9 @@
 -- -- Server Rack
 -- minetest.register_node("workshops:server_rack", {
 -- 	description = "Server Rack",
--- 	tiles = {"server_rack_top.png", "server_rack_top.png",
--- 	         "server_rack_side.png", "server_rack_side.png",
--- 	         "server_rack_front.png", "server_rack_back.png"},
+-- 	tiles = {sl_texgen.texture("server_rack_top.png"), sl_texgen.texture("server_rack_top.png"),
+-- 	         sl_texgen.texture("server_rack_side.png"), sl_texgen.texture("server_rack_side.png"),
+-- 	         sl_texgen.texture("server_rack_front.png"), sl_texgen.texture("server_rack_back.png")},
 -- 	paramtype2 = "facedir",
 -- 	groups = {cracky = 2},
 -- 	is_ground_content = false,
@@ -277,9 +277,9 @@
 -- -- Control Panel (wall-mounted)
 -- minetest.register_node("workshops:control_panel", {
 -- 	description = "Control Panel",
--- 	tiles = {"control_panel_side.png", "control_panel_side.png",
--- 	         "control_panel_side.png", "control_panel_side.png",
--- 	         "control_panel_back.png", "control_panel_front.png"},
+-- 	tiles = {sl_texgen.texture("control_panel_side.png"), sl_texgen.texture("control_panel_side.png"),
+-- 	         sl_texgen.texture("control_panel_side.png"), sl_texgen.texture("control_panel_side.png"),
+-- 	         sl_texgen.texture("control_panel_back.png"), sl_texgen.texture("control_panel_front.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -300,7 +300,7 @@
 -- -- Ventilation Grate
 -- minetest.register_node("workshops:vent_grate", {
 -- 	description = "Ventilation Grate",
--- 	tiles = {"vent_grate.png"},
+-- 	tiles = {sl_texgen.texture("vent_grate.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -321,7 +321,7 @@
 -- -- Pipes (horizontal and vertical)
 -- minetest.register_node("workshops:pipe_horizontal", {
 -- 	description = "Horizontal Pipe",
--- 	tiles = {"pipe_end.png", "pipe_end.png", "pipe_side.png"},
+-- 	tiles = {sl_texgen.texture("pipe_end.png"), sl_texgen.texture("pipe_end.png"), sl_texgen.texture("pipe_side.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -340,7 +340,7 @@
 --
 -- minetest.register_node("workshops:pipe_vertical", {
 -- 	description = "Vertical Pipe",
--- 	tiles = {"pipe_end.png", "pipe_end.png", "pipe_side.png"},
+-- 	tiles = {sl_texgen.texture("pipe_end.png"), sl_texgen.texture("pipe_end.png"), sl_texgen.texture("pipe_side.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	node_box = {
@@ -359,7 +359,7 @@
 -- -- Caution Tape
 -- minetest.register_node("workshops:caution_tape", {
 -- 	description = "Caution Tape",
--- 	tiles = {"caution_tape.png"},
+-- 	tiles = {sl_texgen.texture("caution_tape.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -380,9 +380,9 @@
 -- -- Warning Signs
 -- minetest.register_node("workshops:warning_sign_hazard", {
 -- 	description = "Hazard Warning Sign",
--- 	tiles = {"warning_sign_back.png", "warning_sign_back.png",
--- 	         "warning_sign_back.png", "warning_sign_back.png",
--- 	         "warning_sign_back.png", "warning_sign_hazard.png"},
+-- 	tiles = {sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_back.png"),
+-- 	         sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_back.png"),
+-- 	         sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_hazard.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -401,9 +401,9 @@
 --
 -- minetest.register_node("workshops:warning_sign_radiation", {
 -- 	description = "Radiation Warning Sign",
--- 	tiles = {"warning_sign_back.png", "warning_sign_back.png",
--- 	         "warning_sign_back.png", "warning_sign_back.png",
--- 	         "warning_sign_back.png", "warning_sign_radiation.png"},
+-- 	tiles = {sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_back.png"),
+-- 	         sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_back.png"),
+-- 	         sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_radiation.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -422,9 +422,9 @@
 --
 -- minetest.register_node("workshops:warning_sign_biohazard", {
 -- 	description = "Biohazard Warning Sign",
--- 	tiles = {"warning_sign_back.png", "warning_sign_back.png",
--- 	         "warning_sign_back.png", "warning_sign_back.png",
--- 	         "warning_sign_back.png", "warning_sign_biohazard.png"},
+-- 	tiles = {sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_back.png"),
+-- 	         sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_back.png"),
+-- 	         sl_texgen.texture("warning_sign_back.png"), sl_texgen.texture("warning_sign_biohazard.png")},
 -- 	drawtype = "nodebox",
 -- 	paramtype = "light",
 -- 	paramtype2 = "facedir",
@@ -444,8 +444,8 @@
 -- -- Window and Broken Window
 -- minetest.register_node("workshops:window", {
 -- 	description = "Industrial Window",
--- 	tiles = {"window_frame.png", "window_frame.png", "window_frame.png",
--- 	         "window_frame.png", "window_glass.png", "window_glass.png"},
+-- 	tiles = {sl_texgen.texture("window_frame.png"), sl_texgen.texture("window_frame.png"), sl_texgen.texture("window_frame.png"),
+-- 	         sl_texgen.texture("window_frame.png"), sl_texgen.texture("window_glass.png"), sl_texgen.texture("window_glass.png")},
 -- 	drawtype = "glasslike_framed",
 -- 	paramtype = "light",
 -- 	sunlight_propagates = true,
@@ -457,8 +457,8 @@
 --
 -- minetest.register_node("workshops:window_broken", {
 -- 	description = "Broken Window",
--- 	tiles = {"window_frame.png", "window_frame.png", "window_frame.png",
--- 	         "window_frame.png", "window_broken.png", "window_broken.png"},
+-- 	tiles = {sl_texgen.texture("window_frame.png"), sl_texgen.texture("window_frame.png"), sl_texgen.texture("window_frame.png"),
+-- 	         sl_texgen.texture("window_frame.png"), sl_texgen.texture("window_broken.png"), sl_texgen.texture("window_broken.png")},
 -- 	drawtype = "glasslike_framed",
 -- 	paramtype = "light",
 -- 	sunlight_propagates = true,

@@ -27,7 +27,7 @@ game_mode.MONSTER_NAME = MONSTER_NAME
 game_mode.MONSTER_TYPES = {
 	stalker = {
 		label = "Stalker",
-		texture = "monster_texture.png",
+		texture = sl_texgen.texture("monster_texture.png"),
 		hp = 30,
 		speed = 2.5,
 		damage = 4,
@@ -35,7 +35,7 @@ game_mode.MONSTER_TYPES = {
 	},
 	scout = {
 		label = "Scout",
-		texture = "monster_texture.png^[colorize:#33ffcc:100",
+		texture = sl_texgen.texture("monster_texture.png") .. "^[colorize:#33ffcc:100",
 		hp = 15,
 		speed = 3.8,
 		damage = 3,
@@ -43,7 +43,7 @@ game_mode.MONSTER_TYPES = {
 	},
 	brute = {
 		label = "Brute",
-		texture = "monster_texture.png^[colorize:#ff5522:120",
+		texture = sl_texgen.texture("monster_texture.png") .. "^[colorize:#ff5522:120",
 		hp = 60,
 		speed = 1.6,
 		damage = 8,
@@ -77,7 +77,7 @@ game_mode.MONSTER_TYPES = {
 	-- deploy it from a spawner unit.
 	custodian = {
 		label = "Automated Security Unit",
-		texture = "monster_texture.png^[colorize:#55ddff:120",
+		texture = sl_texgen.texture("monster_texture.png") .. "^[colorize:#55ddff:120",
 		hp = 40,
 		speed = 2.2,
 		damage = 5,
@@ -164,7 +164,7 @@ minetest.register_entity(MONSTER_NAME, {
 		collisionbox = { -0.4, 0.0, -0.4, 0.4, 1.8, 0.4 },
 		visual = "mesh",
 		mesh = "monster.obj",
-		textures = { "monster_texture.png" },
+		textures = { sl_texgen.texture("monster_texture.png") },
 		visual_size = { x = 1, y = 1 },
 		backface_culling = false,
 		-- Match entities never persist in static data: the map system
@@ -347,7 +347,7 @@ minetest.register_entity(modname .. ":scanner_pulse", {
 	initial_properties = {
 		visual = "mesh",
 		mesh = "scanner_pulse.obj",
-		textures = { "pulse_texture.png" },
+		textures = { sl_texgen.texture("pulse_texture.png") },
 		physical = false,
 		collide_with_objects = false,
 		collisionbox = { 0, 0, 0, 0, 0, 0 },
@@ -378,7 +378,7 @@ minetest.register_entity(modname .. ":flare_light", {
 	initial_properties = {
 		visual = "mesh",
 		mesh = "flare_light.obj",
-		textures = { "flare_light_texture.png" },
+		textures = { sl_texgen.texture("flare_light_texture.png") },
 		physical = false,
 		collide_with_objects = false,
 		collisionbox = { 0, 0, 0, 0, 0, 0 },
@@ -401,7 +401,7 @@ minetest.register_entity(modname .. ":death_particle", {
 	initial_properties = {
 		visual = "mesh",
 		mesh = "death_particle.obj",
-		textures = { "particle_texture.png" },
+		textures = { sl_texgen.texture("particle_texture.png") },
 		physical = false,
 		collide_with_objects = false,
 		collisionbox = { 0, 0, 0, 0, 0, 0 },

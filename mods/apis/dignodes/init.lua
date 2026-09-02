@@ -14,7 +14,8 @@ for g=1, #groups do
 				else
 					d = string.format("Dig Test Node: %s=%d", gr, r)
 				end
-				local tile = "dignodes_"..gr..".png^dignodes_rating"..r..".png"
+				local tile = sl_texgen.texture("dignodes_" .. gr .. ".png")
+					.. "^" .. sl_texgen.texture("dignodes_rating" .. r .. ".png")
 				if l==1 then
 					tile = tile .. "^[colorize:#FFFF00:127"
 				elseif l==2 then
@@ -35,5 +36,5 @@ minetest.register_node("dignodes:none", {
 	description = "Dig Test Node: groupless".."\n"..
 		"Can't be dug by normal digging tools".."\n"..
 		"(use the Remover tool to remove)",
-	tiles = {"dignodes_none.png"},
+	tiles = {sl_texgen.texture("dignodes_none.png")},
 })

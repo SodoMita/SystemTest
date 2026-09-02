@@ -79,7 +79,8 @@ function get_crafting_formspec(player, category)
     }
 
     for _, cat in ipairs(categories) do
-        local icon_name = "gui_category_" .. cat.id .. ".png"
+        -- runtime-generated category icons ([png: modifiers via sl_texgen)
+        local icon_name = sl_texgen.texture("gui_category_" .. cat.id .. ".png")
         if cat.id == category then
             table.insert(formspec, string.format("box[%f,1.1;2,0.5;#5a9a5aff]", cat.x))
             table.insert(formspec, string.format("box[%f,1.1;2,0.5;#7aca7a55]", cat.x))

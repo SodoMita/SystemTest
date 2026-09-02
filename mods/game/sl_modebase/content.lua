@@ -14,10 +14,10 @@ local modname = game_mode.modname
 -- Salvage materials (raw loot)
 -- ---------------------------------------------------------------
 local salvage_items = {
-	{ "scrap_metal",       "Scrap Metal",       "sl_scrap_metal.png" },
-	{ "electronic_waste",  "Electronic Waste",  "sl_electronic_waste.png" },
-	{ "raw_crystal",       "Raw Crystal",       "sl_raw_crystal.png" },
-	{ "plastic_scrap",     "Plastic Scrap",     "sl_plastic_scrap.png" },
+	{ "scrap_metal",       "Scrap Metal",       sl_texgen.texture("sl_scrap_metal.png") },
+	{ "electronic_waste",  "Electronic Waste",  sl_texgen.texture("sl_electronic_waste.png") },
+	{ "raw_crystal",       "Raw Crystal",       sl_texgen.texture("sl_raw_crystal.png") },
+	{ "plastic_scrap",     "Plastic Scrap",     sl_texgen.texture("sl_plastic_scrap.png") },
 }
 
 for _, it in ipairs(salvage_items) do
@@ -32,11 +32,11 @@ end
 -- Crafted components
 -- ---------------------------------------------------------------
 local component_items = {
-	{ "metal_ingot",       "Metal Ingot",       "sl_metal_ingot.png" },
-	{ "circuit_board",     "Circuit Board",     "sl_circuit_board.png" },
-	{ "energy_crystal",    "Energy Crystal",    "sl_energy_crystal.png" },
-	{ "hardened_plate",    "Hardened Plate",    "sl_hardened_plate.png" },
-	{ "reinforced_glass",  "Reinforced Glass",  "sl_reinforced_glass.png" },
+	{ "metal_ingot",       "Metal Ingot",       sl_texgen.texture("sl_metal_ingot.png") },
+	{ "circuit_board",     "Circuit Board",     sl_texgen.texture("sl_circuit_board.png") },
+	{ "energy_crystal",    "Energy Crystal",    sl_texgen.texture("sl_energy_crystal.png") },
+	{ "hardened_plate",    "Hardened Plate",    sl_texgen.texture("sl_hardened_plate.png") },
+	{ "reinforced_glass",  "Reinforced Glass",  sl_texgen.texture("sl_reinforced_glass.png") },
 }
 
 for _, it in ipairs(component_items) do
@@ -60,14 +60,14 @@ local function register_tool_basics(name, desc, tex, caps, extra_groups)
 	})
 end
 
-register_tool_basics("combat_blade", "Combat Blade", "sl_combat_blade.png", {
+register_tool_basics("combat_blade", "Combat Blade", sl_texgen.texture("sl_combat_blade.png"), {
 	full_punch_interval = 0.8,
 	max_drop_level = 0,
 	groupcaps = {},
 	damage_groups = { fleshy = 6 },
 })
 
-register_tool_basics("breaching_pick", "Breaching Pick", "sl_breaching_pick.png", {
+register_tool_basics("breaching_pick", "Breaching Pick", sl_texgen.texture("sl_breaching_pick.png"), {
 	full_punch_interval = 1.0,
 	max_drop_level = 1,
 	groupcaps = {
@@ -76,7 +76,7 @@ register_tool_basics("breaching_pick", "Breaching Pick", "sl_breaching_pick.png"
 	damage_groups = { fleshy = 3 },
 })
 
-register_tool_basics("tactical_axe", "Tactical Axe", "sl_tactical_axe.png", {
+register_tool_basics("tactical_axe", "Tactical Axe", sl_texgen.texture("sl_tactical_axe.png"), {
 	full_punch_interval = 1.0,
 	max_drop_level = 1,
 	groupcaps = {
@@ -85,7 +85,7 @@ register_tool_basics("tactical_axe", "Tactical Axe", "sl_tactical_axe.png", {
 	damage_groups = { fleshy = 5 },
 })
 
-register_tool_basics("trench_shovel", "Trench Shovel", "sl_trench_shovel.png", {
+register_tool_basics("trench_shovel", "Trench Shovel", sl_texgen.texture("sl_trench_shovel.png"), {
 	full_punch_interval = 1.0,
 	max_drop_level = 1,
 	groupcaps = {
@@ -94,14 +94,14 @@ register_tool_basics("trench_shovel", "Trench Shovel", "sl_trench_shovel.png", {
 	damage_groups = { fleshy = 2 },
 })
 
-register_tool_basics("energy_blade", "Energy Blade", "sl_energy_blade.png", {
+register_tool_basics("energy_blade", "Energy Blade", sl_texgen.texture("sl_energy_blade.png"), {
 	full_punch_interval = 0.6,
 	max_drop_level = 1,
 	groupcaps = {},
 	damage_groups = { fleshy = 12 },
 })
 
-register_tool_basics("power_drill", "Power Drill", "sl_power_drill.png", {
+register_tool_basics("power_drill", "Power Drill", sl_texgen.texture("sl_power_drill.png"), {
 	full_punch_interval = 0.8,
 	max_drop_level = 1,
 	groupcaps = {
@@ -115,7 +115,7 @@ register_tool_basics("power_drill", "Power Drill", "sl_power_drill.png", {
 -- ---------------------------------------------------------------
 minetest.register_craftitem(modname .. ":flare", {
 	description = S("Flare"),
-	inventory_image = "sl_flare.png",
+	inventory_image = sl_texgen.texture("sl_flare.png"),
 	on_use = function(itemstack, user, pointed_thing)
 		if not user or not user:is_player() then return itemstack end
 		local pos = user:get_pos()
@@ -128,7 +128,7 @@ minetest.register_craftitem(modname .. ":flare", {
 				size = 4,
 				collisiondetection = false,
 				vertical = false,
-				texture = "sl_flare.png",
+				texture = sl_texgen.texture("sl_flare.png"),
 				glow = 14,
 			})
 			minetest.sound_play("place", { pos = pos, gain = 0.5, max_hear_distance = 10 })
@@ -140,7 +140,7 @@ minetest.register_craftitem(modname .. ":flare", {
 
 minetest.register_craftitem(modname .. ":medkit", {
 	description = S("Medkit"),
-	inventory_image = "sl_medkit.png",
+	inventory_image = sl_texgen.texture("sl_medkit.png"),
 	on_use = function(itemstack, user, pointed_thing)
 		if not user or not user:is_player() then return itemstack end
 		local hp = user:get_hp()
@@ -158,11 +158,11 @@ minetest.register_craftitem(modname .. ":medkit", {
 -- Tactical / objective nodes
 -- ---------------------------------------------------------------
 local tactical_nodes = {
-	{ "power_cell",   "Power Cell",   "sl_power_cell.png",   { cracky = 1, oddly_breakable_by_hand = 1 }, 10 },
-	{ "blast_shield", "Blast Shield", "sl_blast_shield.png", { cracky = 1 }, 14 },
-	{ "barricade",    "Barricade",    "sl_barricade.png",    { choppy = 1, cracky = 2 }, 0 },
-	{ "signal_relay", "Signal Relay", "sl_signal_relay.png", { cracky = 1, oddly_breakable_by_hand = 1 }, 8 },
-	{ "sensor_array", "Sensor Array", "sl_sensor_array.png", { cracky = 1, oddly_breakable_by_hand = 1 }, 12 },
+	{ "power_cell",   "Power Cell",   sl_texgen.texture("sl_power_cell.png"),   { cracky = 1, oddly_breakable_by_hand = 1 }, 10 },
+	{ "blast_shield", "Blast Shield", sl_texgen.texture("sl_blast_shield.png"), { cracky = 1 }, 14 },
+	{ "barricade",    "Barricade",    sl_texgen.texture("sl_barricade.png"),    { choppy = 1, cracky = 2 }, 0 },
+	{ "signal_relay", "Signal Relay", sl_texgen.texture("sl_signal_relay.png"), { cracky = 1, oddly_breakable_by_hand = 1 }, 8 },
+	{ "sensor_array", "Sensor Array", sl_texgen.texture("sl_sensor_array.png"), { cracky = 1, oddly_breakable_by_hand = 1 }, 12 },
 }
 
 for _, t in ipairs(tactical_nodes) do
@@ -180,9 +180,9 @@ end
 -- Ritual components (rare; consumed by the Ghost Altar)
 -- ---------------------------------------------------------------
 local ritual_items = {
-	{ "ritual_ashen_relic", "Ashen Relic", "sl_raw_crystal.png^[colorize:#aa00ff:160" },
-	{ "ritual_soul_shard", "Soul Shard", "sl_energy_crystal.png^[colorize:#ff00ff:160" },
-	{ "ritual_signal_ink", "Signal Ink", "sl_circuit_board.png^[colorize:#00ffff:140" },
+	{ "ritual_ashen_relic", "Ashen Relic", sl_texgen.texture("sl_raw_crystal.png") .. "^[colorize:#aa00ff:160" },
+	{ "ritual_soul_shard", "Soul Shard", sl_texgen.texture("sl_energy_crystal.png") .. "^[colorize:#ff00ff:160" },
+	{ "ritual_signal_ink", "Signal Ink", sl_texgen.texture("sl_circuit_board.png") .. "^[colorize:#00ffff:140" },
 }
 for _, item in ipairs(ritual_items) do
 	minetest.register_craftitem(modname .. ":" .. item[1], {
@@ -197,7 +197,7 @@ end
 -- ---------------------------------------------------------------
 minetest.register_craftitem(modname .. ":data_pad_security", {
 	description = S("Decrypted Security Pad"),
-	inventory_image = "sl_circuit_board.png^[colorize:#00ff00:50",
+	inventory_image = sl_texgen.texture("sl_circuit_board.png") .. "^[colorize:#00ff00:50",
 	groups = { information = 1 },
 })
 
@@ -210,7 +210,7 @@ minetest.register_node(modname .. ":terminal", {
 	description = S("Terminal"),
 	drawtype = "mesh",
 	mesh = "terminal.obj",
-	tiles = { "terminal_texture.png" },
+	tiles = { sl_texgen.texture("terminal_texture.png") },
 	paramtype = "light",
 	light_source = 8,
 	groups = { cracky = 2, oddly_breakable_by_hand = 1 },
@@ -240,7 +240,7 @@ end
 minetest.register_node(door_closed, {
 	description = S("Door"),
 	drawtype = "nodebox",
-	tiles = { "door_texture.png" },
+	tiles = { sl_texgen.texture("door_texture.png") },
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { choppy = 2, oddly_breakable_by_hand = 1 },
@@ -254,7 +254,7 @@ minetest.register_node(door_closed, {
 minetest.register_node(door_open, {
 	description = S("Door (Open)"),
 	drawtype = "nodebox",
-	tiles = { "door_texture.png" },
+	tiles = { sl_texgen.texture("door_texture.png") },
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { choppy = 2, oddly_breakable_by_hand = 1, not_in_creative_inventory = 1 },
@@ -281,7 +281,7 @@ minetest.register_node(hatch_closed, {
 	description = S("Hatch"),
 	drawtype = "mesh",
 	mesh = "hatch.obj",
-	tiles = { "door_texture.png" },
+	tiles = { sl_texgen.texture("door_texture.png") },
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { choppy = 2, oddly_breakable_by_hand = 1 },
@@ -295,7 +295,7 @@ minetest.register_node(hatch_closed, {
 minetest.register_node(hatch_open, {
 	description = S("Hatch (Open)"),
 	drawtype = "nodebox",
-	tiles = { "door_texture.png" },
+	tiles = { sl_texgen.texture("door_texture.png") },
 	paramtype = "light",
 	paramtype2 = "facedir",
 	groups = { choppy = 2, oddly_breakable_by_hand = 1, not_in_creative_inventory = 1 },
@@ -312,7 +312,7 @@ minetest.register_node(modname .. ":platform", {
 	description = S("Platform"),
 	drawtype = "mesh",
 	mesh = "platform.obj",
-	tiles = { "platform_texture.png" },
+	tiles = { sl_texgen.texture("platform_texture.png") },
 	paramtype = "light",
 	groups = { cracky = 2, oddly_breakable_by_hand = 1 },
 	is_ground_content = false,
@@ -357,7 +357,7 @@ end
 	description = S("Loose Item"),
 	drawtype = "mesh",
 	mesh = "item.obj",
-	tiles = { "item_texture.png" },
+	tiles = { sl_texgen.texture("item_texture.png") },
 	paramtype = "light",
 	light_source = 6,
 	groups = { oddly_breakable_by_hand = 1, dig_immediate = 3 },
@@ -382,9 +382,9 @@ end
 -- Information & Lore Items
 -- ---------------------------------------------------------------
 local info_items = {
-	{ "data_pad_security", "Security Data Pad", "sl_circuit_board.png^[colorize:#ff0000:50", "ENCRYPTED: 'Section 7 seal critical... profit overrides safety...'" },
-	{ "data_pad_logistics", "Logistics Data Pad", "sl_circuit_board.png^[colorize:#00ff00:50", "LOG: '340k saved on inspections this month. Tell the families it was an accident.'" },
-	{ "data_pad_medical", "Medical Data Pad", "sl_circuit_board.png^[colorize:#0000ff:50", "BIO: 'Dredger Unit 7 confirmed as Maintenance Tech Kowalski. Personality mutated by hydraulic exposure.'" },
+	{ "data_pad_security", "Security Data Pad", sl_texgen.texture("sl_circuit_board.png") .. "^[colorize:#ff0000:50", "ENCRYPTED: 'Section 7 seal critical... profit overrides safety...'" },
+	{ "data_pad_logistics", "Logistics Data Pad", sl_texgen.texture("sl_circuit_board.png") .. "^[colorize:#00ff00:50", "LOG: '340k saved on inspections this month. Tell the families it was an accident.'" },
+	{ "data_pad_medical", "Medical Data Pad", sl_texgen.texture("sl_circuit_board.png") .. "^[colorize:#0000ff:50", "BIO: 'Dredger Unit 7 confirmed as Maintenance Tech Kowalski. Personality mutated by hydraulic exposure.'" },
 }
 
 for _, it in ipairs(info_items) do
@@ -405,7 +405,7 @@ end
 
 minetest.register_tool(modname .. ":summon_monster", {
 	description = S("Summon Basic Monster\n(Monster Master Only)"),
-	inventory_image = "monster_texture.png^[resize:32x32",
+	inventory_image = sl_texgen.icon("monster_texture.png", 32),
 	groups = { not_in_creative_inventory = 1 },
 	on_use = function(itemstack, user, pointed_thing)
 		local name = user:get_player_name()
@@ -445,7 +445,7 @@ game_mode.ESSENCE_ITEM = modname .. ":monster_essence"
 
 minetest.register_craftitem(game_mode.ESSENCE_ITEM, {
 	description = S("Monster Essence\\n(Monster Master resource; spawner fuel)"),
-	inventory_image = "sl_monster_essence.png",
+	inventory_image = sl_texgen.texture("sl_monster_essence.png"),
 	groups = { component = 1, mm_resource = 1 },
 })
 
@@ -612,10 +612,10 @@ end
 
 minetest.register_node(modname .. ":monster_spawner", {
 	description = S("Monster Spawner Unit"),
-	inventory_image = "sl_monster_spawner.png",
+	inventory_image = sl_texgen.texture("sl_monster_spawner.png"),
 	drawtype = "mesh",
 	mesh = "ghost_altar.obj",
-	tiles = { "sl_monster_spawner.png" },
+	tiles = { sl_texgen.texture("sl_monster_spawner.png") },
 	paramtype = "light",
 	light_source = 10,
 	-- sl_essence_value: price paid to the MM pool when the crew's
@@ -695,7 +695,7 @@ end)
 -- Evil ghost sabotage: one bounded charge per revival, targeting a nearby node.
 minetest.register_tool(modname .. ":sabotage_charge", {
 	description = S("Sabotage Charge\n(Evil Ghost Only)"),
-	inventory_image = "sl_circuit_board.png^[colorize:#ff00ff:150",
+	inventory_image = sl_texgen.texture("sl_circuit_board.png") .. "^[colorize:#ff00ff:150",
 	groups = { not_in_creative_inventory = 1 },
 	on_use = function(itemstack, user, pointed_thing)
 		local pl = game_mode.get_player_state(user:get_player_name())
@@ -749,7 +749,7 @@ end)
 -- the single-object limit, and punch-exorcism already bound it.
 minetest.register_tool(modname .. ":possession_focus", {
 	description = S("Possession Focus\n(Evil Ghost Only; one object at a time)"),
-	inventory_image = "sl_raw_crystal.png^[colorize:#ff00ff:150",
+	inventory_image = sl_texgen.texture("sl_raw_crystal.png") .. "^[colorize:#ff00ff:150",
 	groups = { not_in_creative_inventory = 1 },
 	on_use = function(itemstack, user, pointed_thing)
 		if not user or not user:is_player() then return itemstack end
@@ -818,7 +818,7 @@ end
 
 minetest.register_tool(modname .. ":scanner", {
 	description = S("Signal Scanner\n(Living players: sweep for corrupted or possessed systems)"),
-	inventory_image = "sl_sensor_array.png^[colorize:#00ffff:100",
+	inventory_image = sl_texgen.texture("sl_sensor_array.png") .. "^[colorize:#00ffff:100",
 	groups = { information = 1 },
 
 	on_use = function(itemstack, user, pointed_thing)
@@ -895,7 +895,7 @@ minetest.register_craft({
 -- Reincarnation item for ghosts to become evil ghosts
 minetest.register_craftitem(modname .. ":reincarnate", {
 	description = S("Revive as Evil Ghost\n(Ghost Only; lose match points)"),
-	inventory_image = "monster_texture.png^[resize:32x32^[colorize:#ffffff:50",
+	inventory_image = sl_texgen.texture("monster_texture.png") .. "^[resize:32x32^[colorize:#ffffff:50",
 	groups = { not_in_creative_inventory = 1 },
 	on_use = function(itemstack, user, pointed_thing)
 		local name = user:get_player_name()

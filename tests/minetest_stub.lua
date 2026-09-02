@@ -857,6 +857,43 @@ minetest.get_modpath = function(name)
 	return M.modpaths[name] or raw_get_modpath(name)
 end
 
+-- sl_texgen shim: mods reference runtime-generated textures through
+-- sl_texgen.texture()/icon()/sheet()/vframes().  The stub serves the
+-- plain filenames (equivalent of sl_texgen.mode=stock) so gameplay
+-- tests stay independent of texture generation.
+sl_texgen = {
+	texture = function(name)
+		assert(type(name) == "string", "sl_texgen.texture(name) needs a string")
+		return name
+	end,
+	icon = function(name, px)
+		return sl_texgen.texture(name) .. ("^[resize:%dx%d"):format(px, px)
+	end,
+	sheet = function(name, frames_w, frame_length)
+		return {
+			name = sl_texgen.texture(name),
+			animation = {
+				type = "sheet_2d",
+				frames_w = frames_w,
+				frames_h = 1,
+				frame_length = frame_length,
+			},
+		}
+	end,
+	vframes = function(name, aspect_w, aspect_h, length)
+		return {
+			name = sl_texgen.texture(name),
+			animation = {
+				type = "vertical_frames",
+				aspect_w = aspect_w,
+				aspect_h = aspect_h,
+				length = length,
+			},
+		}
+	end,
+}
+
+
 minetest.sound_play = function(name, params)
 	table.insert(M.sounds, { name = name, params = params or {} })
 	return #M.sounds

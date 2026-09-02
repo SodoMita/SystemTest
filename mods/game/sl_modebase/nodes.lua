@@ -368,7 +368,7 @@ end
 
 minetest.register_node(game_mode.modname .. ":loot_crate", {
 	description = S("Loot Crate"),
-	tiles = {"sl_loot_crate.png"},
+	tiles = {sl_texgen.texture("sl_loot_crate.png")},
 	paramtype2 = "facedir",
 	-- sl_essence_value: price paid to the MM pool when a crew-placed
 	-- crate is destroyed (essence ruling §13.3 rule 1).
@@ -454,7 +454,7 @@ minetest.register_node(game_mode.modname .. ":spawn_lobby", {
 
 minetest.register_node(game_mode.modname .. ":ghost_mutator", {
 	description = S("Deprecated Ghost Mutator (Use Ghost Altar)"),
-	tiles = {"sl_raw_crystal.png^[colorize:#ff00ff:80"},
+	tiles = {sl_texgen.texture("sl_raw_crystal.png") .. "^[colorize:#ff00ff:80"},
 	paramtype = "light",
 	light_source = 12,
 	groups = {cracky = 1},
@@ -474,7 +474,7 @@ minetest.register_node(game_mode.modname .. ":ghost_task_terminal", {
 	description = S("Ghost Task Terminal"),
 	drawtype = "mesh",
 	mesh = "terminal.obj",
-	tiles = { "terminal_texture.png^[colorize:#ff00ff:50" },
+	tiles = { sl_texgen.texture("terminal_texture.png") .. "^[colorize:#ff00ff:50" },
 	paramtype = "light",
 	light_source = 8,
 	groups = { cracky = 2 },
@@ -509,7 +509,7 @@ minetest.register_node(game_mode.modname .. ":ghost_altar", {
 	description = S("Ghost Altar"),
 	drawtype = "mesh",
 	mesh = "ghost_altar.obj",
-	tiles = { "sl_raw_crystal.png^[colorize:#7700aa:120" },
+	tiles = { sl_texgen.texture("sl_raw_crystal.png") .. "^[colorize:#7700aa:120" },
 	paramtype = "light",
 	light_source = 12,
 	groups = { cracky = 2, oddly_breakable_by_hand = 1 },

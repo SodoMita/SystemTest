@@ -95,8 +95,8 @@ local function register_pad_pair(kind, desc, tile)
 	})
 end
 
-register_pad_pair("weapon", "Weapon Pad", "sl_weapons_pad_ring.png")
-register_pad_pair("ammo", "Ammo Pad", "sl_weapons_pad_ammo_ring.png")
+register_pad_pair("weapon", "Weapon Pad", sl_texgen.texture("sl_weapons_pad_ring.png"))
+register_pad_pair("ammo", "Ammo Pad", sl_texgen.texture("sl_weapons_pad_ammo_ring.png"))
 
 function W.pad_register(pos, kind, item, armed, rearm_at)
 	local entry = {

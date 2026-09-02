@@ -2,6 +2,27 @@
 
 This asset pass was generated procedurally for prototype use.  It fills missing media references found in the repository and the MVP list in `NEEDED ASSETS.md`.
 
+## Runtime texture pipeline (sl_texgen) — replaces most generated PNGs
+
+The procedural *placeholder textures* listed below (effect spritesheets,
+mob strips, workshop/modebase panels, noise, dignodes, formspec skin,
+weapon dithers, clothing/mvp icons) are no longer shipped as PNG files.
+`mods/apis/sl_texgen` renders all of them in Lua at server startup and
+serves them as `[png:` texture modifiers —
+`"[png:" .. core.encode_base64(core.encode_png(w, h, pixels))` — embedded
+directly in the node/item/entity texture strings (see
+https://docs.luanti.org/for-creators/api/texture-modifiers/).  No media
+push, no disk writes at runtime, byte-stable across platforms; the
+client decodes each modifier once into its texture cache.
+
+- 199 textures across 12 generator modules (`mods/apis/sl_texgen/gen/`);
+  the ~1.4 MB of stock PNG was deleted from the repo.
+- Guards: `tests/texgen_test.lua` (determinism, PNG structure, [png:
+  syntax safety) and `tools/texgen_check.py --verify` (CI: registry ↔
+  repo consistency, bare-reference and dependency checks).
+- Escape hatch: `sl_texgen.mode = stock` serves plain filenames (restore
+  files from git history first). Status: `/sl_texgen`.
+
 ## Added
 
 - `mods/content/sl_mvp_assets/` — MVP placeholder models (`player.obj`, `monster.obj`, `platform.obj`, `terminal.obj`, `door.obj`, `hatch.obj`, `item.obj`, `item_pickup.obj`, `pulse.obj`, `scanner_pulse.obj`, `flare_light.obj`, `particle.obj`, `death_particle.obj`), textures/UI (`neon_cube.png`, `cursor.png`, `hud.png`, `hud_frame.png`, `font.png`, model textures), and OGG sounds (`ambience`, `music`, footsteps, alerts, monster cues, radio static, etc.).

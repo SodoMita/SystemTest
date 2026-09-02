@@ -6,11 +6,11 @@ local ANIM_LENGTH = 1.5
 
 local WHITE_NOISE_TILES, RAINBOW_NOISE_TILES
 if animate_noise then
-	WHITE_NOISE_TILES = { { name = "sus_nodes_white_noise_anim_4n.png", align_style = "world", scale = 4, animation = { type = "vertical_frames", aspect_w = 64, aspect_h = 64, length = ANIM_LENGTH } } }
-	RAINBOW_NOISE_TILES = { { name = "sus_nodes_rainbow_noise_anim_4n.png", align_style = "world", scale = 4, animation = { type = "vertical_frames", aspect_w = 64, aspect_h = 64, length = ANIM_LENGTH } } }
+	WHITE_NOISE_TILES = { { name = sl_texgen.texture("sus_nodes_white_noise_anim_4n.png"), align_style = "world", scale = 4, animation = { type = "vertical_frames", aspect_w = 64, aspect_h = 64, length = ANIM_LENGTH } } }
+	RAINBOW_NOISE_TILES = { { name = sl_texgen.texture("sus_nodes_rainbow_noise_anim_4n.png"), align_style = "world", scale = 4, animation = { type = "vertical_frames", aspect_w = 64, aspect_h = 64, length = ANIM_LENGTH } } }
 else
-	WHITE_NOISE_TILES = { { name = "sus_nodes_white_noise_noanim_4n.png", align_style = "world", scale = 4 } }
-	RAINBOW_NOISE_TILES = { { name = "sus_nodes_rainbow_noise_noanim_4n.png", align_style = "world", scale = 4 } }
+	WHITE_NOISE_TILES = { { name = sl_texgen.texture("sus_nodes_white_noise_noanim_4n.png"), align_style = "world", scale = 4 } }
+	RAINBOW_NOISE_TILES = { { name = sl_texgen.texture("sus_nodes_rainbow_noise_noanim_4n.png"), align_style = "world", scale = 4 } }
 end
 
 -- Glowing, passes light but not sunlight

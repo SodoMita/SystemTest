@@ -31,7 +31,7 @@ end
 -- ----------------------------------------------------------------
 minetest.register_craftitem(W.modname .. ":targeting_log", {
 	description = S("Targeting Log\n(Read a sentry's last 30 seconds)"),
-	inventory_image = "sl_weapons_targeting_log.png",
+	inventory_image = sl_texgen.texture("sl_weapons_targeting_log.png"),
 	on_use = function(itemstack, user)
 		if not user or not user.is_player or not user:is_player() then return itemstack end
 		local name = user:get_player_name()
@@ -75,9 +75,9 @@ minetest.register_entity(W.modname .. ":turret_head", {
 		visual = "cube",
 		-- Cube visuals index six faces; one texture is engine abuse
 		-- even when it happens to render.
-		textures = { "sl_weapons_turret_head.png", "sl_weapons_turret_head.png",
-			"sl_weapons_turret_head.png", "sl_weapons_turret_head.png",
-			"sl_weapons_turret_head.png", "sl_weapons_turret_head.png" },
+		textures = { sl_texgen.texture("sl_weapons_turret_head.png"), sl_texgen.texture("sl_weapons_turret_head.png"),
+			sl_texgen.texture("sl_weapons_turret_head.png"), sl_texgen.texture("sl_weapons_turret_head.png"),
+			sl_texgen.texture("sl_weapons_turret_head.png"), sl_texgen.texture("sl_weapons_turret_head.png") },
 		visual_size = { x = 4, y = 4 },
 		physical = false,
 		pointable = false,
@@ -90,8 +90,8 @@ minetest.register_entity(W.modname .. ":turret_head", {
 
 minetest.register_node(W.modname .. ":turret", {
 	description = S("Sentry Turret"),
-	tiles = { "sl_weapons_turret_top.png", "sl_weapons_turret_base.png",
-		"sl_weapons_turret_side.png" },
+	tiles = { sl_texgen.texture("sl_weapons_turret_top.png"), sl_texgen.texture("sl_weapons_turret_base.png"),
+		sl_texgen.texture("sl_weapons_turret_side.png") },
 	paramtype2 = "facedir",
 	light_source = 4,
 	groups = { cracky = 2, possessable = 1, not_in_creative_inventory = 1 },
@@ -147,7 +147,7 @@ minetest.register_node(W.modname .. ":turret", {
 -- ----------------------------------------------------------------
 minetest.register_craftitem(W.modname .. ":sentry_kit", {
 	description = S("Sentry Kit\n(Deploy on a solid surface)"),
-	inventory_image = "sl_weapons_sentry_kit.png",
+	inventory_image = sl_texgen.texture("sl_weapons_sentry_kit.png"),
 
 	on_place = function(itemstack, placer, pointed_thing)
 		if not placer or not placer.is_player or not placer:is_player() then
@@ -283,7 +283,7 @@ function W.destroy_turret(pos, attacker, how)
 			acceleration = { x = 0, y = -8, z = 0 },
 			expirationtime = 0.7,
 			size = 3,
-			texture = "sl_weapons_spark.png",
+			texture = sl_texgen.texture("sl_weapons_spark.png"),
 			glow = 12,
 		})
 	end

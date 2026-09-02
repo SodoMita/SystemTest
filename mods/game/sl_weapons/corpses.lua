@@ -52,9 +52,9 @@ local function trace_node(name, desc, tex, light)
 	})
 end
 
-trace_node("residue", "Residue", "sl_weapons_residue.png", 1)
-trace_node("mound", "Grave Mound", "sl_weapons_mound.png", 0)
-trace_node("scorch", "Scorch", "sl_weapons_scorch.png", 3)
+trace_node("residue", "Residue", sl_texgen.texture("sl_weapons_residue.png"), 1)
+trace_node("mound", "Grave Mound", sl_texgen.texture("sl_weapons_mound.png"), 0)
+trace_node("scorch", "Scorch", sl_texgen.texture("sl_weapons_scorch.png"), 3)
 
 -- ----------------------------------------------------------------
 -- The corpse entity
@@ -337,7 +337,7 @@ function W.cremate_corpse(lua)
 			acceleration = { x = 0, y = 2, z = 0 },
 			expirationtime = 1.4,
 			size = 4,
-			texture = "sl_weapons_blast.png",
+			texture = sl_texgen.texture("sl_weapons_blast.png"),
 			glow = 12,
 		})
 	end
@@ -398,7 +398,7 @@ minetest.register_entity(W.modname .. ":deadwalk", {
 				acceleration = { x = 0, y = -1, z = 0 },
 				expirationtime = 1.0,
 				size = 2,
-				texture = "sl_weapons_grit.png",
+				texture = sl_texgen.texture("sl_weapons_grit.png"),
 			})
 		end
 	end,

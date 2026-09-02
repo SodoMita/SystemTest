@@ -26,7 +26,7 @@ function W.register_projectile(id, cfg)
 
 		initial_properties = {
 			visual = "sprite",
-			textures = { cfg.texture or "sl_weapons_tracer.png" },
+			textures = { cfg.texture or sl_texgen.texture("sl_weapons_tracer.png") },
 			visual_size = { x = 0.6, y = 0.6 },
 			physical = false,
 			collisionbox = { 0, 0, 0, 0, 0, 0 },
@@ -165,7 +165,7 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 			expirationtime = 0.8,
 			size = 4,
 			collisiondetection = false,
-			texture = "sl_weapons_blast.png",
+			texture = sl_texgen.texture("sl_weapons_blast.png"),
 			glow = 14,
 		})
 	end
@@ -179,7 +179,7 @@ function W.explode(pos, shooter_name, cfg, exclude_obj)
 			expirationtime = 1.6 + math.random() * 0.8,
 			size = 5,
 			collisiondetection = false,
-			texture = "sl_weapons_grit.png",
+			texture = sl_texgen.texture("sl_weapons_grit.png"),
 		})
 	end
 
@@ -250,7 +250,7 @@ W.register_projectile("mortar", {
 	splash = { radius = 3, max = 10, beacon = 2 },
 	self_dmg = 0.5,
 	inherit = true,
-	texture = "sl_weapons_mortar_shell.png",
+	texture = sl_texgen.texture("sl_weapons_mortar_shell.png"),
 	launch_sound = "sl_weapons_mortar_launch",
 	hear = 40,
 })
@@ -261,7 +261,7 @@ W.register_projectile("pulse", {
 	damage = 5,
 	cause = "driver",
 	knock = 0.4, -- pulse-juggle (spec §10)
-	texture = "sl_weapons_pulse_bolt.png",
+	texture = sl_texgen.texture("sl_weapons_pulse_bolt.png"),
 	launch_sound = "sl_weapons_pulse_fire",
 	hear = 24,
 })

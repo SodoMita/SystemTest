@@ -376,7 +376,7 @@ function game_mode.spawn_player(player)
 		player:set_properties({
 			mesh = "monster.obj",
 			visual = "mesh",
-			textures = { pl.phase == "monster" and "monster_texture.png" or "monster_texture.png^[colorize:#ff0000:80" },
+			textures = { pl.phase == "monster" and sl_texgen.texture("monster_texture.png") or sl_texgen.texture("monster_texture.png") .. "^[colorize:#ff0000:80" },
 			visual_size = {x=1, y=1},
 			collisionbox = { -0.4, 0.0, -0.4, 0.4, 1.8, 0.4 },
 		})

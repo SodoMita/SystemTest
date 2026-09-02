@@ -188,7 +188,7 @@ end
 -- ----------------------------------------------------------------
 W.register_weapon({
 	id = "pistol", item = "pistol", desc = "Pulsar Pistol",
-	texture = "sl_weapons_pistol.png",
+	texture = sl_texgen.texture("sl_weapons_pistol.png"),
 	kind = "hitscan", damage = 4, refire = 0.35,
 	range = 60, cause = "pistol", beacon_dmg = 1,
 	pool = "bullets", mag = 12,
@@ -198,7 +198,7 @@ W.register_weapon({
 
 W.register_weapon({
 	id = "chatter", item = "chatter", desc = "Chatter SMG",
-	texture = "sl_weapons_chatter.png",
+	texture = sl_texgen.texture("sl_weapons_chatter.png"),
 	kind = "hitscan", damage = 2, refire = 0.09,
 	range = 48, cause = "chatter", beacon_dmg = 1,
 	pool = "bullets", mag = 30,
@@ -210,7 +210,7 @@ W.register_weapon({
 
 W.register_weapon({
 	id = "scatter", item = "scatter", desc = "Riot Scatter",
-	texture = "sl_weapons_scatter.png",
+	texture = sl_texgen.texture("sl_weapons_scatter.png"),
 	kind = "hitscan", damage = 1.5, refire = 0.9,
 	pellets = 8, spread = 9, range = 24,
 	cause = "scatter", beacon_dmg = 1,
@@ -220,7 +220,7 @@ W.register_weapon({
 
 W.register_weapon({
 	id = "lance", item = "lance", desc = "Arc Lance",
-	texture = "sl_weapons_lance.png",
+	texture = sl_texgen.texture("sl_weapons_lance.png"),
 	kind = "hitscan", damage = 18, refire = 1.6,
 	range = 90, cause = "lance", beacon_dmg = 3,
 	pool = "cells", mag = 6,
@@ -230,7 +230,7 @@ W.register_weapon({
 
 W.register_weapon({
 	id = "mortar", item = "mortar", desc = "Fusion Mortar",
-	texture = "sl_weapons_mortar.png",
+	texture = sl_texgen.texture("sl_weapons_mortar.png"),
 	kind = "mortar", refire = 0.9,
 	pool = "rockets", mag = 3, cause = "mortar",
 	beacon_dmg = 4,
@@ -238,7 +238,7 @@ W.register_weapon({
 
 W.register_weapon({
 	id = "driver", item = "driver", desc = "Pulse Driver",
-	texture = "sl_weapons_driver.png",
+	texture = sl_texgen.texture("sl_weapons_driver.png"),
 	kind = "pulse", refire = 0.15,
 	pool = "cells", mag = 20, cause = "driver",
 	beacon_dmg = 1,
@@ -250,7 +250,7 @@ W.register_weapon({
 -- ----------------------------------------------------------------
 W.register_weapon({
 	id = "six", item = "neon_six", desc = "Neon Six",
-	texture = "sl_weapons_neon_six.png",
+	texture = sl_texgen.texture("sl_weapons_neon_six.png"),
 	kind = "hitscan", damage = 7, refire = 0.55,
 	range = 60, cause = "six", beacon_dmg = 1,
 	pool = "bullets", mag = 6,
@@ -264,7 +264,7 @@ W.register_weapon({
 
 W.register_weapon({
 	id = "repeater", item = "neon_repeater", desc = "Neon Repeater",
-	texture = "sl_weapons_repeater.png",
+	texture = sl_texgen.texture("sl_weapons_repeater.png"),
 	kind = "hitscan", damage = 6, refire = 0.8,
 	range = 72, cause = "repeater", beacon_dmg = 1,
 	pool = "bullets", mag = 8,
@@ -277,10 +277,10 @@ W.register_weapon({
 -- trade bait"). Using one loads it into the shooter's pools.
 -- ----------------------------------------------------------------
 local ammo_items = {
-	{ "ammo_bullets", "Bullet Cache", "sl_weapons_ammo_bullets.png", "bullets" },
-	{ "ammo_shells", "Shell Cache", "sl_weapons_ammo_shells.png", "shells" },
-	{ "ammo_cells", "Cell Cache", "sl_weapons_ammo_cells.png", "cells" },
-	{ "ammo_rockets", "Rocket Cache", "sl_weapons_ammo_rockets.png", "rockets" },
+	{ "ammo_bullets", "Bullet Cache", sl_texgen.texture("sl_weapons_ammo_bullets.png"), "bullets" },
+	{ "ammo_shells", "Shell Cache", sl_texgen.texture("sl_weapons_ammo_shells.png"), "shells" },
+	{ "ammo_cells", "Cell Cache", sl_texgen.texture("sl_weapons_ammo_cells.png"), "cells" },
+	{ "ammo_rockets", "Rocket Cache", sl_texgen.texture("sl_weapons_ammo_rockets.png"), "rockets" },
 }
 
 for _, a in ipairs(ammo_items) do
@@ -335,7 +335,7 @@ local SEVERANCE = W.modname .. ":severance"
 -- this one does not.
 minetest.register_tool(SEVERANCE, {
 	description = S("Severance\nOne swing, 200 damage. Then it is gone."),
-	inventory_image = "sl_weapons_severance.png",
+	inventory_image = sl_texgen.texture("sl_weapons_severance.png"),
 	tool_capabilities = {
 		full_punch_interval = 1.0,
 		damage_groups = { fleshy = 200 },

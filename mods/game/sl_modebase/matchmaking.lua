@@ -342,7 +342,7 @@ minetest.register_node(game_mode.modname .. ":lobby_terminal", {
 	description = S("Lobby Matchmaking Terminal"),
 	drawtype = "mesh",
 	mesh = "terminal.obj",
-	tiles = { "terminal_texture.png^[colorize:#00ffff:50" },
+	tiles = { sl_texgen.texture("terminal_texture.png") .. "^[colorize:#00ffff:50" },
 	paramtype = "light",
 	light_source = 10,
 	groups = { cracky = 1, oddly_breakable_by_hand = 1 },

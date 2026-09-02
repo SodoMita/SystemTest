@@ -43,7 +43,7 @@ state.betrayal = state.betrayal or {}
 if not minetest.registered_nodes[modname .. ":leap_mark"] then
 	minetest.register_node(modname .. ":leap_mark", {
 		description = S("Mark of a Leap"),
-		tiles = { "sl_weapons_residue.png" },
+		tiles = { sl_texgen.texture("sl_weapons_residue.png") },
 		paramtype = "light",
 		light_source = 1,
 		groups = { cracky = 2, not_in_creative_inventory = 1 },

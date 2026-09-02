@@ -9,13 +9,13 @@ local modname = "sl_strand"
 
 minetest.register_craftitem(modname .. ":scrap_defense_kit", {
 	description = S("Scrap Defense Kit (scrap->horror)"),
-	inventory_image = "sl_scrap_metal.png",
+	inventory_image = sl_texgen.texture("sl_scrap_metal.png"),
 	groups = { sl_strand_kit = 1 },
 })
 
 minetest.register_craftitem(modname .. ":trust_charge", {
 	description = S("Trust Charge"),
-	inventory_image = "sl_sensor_array.png",
+	inventory_image = sl_texgen.texture("sl_sensor_array.png"),
 	groups = { sl_strand_kit = 1 },
 	_strand_trust = 1,
 })
@@ -25,7 +25,7 @@ minetest.register_craftitem(modname .. ":trust_charge", {
 -- consumed on revival).  The base Evil Ghost is still the default.
 minetest.register_craftitem(modname .. ":form_void_nomad", {
 	description = S("Form Item: Void Nomad (revive as the horror)"),
-	inventory_image = "sl_monster_essence.png",
+	inventory_image = sl_texgen.texture("sl_monster_essence.png"),
 	groups = { sl_strand_form_item = 1 },
 })
 
