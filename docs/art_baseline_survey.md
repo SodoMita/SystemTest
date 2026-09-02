@@ -15,16 +15,28 @@ sprite mobs render their whole 144×16 strip instead of animating it**
 It is unrelated to which art pass wins: all four passes carry the same
 broken strips, so the fix ships here regardless (see §7).
 
+> **Owner gate answered — 2026-09-02 (rev B).** Rulings: UI restyles are
+> removed except fills of nonexistent/placeholder art · no blur/AA
+> anywhere (binary alpha, crisp edges) · strict colour palettes · this
+> game's content surfaces are 32px+ (the 16×16 branch art was off-spec) ·
+> mobs may be higher-resolution and must follow the neon wire-glow theme.
+> Outcome: **nothing else from the four passes survives those rules** — a
+> per-file triage is in §10 — so the only additions to this branch are
+> (1) the mob re-ink at 64×64 (§7), (2) the 11 crisp 64×64 clothing
+> textures from `01a04bfa` and (3) the boxman player texture fill from
+> `01a049ee` (§10). See the rev-B curation note at the top of §1.
+
 ---
 
 ## 1. Bottom line
 
 | # | Decision | Detail |
 |---|---|---|
-| 1 | **Pick `01a04c31` as the node/content art slice** | Strictest palette discipline of the four (avg ~4.3 colors/file, all-16×16, ~13 KiB of changed pixels across ~93 files), covers every *game-owned* node/item surface (modebase items, workshops furniture, mvp, sky, scary nodes), newest tip of the lineage, and is a restyle-and-extension of `01a049ee`'s neutral sets (which it subsumes). |
-| 2 | **Do not port `01a04bfa`'s UI/clothing/formspec re-authoring over master's current UI** | Master's `sl_gui` icons are *newer* than that pass (roster tab, tab-icon series, achievement icons). The pass predates them, so a port would overwrite curated master work with older art — a regression risk, not an upgrade. |
-| 3 | **`01a0487d` (default-family re-texture) is a separate world-style decision** | 241 files over the stock mtg family, incl. oversized/custom exceptions (`default_furnace_front_new.png` 512×341, `gui_formbg` 26k colors, animated torch/water sheets). Only relevant if the game wants a re-skinned *world* in addition to arena content. Curate if chosen; never squash-merge. |
-| 4 | **Companion fix in this PR** | Mob sprite strips transposed 144×16 → 16×144 and animated through `set_sprite` + `spritediv` (see §7). |
+| 0 | **Rev B (owner gate, 2026-09-02)** | Under the owner's rules — no UI restyles except placeholder fills, no blur/AA, strict palettes, content at 32px+, mobs hi-res + wire-glow — the four passes contain **no wholesale port**. Per-file triage §10. Ported instead: mob re-ink 64×64 (this branch), `01a04bfa`'s 11 crisp clothing textures, `01a049ee`'s boxman fill. |
+| 1 | ~~Pick `01a04c31` as the node/content art slice~~ | **Superseded.** Its modebase/workshop tiles are 16×16 where master's surfaces are 64×64 → off-spec under the 32px+ ruling; excluded along with every other 16×16 pass re-author (incl. the beacons it adds for a sky/beacon system master does not have). |
+| 2 | **UI restyles (`01a04bfa` sl_gui/formspec/dignodes) removed** | Master's icons are 1-bit by design; the pass restyle is anti-aliased (semi up to 0.7) → forbidden. Only fills: the 2×2 boxman placeholder (from `01a049ee`, 16×16 2-colour, no AA). |
+| 3 | `01a0487d` (default family) still **deferred** | 241 files; only relevant if the world is re-skinned neon; keep stock unless ruled. |
+| 4 | **Companion fix + mob art on this branch** | Sprite strips now play (§7); mobs re-inked at 64×64 strict palette to match the wire-glow theme. |
 
 The "owner gate" questions are collected in §8.
 
@@ -161,6 +173,13 @@ strip rendered whole); bottom 3 rows = the corrected frame sequences
 (dredger, containment, wraith), columns 0-8 = frames: 0-2 idle, 3-5
 walk, 6-7 attack, 8 death. This is the animation this PR turns on.
 
+**`cs_mobs_v2.png`** (rev B) — old soft 16px frames vs the new 64×64
+strict-palette wire-glow re-ink, per mob, frames 0-8.
+
+**`cs_ported.png`** (rev B) — the only branch fills that survived the
+owner rules: 11 crisp 64×64 clothing textures (`01a04bfa`) and the
+boxman player texture (`01a049ee`), old vs new.
+
 ---
 
 ## 7. The mob sprite bug and the fix on this branch
@@ -181,23 +200,36 @@ byte-identical across master and all four passes (`9b35b7f3`, `7c65c7e4`,
 `88a44e7f`), and every tree's `init.lua` calls `set_animation` on them.
 No branch ever fixed this, so the fix is pass-independent.
 
-**Fix shipped on this branch:**
+**Fix shipped on this branch (rev B):**
 
 1. `mods/content/sl_scary/pipeline/transpose_sprite_strip.py` — new,
-   pure-stdlib, deterministic block transpose. 144×16 → **16×144**,
-   pixels untouched (verified frame-identical for all 9 frames of all
-   three mobs).
+   pure-stdlib, deterministic block transpose. 144×16 → **vertical**,
+   pixels untouched.
 2. `init.lua`: each sprite mob now declares `spritediv = {x=1, y=9}` +
    `initial_sprite_basepos = {x=0, y=0}`, and `set_sprite_anim()` calls
    `object:set_sprite({x=0, y=<row>}, <n frames>, <s/frame>, false)` per
    state — idle rows 0-2 @2fps, walk 3-5 @4fps, attack 6-7 @6fps, death
-   row 8. Frame-range comments updated to the vertical layout.
+   row 8.
 3. Loot icons (`dredger_badge`, `containment_shard`, `corrupted_data`)
    used `^[resize:16x16` on the whole strip (a squashed-sheet icon);
-   now `^[verticalframe:9:0` — a clean 16×16 crop of the idle frame.
-4. `pipeline/README.md` and `GENERATED_ASSETS.md` document the vertical
-   layout and why (the Seirin toolchain on `01a0436b-systemtest` still
-   emits horizontal strips; run the transpose script after regenerating).
+   now `^[verticalframe:9:0` — a clean crop of the idle frame.
+4. **Mob art re-ink (owner rev-B ruling):** `pipeline/reink_mobs.py`
+   re-inks each 16×16 frame onto a strict palette — black silhouette +
+   the two spec accent colours (dredger rust `#CC6622`/neon-green
+   `#00FF41`; wraith void-purple `#1A0033`/neon-cyan `#00FFFF`;
+   containment crimson `#8B0000`/neon-amber `#FFBF00`) with **binary
+   alpha, zero anti-aliasing** — and scales 4× nearest to 64×64 frames.
+   Strips are now **64×576**. The soft 16px Seirin frames were exactly
+   the "awful, ignoring wire glow" look: 40-90 gradient colours/frame
+   with AA edges; the re-ink makes every mob read as a clean neon
+   silhouette in-engine (entities already carry `glow` 4-8). Preview:
+   `docs/art_baseline/cs_mobs_v2.png` (old vs new per mob, frame 0-8).
+5. `pipeline/README.md` and `GENERATED_ASSETS.md` document the vertical
+   layout, the re-ink, and why.
+
+Side note: `sl_scary_signal_wraith.png` (16×16, single frame) has no Lua
+reference on master — legacy leftover from before the strip rebuild;
+left in place (referenced by none of the passes either).
 
 Side note: `sl_scary_signal_wraith.png` (16×16, single frame) has no Lua
 reference on master — legacy leftover from before the strip rebuild;
@@ -206,6 +238,10 @@ left in place (referenced by none of the passes either).
 ---
 
 ## 8. Owner-gated questions (decision request)
+
+> **2026-09-02 rev B:** question 1 is answered (no wholesale pass — see
+> the rev-B note and §10). Questions 2-4 remain open; the recommendation
+> text below that assumed picking `01a04c31` is superseded by §10.
 
 1. **Which direction for game-owned nodes/items?** Recommendation:
    `01a04c31`. Alternatives: `01a04bfa` (if the game should go light /
@@ -252,3 +288,58 @@ and soak cover it on push.
 Still open from Turn 6 step 3: reconcile the stale "procedural mapgen is
 abandoned" line in `ROADMAP.md` with the shipped map system (unchanged
 here; flagged so it is not lost).
+
+---
+
+## 10. Rev-B curation record (owner gate answered, 2026-09-02)
+
+Owner rulings applied: *UI restyles removed except fills of
+nonexistent/previous placeholders · no blur/AA (binary alpha) · strict
+palettes · content surfaces are 32px+ · mobs hi-res allowed + wire-glow
+theme · pick best per branch.*
+
+Method: per-file byte diff of every branch tree vs master (not
+name-only — earlier "285 modified" counts were tree-skewed because the
+passes fork a snapshot that lacks master-only mods like `sl_weapons`),
+then rule filters: candidate must replace a master **placeholder or
+missing** file, keep native resolution ≥ master's (≥32 for content),
+palette ≤ ~12 colours, semi-transparent share ≈ 0.
+
+### What survives → ported
+
+| File | From | Why |
+|---|---|---|
+| `sl_scary_*_strip.png` (3) | this branch | re-inked 64×576, strict 3-colour + binary alpha (see §7) |
+| `sl_clothing/textures/character_tool_*.png` (11) | `01a04bfa` | master's are 64×64 AA mush (semi 0.66-0.92, 90-172 colours); the pass re-authored them at the same native 64×64 with 6-8 colours, semi 0 → the only crisp, resolution-correct content fill in any pass. |
+| `sl_characters/textures/sl_boxman_neon.png` | `01a049ee` | master file is a 2×2 pixel (4-colour) placeholder used as the player-model texture across sl_gui avatars, boxman ghosts, bot bodies and beacon ghost nodes; 049ee drew a real 16×16 two-colour 1-bit face (no AA). 04bfa's version is AA'd → excluded. |
+
+Preview: `docs/art_baseline/cs_ported.png` (clothing old→new, boxman
+old→new) and `cs_mobs_v2.png` (mob old→new).
+
+### Checked and rejected (all other pass differences)
+
+| Group | Files | Rejected because |
+|---|---|---|
+| modebase tiles/icons, workshops furniture (049ee/04c31/04bfa) | 27-31 / 50-57 each | authored at 16×16 where master surfaces are 64×64 → off-spec under the ≥32 ruling; not placeholder fills |
+| beacons + sky/cloud additions (04c31) | ~11 | belong to a beacon/sky feature set master does not carry (no Lua refs on master → dead files) |
+| `sl_gui` restyle (04bfa) | 117 | UI restyle; master icons are deliberate 1-bit; pass is AA'd (semi ≤ 0.7) |
+| formspec chrome, dignodes icons (04bfa) | 12 | UI restyle, AA'd |
+| construction ambience sheets (04bfa) | 22 | pass replaces master's crisp dark neon frames (semi 0, 0.9-1.0 dark, rich neon) with 2-36 colour near-transparent mush (semi 0.9-1.0) — a regression |
+| clothing/mvp/scary-node restyles by other passes | — | 16×16 (scary hide-spot faces, mvp faces) or AA'd (mvp restyle drops to 1-7 colours w/ semi) — off-spec |
+| weapons 37 placeholders | — | no pass contains `sl_weapons` art at all (all predate the mod); nothing to pick — still open (question 3) |
+| default world family (0487d) | 241 | optional world re-skin; untouched pending question 2 |
+
+### Owner questions still open
+
+1. (was: pick a pass) — resolved rev B: no wholesale pass; curation record above.
+2. World-family neon re-skin (`01a0487d`) — defer / rule?
+3. `sl_weapons` 37 icons — still placeholder in every tree; separate slice later?
+4. UI — keep master 1-bit series (recommended, now consistent with the boxman fill).
+
+### Numeric verification (rev B files on this branch)
+
+- `sl_scary_*_strip.png`: 64×576, exactly 3 opaque colours each (black +
+  2 accents), 0 semi-transparent pixels, binary alpha.
+- 11 clothing textures: 64×64, 6-8 colours, semi 0 (one file's 80
+  residual AA pixels re-hardened to binary).
+- `sl_boxman_neon.png`: 16×16, 2 colours, semi 0.

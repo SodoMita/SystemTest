@@ -746,19 +746,23 @@ minetest.register_node("sl_scary:hide_spot", {
 --   "Responsibility is horror. The scariest thing is 'I caused this.'"
 -- ============================================================
 
--- Sprite strip frame layout (16×144, 9 frames of 16×16 stacked vertically):
---   Rows 0-2    (y: 0-48):    idle   (3 frames, ~2 fps loop)
---   Rows 3-5    (y: 48-96):   walk   (3 frames, ~4 fps loop)
---   Rows 6-7    (y: 96-128):  attack (2 frames, ~6 fps loop)
---   Row 8       (y: 128-144): death  (1 frame)
+-- Sprite strip frame layout (64×576, 9 frames of 64×64 stacked vertically):
+--   Rows 0-2    (y: 0-192):    idle   (3 frames, ~2 fps loop)
+--   Rows 3-5    (y: 192-384):  walk   (3 frames, ~4 fps loop)
+--   Rows 6-7    (y: 384-512):  attack (2 frames, ~6 fps loop)
+--   Row 8       (y: 512-576):  death  (1 frame)
 --
 -- Luanti plays `sprite` visuals through `object:set_sprite(...)`, and the
 -- frame animation iterates along the frame *y* position only (see
 -- lua_api.md -> set_sprite).  Sheets must therefore be vertical with
 -- `spritediv = {x=1, y=9}`; a horizontal strip renders as one undivided
--- texture, i.e. the whole sheet at once.  The sheets are transposed by
--- mods/content/sl_scary/pipeline/transpose_sprite_strip.py (pixels are
--- not resampled; each frame keeps its pixels, order top-to-bottom).
+-- texture, i.e. the whole sheet at once.
+--
+-- Re-inked (2026-09-02, owner art-gate rules): strict 3-colour palette
+-- (black silhouette + the two spec accent colours), binary alpha, no
+-- anti-aliasing, 4x nearest scaling from the 16px Seirin frames to 64px
+-- frames for the game's ≥32px surface standard.  See
+-- mods/content/sl_scary/pipeline/reink_mobs.py.
 
 local sprite_animations = {
     idle   = {row = 0, frames = 3, framelength = 0.5},   -- 2 fps

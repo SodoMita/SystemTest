@@ -1,6 +1,16 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-02 (rev 7)
+**Date:** 2026-09-02 (rev 8)
+**Rev 8 adds:** the **owner art-gate rulings** (Turn 6 step 1 resolution,
+2026-09-02): no UI restyles except placeholder fills · no blur/AA ·
+strict palettes · content surfaces ≥32px · mobs hi-res + wire-glow. The
+four passes yield **no wholesale port** (per-file triage in
+`docs/art_baseline_survey.md` §10). Ported: `01a04bfa`'s 11 crisp 64×64
+clothing textures (master's were AA mush at 66-92% semi) and
+`01a049ee`'s 16×16 two-colour boxman player-texture fill (master had a
+2×2 placeholder). The `sl_scary` mob strips are re-inked (rev 7 fix) at
+64×64 frames — strict 3-colour wire-glow palettes, binary alpha — via
+`mods/content/sl_scary/pipeline/reink_mobs.py`.
 **Rev 7 adds:** the **art-baseline survey** (Turn 6 step 1, owner-gated):
 contact sheets + per-branch diff stats vs master + a pick recommendation
 for the four competing art passes — see `docs/art_baseline_survey.md`.
