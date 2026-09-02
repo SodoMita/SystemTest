@@ -670,5 +670,54 @@ give.
 **Also inherited:** the emitter's cadence is subject to §7c rate independence. A state
 block pushed only when something happens is itself a signal.
 
+### §7j — The roster tab (PR #12, on master): the largest oracle in the repo, and the reason G7 was mis-scoped
+
+`mods/apis/sl_gui/players_tab.lua` (257 lines, merged to `master` at `21bc2d8`) adds a
+sixth inventory tab that renders, **for every connected player, to every connected
+player**:
+
+| Column / element | Leak |
+|---|---|
+| `Name` | who is in the match |
+| `Team` (`get_team_label(pl.team)`, or "Monster Master") | **the team assignment** |
+| `Status` — `ALIVE / READY / GHOST / EVIL / ELIM / MM` | **another operator's phase**, including who revived as an evil ghost |
+| `HP` (`p:get_hp()` / `hp_max`) | **who is hurt right now** |
+| `Pts` (`pl.points`) | **a live, mid-run scoreboard** |
+| header `MM: <name>` | the Monster Master, named |
+| header `Alive: N / Ghosts: N`, ready-check roll | the living/dead split, continuously |
+
+`gather_roster(viewer)` takes the viewer and uses it for exactly one thing: appending
+`(you)` to your own row. **There is no redaction, no priv gate, and no match-state
+gate** — the only use of `state.match_active` is choosing a header caption.
+
+Against the rules already agreed:
+
+- **MASTER_DESIGN §8** — *"Must NEVER show: team name/color/emblem, another player's
+  phase, another's private state…"* Every forbidden field is a column.
+- **§7 oracle test** — facts about living participants, observable at will, free. All
+  three questions, six times over.
+- **glitch's mid-run scoreboard ruling** (hours old): *"a sudden +2 tells the whole
+  node someone is crafting."* The `Pts` column ships that oracle today, before the
+  point economy that was supposed to be careful about it even exists.
+
+**Proposed fix — the tab is good, its audience is wrong.** Keep it as a **lobby
+surface** (roster, ready state, connection health — genuinely useful, and identity is
+not yet in play). The moment `state.match_active` is true it collapses to: your own
+row in full, plus `Connected: N`. No other names, teams, phases, HP or points. Ready
+check, MM name and the alive/ghost split are lobby-only for the same reason.
+
+**And the meta-lesson, which is worth more than the fix.** G7 as filed was
+`git grep -n "team\|role\|possess" mods/game/sl_modebase/hud.lua` — **scoped to a
+filename.** The violation arrived in a *new file, in a different mod*, and the grep
+would have stayed green through the merge. Rewrite G7 to be scoped to the **surface**,
+not the path:
+
+> Enumerate every function that builds a formspec, HUD element or chat line delivered
+> to a player, and assert that none of them reads `pl.team`, `pl.role`, `pl.phase`,
+> `pl.points`, `get_hp()` or `monster_master.player` **for anyone other than the
+> viewer.** New files inherit the test by construction.
+
+An audit pinned to a path only audits the code that was there when it was written.
+
 -- Jax // Sky-Metal strip
 
