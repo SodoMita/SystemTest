@@ -201,7 +201,15 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
     meta:set_string("crafting_category", category)
 
     -- Crafting
+    -- SECURITY: `fields` is client text and this handler also answers to an
+    -- EMPTY formname, which the engine forwards without ever having shown a
+    -- form. A real formspec submits exactly one craft button; a forged packet
+    -- can carry craft_1..craft_N and this loop used to honour all of them in a
+    -- single submission. One submission, one craft.
+    local MAX_STACK = 65535 -- the engine clamps an ItemStack count above this
+    local craft_done = false
     for field, _ in pairs(fields) do
+        if craft_done then break end
         if field:sub(1, 6) == "craft_" then
             local id_str = field:sub(7)
             local recipe_id = tonumber(id_str)
@@ -212,9 +220,24 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 
                 local quantity_field = "qty_" .. recipe_id
                 local quantity = tonumber(fields[quantity_field] or "1") or 1
+                if quantity ~= quantity then quantity = 1 end -- NaN
                 quantity = math.max(1, math.min(999, math.floor(quantity)))
 
                 if recipe then
+                    -- A count above the per-stack cap is silently clamped by
+                    -- ItemStack(), which is how "do you have N?" can pass while
+                    -- remove_item() takes less than N. Shrink the batch instead.
+                    for _, count in pairs(recipe.ingredients or {}) do
+                        if count and count > 0 then
+                            quantity = math.min(quantity, math.floor(MAX_STACK / count))
+                        end
+                    end
+                    local out_count = recipe.output_count or 1
+                    if out_count > 0 then
+                        quantity = math.min(quantity, math.floor(MAX_STACK / out_count))
+                    end
+                    quantity = math.max(1, quantity)
+                    craft_done = true
                     -- World-affecting outputs belong to machines, never inventory crafting.
                     -- A registered node is the authoritative signal for this prototype;
                     -- a def that opts in via groups.sl_craft_in_inventory (today: the
