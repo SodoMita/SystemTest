@@ -47,15 +47,16 @@ No world data beyond it. This is the counterpart to the HUD's "identity-neutral"
     "inventory": ["combat_blade", "medkit", "scanner", "circuit_board", "scrap_metal x2"],
     "hp": 20, "hp_max": 20
   },
-  "nearby": [                    // rendered as IDs, NEVER as identity
-    { "id": "#4", "distance": "8m", "bearing": "N", "activity": "moving_away" }
+  "nearby": [                    // WORLD CONTACT TAGS = observation threads, NOT people
+    { "tag": "contact-14a", "distance": "8m", "bearing": "N", "activity": "moving_away",
+      "marks": ["carrying_core"] }   // distinguishing marks, not an identity
   ],
   "visible": [                   // entities/monsters in view
-    { "kind": "operator", "id": "#7", "distance": "5m" },
+    { "kind": "operator", "tag": "contact-14a", "distance": "5m" },
     { "kind": "monster", "sig": "dredger", "distance": "12m", "bearing": "E" }
   ],
   "comms": {
-    "global_chat": ["#4: heading to the grid", "#9: scanner clear"],
+    "global_chat": ["handle-4: heading to the grid", "handle-9: scanner clear"],
     "dm_inbox": [],
     "whisper": null,             // present ONLY when a whisper lands; sender is a garble
     "summon_offer": null
@@ -71,13 +72,23 @@ No world data beyond it. This is the counterpart to the HUD's "identity-neutral"
 }
 ```
 
-- **IDs not names.** Other operators are `#4`, `#7` — rendered as a figure you must track
-  by behavior, not a label you can trust. This is the text version of "no nametag."
-- **`objective.enemy_flow`** is a *read*, not data — the agent sees that the enemy is
-  *concentrating*, and has to infer *what they're building* (Signal/Breach/Shroud). That's
-  the readable-material-flow principle from `OBJECTIVE_IS_A_SIGNAL.md`.
-- **`whisper` is null unless it happens**, and when it does, the sender is a garble.
-  The agent can never render the source name — same doctrine as the log.
+- **World tags are observation threads, NOT people (§7i).** `contact-14a` is minted when a
+  contact enters perception and **retired when it leaves.** A re-sighting after losing the
+  line mints a **new** tag. The same operator seen twice is two tags unless the agent kept
+  eyes on them continuously. This is the load-bearing rule: a *stable* `#4` resurfacing
+  every turn hands the agent **perfect, costless identity tracking** — an oracle. Tags
+  force **distinguishing marks** (gait, carried Core, fresh burn) to become the evidence
+  layer, which is the exact currency this game claims to trade in.
+- **Chat handles and world tags live in DIFFERENT namespaces (§7i).** `handle-4` (radio
+  continuity) is never the same token as `contact-14a` (world contact), and the block never
+  links them. Hearing `handle-4` on comms, seeing `contact-14a` in the corridor, and
+  deciding they're the same body **is the deduction.** Fuse the namespaces and the game
+  plays itself.
+- **`objective.enemy_flow`** is a *read*, not data — the agent sees the enemy is
+  *concentrating* and infers what they're building (Signal/Breach/Shroud). Every field in
+  the state is an observation, so every field **may be wrong.**
+- **`whisper` is null unless it happens**, and when it does the sender is a garble. The
+  agent can never render the source name — same doctrine as the log.
 
 ---
 
@@ -85,27 +96,36 @@ No world data beyond it. This is the counterpart to the HUD's "identity-neutral"
 
 The agent reads these as text. The asymmetry has to survive:
 
-| Channel | Text render | Can it lie? | The agent's problem |
+| Channel | Text render (chat-handle namespace) | Can it lie? | The agent's problem |
 |---|---|---|---|
-| **Global chat** | `#4: heading to the grid` | No — sender is what they say | But is `#4` still `#4`? Track the figure, not the tag. |
-| **DM** | `[SECURE LINK] #7 -> You: "trust me"` | No — but must be believed | You cannot verify the sender is who they were a turn ago. |
+| **Global chat** | `handle-4: heading to the grid` | No — sender is what they say | But is `handle-4` the same body as `contact-14a`? Connecting them IS the deduction. |
+| **DM** | `[SECURE LINK] handle-7 -> You: "trust me"` | No — but must be believed | You cannot verify the handle maps to a body you've been watching. |
 | **Summon offer** | `[GHOST OFFER] a voice you know: "the seal in 7 is failing"` | **Yes** | A summoned ghost may be lying, or corrupted. |
 | **Whisper** | `[WHISPER] *%&@$* -> You: "…"` | **Yes, sender always garbled** | The sharpest channel — you can't even argue who said it. |
 
 **This is the whole game rendered.** Two of four can lie, and the one that can lie about
-*who said it* is structurally unidentifiable. The agent builds a belief model of `#4`,
-`#7`, `#9` from text the same way a human builds it from a screen.
+*who said it* is structurally unidentifiable. The agent builds a belief model of `handle-4`
++ `contact-14a` pairs from text the same way a human builds a model of voices and shapes —
+and the **work of connecting them** is the deduction, never a subscript.
 
 ---
 
-## 4. The whisper in text — the hard constraint holds
+## 4. The whisper in text — the HONEST guarantee, not a stronger one
 
 - A whisper lands as a line with a **garbled sender** (never a name, never an ID that maps
   back). `[WHISPER] *%&@$* -> You: "…"`.
-- **It is not appended to any history the agent can replay.** After the turn, it's gone —
-  the agent holds the *content* in its context but cannot re-derive the *source* from the
-  text state. This is the §7g non-publication law: the whisper must never be renderable
-  from any log.
+- **The guarantee is exact, and it is written as an honest limit (§7i):**
+  > **The game never re-serves the whisper.** Not in history, not in a summary, not in a
+  > later state block.
+  Not "the whisper is gone" — that would be a comfortable claim. With an LLM the transcript
+  *is* the agent's context and most harnesses persist prompts to disk, so the whisper is not
+  technically unrecoverable. What the harness's own transcript retains is under the §7g
+  threat model — **operator-visible, never surfaced to players.** That's the checkable
+  guarantee.
+- **Memory is testimony, not evidence.** The whisper enters context once, verbatim, and
+  everything after is the agent's own re-encoding. If it quotes the whisper three turns
+  later, that is *testimony* about a whisper — hearsay the others may doubt, exactly like a
+  spoken claim. Only the **log** gets to be evidence; the state block never re-emits it.
 - **The Betrayer hears both sides** even in text — a whisper sent *through* a body shows
   the recipient the message, and the Betrayer (if it's the agent) gets the "your body
   says" line. Complicity, not puppetry.
@@ -114,7 +134,7 @@ The agent reads these as text. The asymmetry has to survive:
 
 ## 5. What the agent DOESN'T get (the negative contract — most important)
 
-The implementer hardest temptation is to be *helpful.* Don't. The text block must NOT
+The implementer's hardest temptation is to be *helpful.* Don't. The text block must NOT
 contain:
 
 - ❌ **Your team** (`you.team`), team color, or "ally" flags.
@@ -122,11 +142,31 @@ contain:
 - ❌ **Who is the Betrayer**, or that a body is possessed.
 - ❌ **Who owns a sabotage** — a scanner reports `POSSESSION — 20m E, 12s` with no owner.
 - ❌ **Objective truth** — `enemy_flow` is a read, never `"enemy_is_building_signal"`.
-- ❌ **Any world map** — position is a named sector + relative bearings, not coordinates
-  you can plan on. Unknown is a gap between reports.
+- ❌ **Any world map** — position is a named sector + relative bearings, not coords.
+- ❌ **The roster** — PR #12 merged a Players roster tab on master; the human HUD may list
+  names, but the **text state never carries the roster.** Presence arrives via `nearby`
+  (world tags) + `comms` (chat handles in their own namespace). **Assert: no roster-shaped
+  field, ever** — a roster leaks the full identity set at a glance.
+- ❌ **A stable world tag** — `contact-14a` is an observation thread minted on contact entry,
+  retired on loss; it must NOT resurface for the same person across a break (§7i). A
+  re-sighting mints a new tag.
+
+**Every field in the text state is an observation, so every field may be wrong.** A field
+allowed to be a fact is a field that will become one. The negative contract is also a
+schema you can **assert against** — which is why it's a test, not prose.
+
+**Scanner noise is deterministic, not averaging (carmack/jax).** Bearings to 8 compass
+points, distances to bands, error deterministic per (target, time-window). The same window
+returns the same wrong answer; only a new window re-rolls. No independent per-sample jitter
+— otherwise ten scans triangulate a position the fiction says cannot be bought.
+*Observation is billable; an averaging trick is a way of not paying.*
 
 If any of these slip into the text state, the agent stops *deducing* and starts *reading.*
 That's the loss. The negative contract is the design.
+
+> **This is a test, not prose (carmack).** Render the text state for every role × phase ×
+> proximity, then assert none of the forbidden fields appear. Place it **between the emitter
+> and the parser** — correct emitter output is defined by what the contract forbids.
 
 ---
 
@@ -167,37 +207,50 @@ and must decide *who* without ever being told. That single case is the game.
 
 ---
 
-## 8. The one design tension the meeting must settle
+## 8. The whisper tension — RESOLVED (glitch + jax §7i)
 
 **Does the agent get the whisper in its *context* after the turn, or only during?**
-- (A) **During only** — strongest non-publication: after the turn it's gone from the block,
-  though the agent's own context still holds it (the model can't un-see it, but the *text
-  state* won't re-serve it). Hard but clean.
-- (B) **Persist in a sealed, non-replayable "memory" field** — softer; lets the agent
-  reference it without re-deriving the source, useful if a later turn asks "what did that
-  whisper say?"
+- **DURING-only in the state block** — the whisper is emitted once, garbled, never
+  re-readable by anyone. Non-publication, and it holds.
+- **BUT memory is not the log.** Forcing DURING-only on the agent's *memory* would break
+  the first rule (the agent gets exactly what a human gets — and a human *remembers* the
+  whisper). The resolution: the whisper enters context **once, verbatim**, and everything
+  after is the agent's own re-encoding — notes it chose to take, in its words, subject to
+  its noise.
+- **A remembered whisper is testimony; a re-readable whisper is evidence. Only the log gets
+  to be evidence.** If the agent quotes it three turns later, that is hearsay the others
+  may doubt — exactly like a spoken claim.
 
-My vote is **(A)** — the text state never re-serves it, which keeps the log-truth the
-session spent all afternoon defending. But it's worth the meeting's word, because it's the
-one place the text loop could quietly reintroduce a re-derivable source.
+The acceptance fixture must test **both halves:** the agent CAN quote from memory; the
+**state block never re-emits it.** This is already the exact non-publication doctrine the
+session spent a day defending — and it survives the text port intact.
+
+**Emitter cadence (§7c).** Emit on a fixed cadence, or emit nothing. A state block pushed
+only when something happens is itself a signal — the agent learns a turn with a block is a
+turn where something was near.
 
 ---
 
 ## 9. What the implementer needs to build (in order)
 
-1. **The text-state emitter** — the §2 block, with the negative contract (§5) enforced by
-   a test: assert the block never contains a team/name/owner field. This is the §7 audit
-   for text.
-2. **The action parser** — map `move/acquire/craft/punch/scan/whisper/dm/offer/revive` to
+1. **The text-state emitter** — the §2 block, on a **fixed cadence** (§7c), with world tags
+   minted/retired per §7i (observation threads, not identities).
+2. **The negative-contract TEST** — between the emitter and the parser. Render every role ×
+   phase × proximity, assert none of the forbidden fields (§5) appear, including **no
+   roster-shaped field ever** and **no stable world tag across a break.** This is what
+   defines correct emitter output.
+3. **The action parser** — map `move/acquire/craft/punch/scan/whisper/dm/offer/revive` to
    existing `game_mode` calls (they nearly all exist).
-3. **The whisper render** — garbled sender, never appended to re-playable history (§8).
-4. **The readable `objective.enemy_flow`** — the material-flow read, not a truth.
-5. **Agent move via `end_turn` + named sectors** — so the agent plans by bearing, not coords.
+4. **The whisper render** — garbled sender, never re-served by the state block (§8).
+5. **The readable `objective.enemy_flow`** — the material-flow read, not a truth.
+6. **Agent move via `end_turn` + named sectors** — so the agent plans by bearing, not coords.
+7. **Two namespaces** — chat handles (`handle-N`, stable within match) and world tags
+   (`contact-MM`, observation threads). Never linked by the emitter.
 
 **Exit check:** an LLM can start a match as an operator, see only the §2 block, and make a
 trust deduction that is *wrong for the right reason* (it read someone, then got lied to),
-without ever being shown a team or an owner. If the agent can read the answer off the text,
-the negative contract is leaking.
+without ever being shown a team, an owner, a roster, or a tag that survives a break. If the
+agent can read the answer off the text, the negative contract is leaking.
 
 ---
 
