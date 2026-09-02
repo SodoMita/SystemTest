@@ -53,6 +53,7 @@ end
 
 include_files(
 	"state.lua",    -- persistent state, teams, helpers
+	"scoring.lua",  -- per-player point model (kill K/D×7, objective, survive, victory)
 	"map.lua",      -- map types (procedural / test / handmade .mts) + reset
 	"spawn.lua",    -- spawn logic and join/respawn hooks
 	"match.lua",    -- match lifecycle and win conditions

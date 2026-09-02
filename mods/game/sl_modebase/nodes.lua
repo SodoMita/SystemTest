@@ -6,7 +6,41 @@ local state = game_mode.state
 -- ================================================================
 
 local function handle_beacon_destruction(team_id, pos, attacker_name)
-	game_mode.broadcast(S("@1 has been destroyed by @2! Team eliminated.", 
+	-- Credit the attacker with the beacon-destruction reward BEFORE
+	-- end_match fires (which credits the victory bonus to all living
+	-- winning-team members via the end_match pass). The beacon-kill
+	-- reward is the attacker's personal contribution; the victory
+	-- bonus is the team's. A player can earn both.
+	--
+	-- If the attacker resolves to the current Monster Master, also
+	-- credit the MM's essence pool. A monster's owner is set on
+	-- the luaentity by entities.lua spawn_monster; the engine's
+	-- punch pipeline forwards it as attacker_name through
+	-- damage_beacon → handle_beacon_destruction. The MM's monster
+	-- destroying the enemy beacon therefore credits the MM (not
+	-- the literal "A Monster" string) with both the +1000 point
+	-- reward and +1 essence — same effect as if the MM had
+	-- destroyed the beacon with their own hand.
+	local credited_name = nil
+	if attacker_name and attacker_name ~= "A Monster"
+		and attacker_name ~= "Corrosion" then
+		credited_name = attacker_name
+		if game_mode.award_objective_points then
+			game_mode.award_objective_points(credited_name, "beacon_destruction")
+		end
+		-- MM's own monster destroying the beacon pays the MM's
+		-- essence pool. (A regular player destroying a beacon
+		-- does not get essence; essence is the MM's spawner
+		-- fuel. This keeps the per-match resource economy
+		-- closed: a beacon's destruction is "owned" by whoever
+		-- killed it, and the MM is the only one whose economy
+		-- cares about a destroyed beacon's value as fuel.)
+		if state.monster_master.player == credited_name
+			and game_mode.add_mm_essence then
+			game_mode.add_mm_essence(1, "beacon:" .. tostring(team_id))
+		end
+	end
+	game_mode.broadcast(S("@1 has been destroyed by @2! Team eliminated.",
 		game_mode.get_team_label(team_id), attacker_name or "Unknown"))
 	state.teams[team_id].spawn = nil -- Disable spawning for this match
 	
@@ -312,6 +346,13 @@ function game_mode.deliver_objective(team_id, actor_name)
 	if not state.match_active then return false, "no active match" end
 	if not state.win_conditions.objective then return false, "objective mode disabled" end
 	if not game_mode.is_beacon_team(team_id) then return false, "invalid team" end
+	-- Credit the actor with the core-delivery reward BEFORE end_match
+	-- runs (which is the only place that resets phase/awarded flags).
+	-- The match-end pass handles survival + victory; the act of
+	-- delivery is itself the objective and gets its own +5000.
+	if game_mode.award_objective_points then
+		game_mode.award_objective_points(actor_name, "core_delivery")
+	end
 	game_mode.end_match(team_id, S("@1 delivered the Objective Core!", actor_name or "Unknown"))
 	return true
 end

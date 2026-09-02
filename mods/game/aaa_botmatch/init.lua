@@ -9,9 +9,15 @@
 -- handlers exactly like the engine would — so sl_modebase's real
 -- match logic runs unmodified.
 --
--- INERT UNLESS ENABLED: everything is gated behind the setting
+-- INERT UNLESS ENABLED: the harness (bots, soak loop, arena, mob
+-- entities) is gated behind the setting
 --   sl_botmatch.enabled = true
--- so normal servers never load any of this behavior.
+-- so normal servers never load any of that behavior. The /sl_bots
+-- admin chat command is registered regardless — once
+--   sl_botmatch.mob_mode = true
+-- is set, an sl_admin can use it to add/remove bots at runtime even
+-- if the rest of the harness is opted out. The chat command itself
+-- checks both gates and returns a clear error if either is missing.
 --
 -- TELEMETRY: writes <world>/botmatch_stats.json after every match
 -- and at run end. Lua errors triggered by simulated play are
@@ -20,6 +26,7 @@
 -- ================================================================
 
 local modname = minetest.get_current_modname()
+local S = minetest.get_translator(modname)
 
 botmatch = rawget(_G, "botmatch") or {}
 _G.botmatch = botmatch
@@ -27,8 +34,102 @@ _G.botmatch = botmatch
 botmatch.modpath = minetest.get_modpath(modname)
 botmatch.enabled = minetest.settings:get_bool("sl_botmatch.enabled")
 
+-- Initialize the pool table BEFORE the enabled-gate so /sl_bots can
+-- reach it from a session where the harness is opted out. The
+-- chat-command handler rejects with a clear error if the harness is
+-- not enabled, so this is purely a no-op safety net.
+botmatch.pool = botmatch.pool or {}
+
+-- Register the /sl_bots admin chat command BEFORE the enabled-gate so
+-- it's available whenever aaa_botmatch is loaded. The harness itself
+-- (bots, arena, soak loop) still requires sl_botmatch.enabled = true;
+-- the chat command's func checks both gates and returns a friendly
+-- error if either is missing.
+local BOT_NAMES = { "bot_alpha", "bot_beta", "bot_gamma", "bot_delta", "bot_epsilon", "bot_zeta" }
+local function pool_index_of(name)
+	for i, entry in ipairs(botmatch.pool or {}) do
+		if entry.name == name then return i end
+	end
+	return nil
+end
+local function next_default_bot_name()
+	for _, n in ipairs(BOT_NAMES) do
+		if not pool_index_of(n) and not (botmatch.bots and botmatch.bots[n]) then
+			return n
+		end
+	end
+	return nil
+end
+minetest.register_chatcommand("sl_bots", {
+	params = "add [name] <beacon_a|beacon_b> | remove <name> | team <name> <beacon_a|beacon_b> | list | clear",
+	description = S("Add, remove, retag, list, or clear the bot roster (mob mode, sl_admin)."),
+	privs = { sl_admin = true },
+	func = function(caller, param)
+		-- Two gates: the harness must be enabled, AND mob_mode must be on.
+		-- Either missing → a clear error so the admin knows what to set.
+		if not botmatch.enabled or not botmatch.config then
+			return false, S("/sl_bots requires sl_botmatch.enabled = true in minetest.conf.")
+		end
+		if not botmatch.config.mob_mode then
+			return false, S("/sl_bots requires sl_botmatch.mob_mode = true in minetest.conf.")
+		end
+
+		local args = {}
+		for word in (param or ""):gmatch("%S+") do
+			table.insert(args, word)
+		end
+		local sub = args[1] or "list"
+
+		if sub == "list" or sub == "" then
+			local lines = botmatch.list_pool_lines()
+			if #lines == 0 then
+				return true, S("Bot pool is empty. Add some with /sl_bots add <name> <beacon_a|beacon_b>.")
+			end
+			return true, S("Bot pool (@1): @2", tostring(#lines), table.concat(lines, ", "))
+
+		elseif sub == "add" then
+			local name, team = args[2], args[3]
+			if not team and (name == "beacon_a" or name == "beacon_b") then
+				team, name = name, next_default_bot_name()
+				if not name then
+					return false, S("Pool is full (max @1 bots) and no canonical name is free.", tostring(botmatch.POOL_MAX))
+				end
+			elseif not name or not team then
+				return false, S("Usage: /sl_bots add [name] <beacon_a|beacon_b>")
+			end
+			local ok, err = botmatch.add_bot(name, team, true)
+			if not ok then return false, err end
+			return true, S("Added bot @1 on @2. Use /sl_match_start to begin.", name, team)
+
+		elseif sub == "remove" then
+			local name = args[2]
+			if not name then return false, S("Usage: /sl_bots remove <name>") end
+			local ok, err = botmatch.remove_bot(name)
+			if not ok then return false, err end
+			return true, S("Removed bot @1.", name)
+
+		elseif sub == "team" then
+			local name, team = args[2], args[3]
+			if not name or not team then
+				return false, S("Usage: /sl_bots team <name> <beacon_a|beacon_b>")
+			end
+			local ok, err = botmatch.set_team(name, team)
+			if not ok then return false, err end
+			return true, S("Bot @1 reassigned to @2.", name, team)
+
+		elseif sub == "clear" then
+			local ok, err = botmatch.clear_bots()
+			if not ok then return false, err end
+			return true, S("Cleared the bot pool.")
+
+		else
+			return false, S("Unknown subcommand '@1'. Try: add, remove, team, list, clear.", sub)
+		end
+	end,
+})
+
 if not botmatch.enabled then
-	minetest.log("action", "[botmatch] disabled (set sl_botmatch.enabled = true to run soak tests)")
+	minetest.log("action", "[botmatch] disabled (set sl_botmatch.enabled = true to run soak tests; /sl_bots is still available)")
 	return
 end
 
@@ -207,6 +308,200 @@ function botmatch.is_connected(name)
 end
 
 -- ================================================================
+-- Bot roster (runtime-configurable pool)
+-- ================================================================
+-- The "pool" is the source of truth for which bots exist for the next
+-- match. On server start, spawn_bots() seeds it from
+-- sl_botmatch.bots (preserving the existing soak path). Admins can
+-- add/remove/retag bots at runtime via /sl_bots; the changes take
+-- effect on the next start_new_match (mid-match edits are rejected
+-- because they would corrupt an in-flight simulation).
+--
+-- Each pool entry: { name = "<unique>", team = "beacon_a"|"beacon_b" }
+-- Names that are already connected real players are rejected.
+-- Team is required (the user asked for explicit team assignment;
+-- no auto-balancing). If a match can't be started because one team
+-- is empty, sl_modebase.start_new_match returns its own error.
+botmatch.pool = botmatch.pool or {}
+botmatch.POOL_MAX = 6 -- matches the names[] table in spawn_bots
+local POOL_VALID_TEAMS = { beacon_a = true, beacon_b = true }
+
+-- pool_index_of is defined above the enabled-gate (so /sl_bots can
+-- reach it). Reuse that one here.
+
+-- Spawn one bot: create the fake player ref, optionally its mob body,
+-- add to the connected/ordered lists, and fire on_joinplayer so any
+-- sl_modebase handler (e.g. spawn_player scheduling) runs.
+local function spawn_one_bot(name, team)
+	local fp = dofile(botmatch.modpath .. "/fake_player.lua")
+	local bot = fp.new(name)
+	-- If the caller passed an explicit team, attach it to the
+	-- logical player state immediately. (apply_pool always does
+	-- this; the start_run path may not, in which case the team
+	-- defaults to nil and the body spawn falls back to the lobby
+	-- area — that's intentional, the first match will assign a
+	-- team on insertion.)
+	if team and rawget(_G, "game_mode") then
+		local pl = game_mode.get_player_state(name)
+		pl.team = team
+	end
+	botmatch.bots[name] = bot
+	table.insert(botmatch.bot_order, name)
+	table.insert(botmatch.connected, name)
+	if botmatch.config.mob_mode and botmatch.spawn_mob_body then
+		botmatch.spawn_mob_body(name, bot)
+	end
+	botmatch.fire("joinplayer", bot)
+end
+
+-- Reverse of spawn_one_bot: remove the mob body, fire leaveplayer,
+-- drop the bot from the connected/ordered lists. Caller has already
+-- validated that the bot is currently connected.
+local function despawn_one_bot(name)
+	botmatch.fire("leaveplayer", botmatch.bots[name])
+	if botmatch.mobs and botmatch.mobs[name] then
+		pcall(function() botmatch.mobs[name]:remove() end)
+		botmatch.mobs[name] = nil
+	end
+	for i, n in ipairs(botmatch.connected) do
+		if n == name then table.remove(botmatch.connected, i) break end
+	end
+	for i, n in ipairs(botmatch.bot_order) do
+		if n == name then table.remove(botmatch.bot_order, i) break end
+	end
+	-- Clear any per-match bookkeeping; state.players is owned by
+	-- sl_modebase and will be reset by its own clean reset.
+	botmatch.bots[name] = nil
+end
+
+-- Add a bot to the pool. team must be "beacon_a" or "beacon_b".
+-- live_spawn=true spawns the body immediately (so the admin can see
+-- them in the lobby before the next match); false just records the
+-- preference for the next spawn_bots() call.
+function botmatch.add_bot(name, team, live_spawn)
+	if type(name) ~= "string" or name == "" then
+		return false, "name must be a non-empty string"
+	end
+	if not POOL_VALID_TEAMS[team] then
+		return false, "team must be beacon_a or beacon_b"
+	end
+	if pool_index_of(name) then
+		return false, "bot '" .. name .. "' is already in the pool"
+	end
+	if botmatch.bots[name] then
+		return false, "bot '" .. name .. "' is already connected"
+	end
+	if minetest.get_player_by_name(name) and not botmatch.bots[name] then
+		return false, "'" .. name .. "' is a real player name, not a bot"
+	end
+	if #botmatch.pool >= botmatch.POOL_MAX then
+		return false, "pool is full (max " .. botmatch.POOL_MAX .. " bots)"
+	end
+	if botmatch.current and botmatch.current.id then
+		return false, "cannot add bots during a match (wait for lobby)"
+	end
+	table.insert(botmatch.pool, { name = name, team = team })
+	-- Default roster ordering: bots are spawned in pool order, so the
+	-- behavior tick's round-robin stays stable across additions.
+	if live_spawn then
+		spawn_one_bot(name)
+	end
+	return true
+end
+
+function botmatch.remove_bot(name)
+	if not pool_index_of(name) then
+		return false, "bot '" .. (name or "?") .. "' is not in the pool"
+	end
+	if botmatch.current and botmatch.current.id then
+		return false, "cannot remove bots during a match (wait for lobby)"
+	end
+	if botmatch.bots[name] then despawn_one_bot(name) end
+	for i, entry in ipairs(botmatch.pool) do
+		if entry.name == name then table.remove(botmatch.pool, i) break end
+	end
+	return true
+end
+
+function botmatch.set_team(name, team)
+	local idx = pool_index_of(name)
+	if not idx then
+		return false, "bot '" .. (name or "?") .. "' is not in the pool"
+	end
+	if not POOL_VALID_TEAMS[team] then
+		return false, "team must be beacon_a or beacon_b"
+	end
+	if botmatch.current and botmatch.current.id then
+		return false, "cannot retag bots during a match (wait for lobby)"
+	end
+	botmatch.pool[idx].team = team
+	return true
+end
+
+function botmatch.clear_bots()
+	if botmatch.current and botmatch.current.id then
+		return false, "cannot clear pool during a match (wait for lobby)"
+	end
+	-- Despawn any currently connected bots first.
+	for i = #botmatch.connected, 1, -1 do
+		despawn_one_bot(botmatch.connected[i])
+	end
+	botmatch.pool = {}
+	return true
+end
+
+-- Human-readable listing for /sl_bots list and the formspec.
+function botmatch.list_pool_lines()
+	local lines = {}
+	for _, entry in ipairs(botmatch.pool) do
+		local connected = botmatch.bots[entry.name] and "connected" or "lobby"
+		table.insert(lines, string.format("%s -> %s (%s)",
+			entry.name, entry.team, connected))
+	end
+	return lines
+end
+
+-- Re-run the spawn pipeline to honor current pool state. Called by
+-- start_run() at boot and by /sl_bots apply (after a batch of edits).
+-- Existing connected bots (matched by name) are kept; their team is
+-- re-applied to the player state so the next match picks it up.
+function botmatch.apply_pool()
+	-- 1. Remove currently connected bots that are no longer in the pool.
+	for i = #botmatch.connected, 1, -1 do
+		local name = botmatch.connected[i]
+		if not pool_index_of(name) then
+			despawn_one_bot(name)
+		end
+	end
+	-- 2. Spawn pool entries that aren't connected yet.
+	for _, entry in ipairs(botmatch.pool) do
+		if not botmatch.bots[entry.name] then
+			-- Initialize the logical player state with the pool-
+			-- assigned team BEFORE the mob body is spawned. The
+			-- spawn search uses bot.team to anchor the position
+			-- near the right bastion, and behaviour.lua reads
+			-- pl.team to pick targets — both must agree on the
+			-- team from the very first tick.
+			if rawget(_G, "game_mode") then
+				local pl = game_mode.get_player_state(entry.name)
+				pl.team = entry.team
+				pl.role = nil
+				pl.eliminated = false
+			end
+			spawn_one_bot(entry.name, entry.team)
+		elseif rawget(_G, "game_mode") then
+			-- Already-spawned bot: keep its player-state team in
+			-- sync with the pool entry. (Admin retag via
+			-- /sl_bots team <name> <team> lands here.)
+			local pl = game_mode.get_player_state(entry.name)
+			pl.team = entry.team
+			pl.role = nil
+			pl.eliminated = false
+		end
+	end
+end
+
+-- ================================================================
 -- Death / kill accounting
 -- ================================================================
 function botmatch.on_bot_lethal(bot)
@@ -252,6 +547,16 @@ function botmatch.attribute_kill(attacker, victim)
 	if vb then
 		local vteam = game_mode.get_player_state(victim).team
 		if vteam and m.teams[vteam] then m.teams[vteam].deaths = m.teams[vteam].deaths + 1 end
+	end
+	-- Also credit the per-player point model. In mob mode a real
+	-- admin can join and kill bots, or a bot can kill a real admin
+	-- (when the bot AI targets them); both flows go through
+	-- attribute_kill and both should land in the killer's pl.points
+	-- using the same K/D-weighted formula as a real-player kill.
+	-- award_kill_points is a no-op for suicides and for inactive
+	-- matches, so it is safe to call unconditionally.
+	if game_mode and game_mode.award_kill_points then
+		game_mode.award_kill_points(attacker, victim)
 	end
 end
 
@@ -303,6 +608,13 @@ function botmatch.hook_game_mode()
 			botmatch.finish_match(winner, reason)
 		end
 		orig_end(winner, reason)
+		-- sl_modebase's clean reset normalises every player's phase
+		-- to alive, so by this point every mob body is on the alive
+		-- path and the spawn search would otherwise reuse the old
+		-- claims. Clear them so the next match re-picks clean air.
+		if botmatch.config.mob_mode and botmatch.clear_mob_spawn_claims then
+			botmatch.clear_mob_spawn_claims()
+		end
 		botmatch.schedule_next()
 	end
 
@@ -390,21 +702,23 @@ function botmatch.start_run()
 end
 
 function botmatch.spawn_bots()
-	local fp = dofile(botmatch.modpath .. "/fake_player.lua")
-	local names = { "bot_alpha", "bot_beta", "bot_gamma", "bot_delta", "bot_epsilon", "bot_zeta" }
-	for i = 1, math.min(botmatch.config.bots, #names) do
-		local bot = fp.new(names[i])
-		botmatch.bots[names[i]] = bot
-		table.insert(botmatch.bot_order, names[i])
-		table.insert(botmatch.connected, names[i])
-		if botmatch.config.mob_mode and botmatch.spawn_mob_body then
-			botmatch.spawn_mob_body(names[i], bot)
+	-- Seed the pool from the sl_botmatch.bots setting when empty.
+	-- This preserves the original soak behaviour: an untouched
+	-- minetest.conf + sl_botmatch.enabled = true boots with the
+	-- configured roster and balanced teams. Round-robin (A, B, A, B)
+	-- matches the previous default ordering.
+	if #botmatch.pool == 0 and botmatch.config.bots > 0 then
+		local names = { "bot_alpha", "bot_beta", "bot_gamma", "bot_delta", "bot_epsilon", "bot_zeta" }
+		for i = 1, math.min(botmatch.config.bots, #names) do
+			local team = (i % 2 == 1) and "beacon_a" or "beacon_b"
+			botmatch.pool[#botmatch.pool + 1] = { name = names[i], team = team }
 		end
-		botmatch.fire("joinplayer", bot)
 	end
+	botmatch.apply_pool()
 	minetest.log("action", "[botmatch] " .. #botmatch.bot_order
 		.. (botmatch.config.mob_mode and " mob players embodied (pathfinding entities)"
-			or " simulated players connected"))
+			or " simulated players connected")
+		.. " (pool size " .. #botmatch.pool .. ")")
 end
 
 -- Bridge: a real player (admin) punches a mob body. Damage is routed

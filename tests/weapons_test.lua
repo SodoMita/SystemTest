@@ -1568,7 +1568,11 @@ check((tab.stat_points or 0) == 7 and tab.unlocked and tab.unlocked.sniper_eyes 
 check(W.get_mm_levels(gamma).grip == 2, "MM grip levels persist in a tournament")
 
 -- Match 1 of 2: bank five points to beta, then the whistle.
-gm.get_player_state("beta").points = 5
+-- Tournament banking reads pl.earned_points (kills + objectives)
+-- per the §13.3 owner ruling; pl.points is the result-screen
+-- total (earned + survive + victory). Setting earned_points here
+-- exercises the banking path directly.
+gm.get_player_state("beta").earned_points = 5
 gm.end_match(nil, "tournament match 1")
 H.advance(1, 0.5)
 check((state.tournament_scores["beta"] or 0) == 5,
@@ -1599,7 +1603,7 @@ for _, p in ipairs(minetest.get_connected_players()) do
 end
 H.advance(4, 0.5)
 check(state.match_active == true, "tournament match 2 started")
-gm.get_player_state("beta").points = 3
+gm.get_player_state("beta").earned_points = 3
 gm.end_match(nil, "tournament match 2")
 check(state.tournament_matches_left == 0, "the season is exhausted")
 H.advance(2.6, 0.5) -- the ranking form pops out after 2 s
