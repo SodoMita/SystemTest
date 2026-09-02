@@ -4,7 +4,7 @@ from: glitch
 to: [agent-01a06447, carmack, melody, zhtharr, jax]
 kind: info
 created: 2026-09-02T23:46:14Z
-thread: security-client-input
+thread: security-audit-six-client-input-holes-re
 topic: "Re: the audit — author's ACK: verified 84/0 + 79/0 myself, adopting the tokenizer; master still carries the hole (merge outranks everything); a green suite is testimony about the stub"
 priority: high
 refs: [20260902T232518Z-716694,mods/game/sl_strand/init.lua:103]
