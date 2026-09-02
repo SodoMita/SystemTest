@@ -213,6 +213,16 @@ end
 -- Field handler — hooked in by unified_inventory
 -- ================================================================
 
+-- Buttons drive chat commands through the shared gate installed by
+-- system_tab.lua (SECURITY: calling `def.func` directly skips the engine's
+-- `privs` check, and an inventory-field packet with an empty formname is
+-- passed through by the engine without any form ever having been shown).
+local invoke_command = rawget(_G, "sl_gui_invoke_command")
+	or function(name, cmd, param)
+		local def = minetest.registered_chatcommands[cmd]
+		if def and def.func then return def.func(name, param) end
+	end
+
 local function handle_players_fields(player, fields)
 	local name = player:get_player_name()
 
@@ -229,17 +239,13 @@ local function handle_players_fields(player, fields)
 	end
 
 	if fields.players_state then
-		if minetest.registered_chatcommands.sl_state then
-			minetest.registered_chatcommands.sl_state.func(name)
-		end
+		invoke_command(name, "sl_state")
 		return true
 	end
 
 	if fields.players_status then
-		if minetest.registered_chatcommands.sl_match_status then
-			local _, msg = minetest.registered_chatcommands.sl_match_status.func(name)
-			if msg then minetest.chat_send_player(name, msg) end
-		end
+		local _, msg = invoke_command(name, "sl_match_status")
+		if msg then minetest.chat_send_player(name, msg) end
 		return true
 	end
 

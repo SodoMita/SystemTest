@@ -234,6 +234,49 @@ function get_comms_formspec(player)
 end
 
 -- ================================================================
+-- Driving a chat command from a GUI button (SECURITY)
+-- ================================================================
+-- The engine checks a command's `privs` BEFORE it ever calls `def.func`.
+-- Invoking `def.func` directly -- which is what every button below does --
+-- skips that gate. The door is also wider than chat: the engine passes an
+-- inventory-field submission with an EMPTY formname straight through without
+-- ever having shown a form ("pass through inventory submits"), so any client
+-- can forge `{sys_match_start_now = "true"}` at any time. `invoke_command`
+-- re-imposes the command's own declared privileges, so the GUI can never be a
+-- softer door than the chat line it mirrors.
+local function command_privs_ok(name, def)
+	local required = {}
+	for priv, wanted in pairs(def.privs or {}) do
+		if wanted then required[#required + 1] = priv end
+	end
+	if #required == 0 then return true, {} end
+	local have = minetest.get_player_privs(name) or {}
+	local missing = {}
+	for _, priv in ipairs(required) do
+		if not have[priv] then missing[#missing + 1] = priv end
+	end
+	table.sort(missing)
+	return #missing == 0, missing
+end
+
+local function invoke_command(name, cmd, param)
+	local def = minetest.registered_chatcommands[cmd]
+	if not def or type(def.func) ~= "function" then return nil end
+	local allowed, missing = command_privs_ok(name, def)
+	if not allowed then
+		minetest.chat_send_player(name, minetest.colorize("#ff5555",
+			S("Admin only - missing privilege(s): @1", table.concat(missing, ", "))))
+		minetest.log("action", "[sl_gui] " .. name .. " pressed /" .. cmd
+			.. " without: " .. table.concat(missing, ", "))
+		return false
+	end
+	return def.func(name, param)
+end
+
+-- Shared with players_tab.lua (it loads after this file).
+_G.sl_gui_invoke_command = invoke_command
+
+-- ================================================================
 -- Field handlers for System and Comms tabs
 -- These are hooked into unified_inventory's receive_fields
 -- ================================================================
@@ -246,14 +289,12 @@ local function handle_system_fields(player, fields)
 
 	-- Player actions
 	if fields.sys_ready then
-		if minetest.registered_chatcommands.sl_ready then
-			minetest.registered_chatcommands.sl_ready.func(name)
-		end
+		invoke_command(name, "sl_ready")
 		return true
 	end
 	if fields.sys_matchmaking then
 		if minetest.registered_chatcommands.sl_matchmaking then
-			minetest.registered_chatcommands.sl_matchmaking.func(name)
+			invoke_command(name, "sl_matchmaking")
 		else
 			-- Fallback: show matchmaking formspec directly if command missing
 			if rawget(_G, "game_mode") and game_mode.state then
@@ -264,27 +305,30 @@ local function handle_system_fields(player, fields)
 		return true
 	end
 	if fields.sys_state then
-		if minetest.registered_chatcommands.sl_state then
-			minetest.registered_chatcommands.sl_state.func(name)
-		end
+		invoke_command(name, "sl_state")
 		return true
 	end
 	if fields.sys_status then
-		if minetest.registered_chatcommands.sl_match_status then
-			local _, msg = minetest.registered_chatcommands.sl_match_status.func(name)
-			if msg then minetest.chat_send_player(name, msg) end
-		end
+		local _, msg = invoke_command(name, "sl_match_status")
+		if msg then minetest.chat_send_player(name, msg) end
 		return true
 	end
 
 	-- MM actions
 	if fields.sys_be_mm then
-		if minetest.registered_chatcommands.sl_be_monster_master then
-			minetest.registered_chatcommands.sl_be_monster_master.func(name)
-		end
+		invoke_command(name, "sl_be_monster_master")
 		return true
 	end
 	if fields.sys_leave_mm then
+		-- Resigning the role is an admin action in matchmaking.lua
+		-- (`leave_mm`); the GUI must not be the softer door. Ungated, any
+		-- client could drop the MM mid-match -- and claim/resign in a loop
+		-- to re-trigger the role's starter kit.
+		if not admin then
+			minetest.chat_send_player(name, minetest.colorize("#ff5555",
+				S("Admin only - the Monster Master role is match state.")))
+			return true
+		end
 		if rawget(_G, "game_mode") and game_mode.set_monster_master then
 			game_mode.set_monster_master(nil)
 			game_mode.broadcast(S("Monster Master has resigned."))
@@ -292,73 +336,51 @@ local function handle_system_fields(player, fields)
 		return true
 	end
 	if fields.sys_mm_return then
-		if minetest.registered_chatcommands.sl_mm_return then
-			minetest.registered_chatcommands.sl_mm_return.func(name)
-		end
+		invoke_command(name, "sl_mm_return")
 		return true
 	end
 	if fields.sys_mm_spawn1 then
-		if minetest.registered_chatcommands.sl_mm_spawn then
-			minetest.registered_chatcommands.sl_mm_spawn.func(name, "1")
-		end
+		invoke_command(name, "sl_mm_spawn", "1")
 		return true
 	end
 	if fields.sys_mm_spawn3 then
-		if minetest.registered_chatcommands.sl_mm_spawn then
-			minetest.registered_chatcommands.sl_mm_spawn.func(name, "3")
-		end
+		invoke_command(name, "sl_mm_spawn", "3")
 		return true
 	end
 
 	-- Admin / match control
 	if fields.sys_match_start then
-		if minetest.registered_chatcommands.sl_match_start then
-			minetest.registered_chatcommands.sl_match_start.func(name, "")
-		end
+		invoke_command(name, "sl_match_start", "")
 		return true
 	end
 	if fields.sys_match_start_now then
-		if minetest.registered_chatcommands.sl_match_start then
-			minetest.registered_chatcommands.sl_match_start.func(name, "now")
-		end
+		invoke_command(name, "sl_match_start", "now")
 		return true
 	end
 	if fields.sys_match_stop then
-		if minetest.registered_chatcommands.sl_match_stop then
-			minetest.registered_chatcommands.sl_match_stop.func(name)
-		end
+		invoke_command(name, "sl_match_stop")
 		return true
 	end
 	if fields.sys_autostart_toggle then
-		if minetest.registered_chatcommands.sl_autostart then
-			local st = get_state()
-			local new_arg = st.settings.auto_start and "off" or "on"
-			minetest.registered_chatcommands.sl_autostart.func(name, new_arg)
-		end
+		local st = get_state()
+		local new_arg = st.settings.auto_start and "off" or "on"
+		invoke_command(name, "sl_autostart", new_arg)
 		return true
 	end
 	if fields.sys_set_lobby then
-		if minetest.registered_chatcommands.sl_set_lobby then
-			minetest.registered_chatcommands.sl_set_lobby.func(name)
-		end
+		invoke_command(name, "sl_set_lobby")
 		return true
 	end
 	if fields.sys_build_cage then
-		if minetest.registered_chatcommands.sl_build_cage then
-			minetest.registered_chatcommands.sl_build_cage.func(name)
-		end
+		invoke_command(name, "sl_build_cage")
 		return true
 	end
 	if fields.sys_assign_a then
-		if minetest.registered_chatcommands.sl_assign then
-			minetest.registered_chatcommands.sl_assign.func(name, name .. " beacon_a")
-		end
+		invoke_command(name, "sl_assign", name .. " beacon_a")
 		return true
 	end
 	if fields.sys_assign_b then
-		if minetest.registered_chatcommands.sl_assign then
-			minetest.registered_chatcommands.sl_assign.func(name, name .. " beacon_b")
-		end
+		invoke_command(name, "sl_assign", name .. " beacon_b")
 		return true
 	end
 
@@ -386,15 +408,11 @@ local function handle_system_fields(player, fields)
 		return true
 	end
 	if fields.sys_test_arena then
-		if minetest.registered_chatcommands.sl_test_arena then
-			minetest.registered_chatcommands.sl_test_arena.func(name)
-		end
+		invoke_command(name, "sl_test_arena")
 		return true
 	end
 	if fields.sys_test_bots then
-		if minetest.registered_chatcommands.sl_test_bots then
-			minetest.registered_chatcommands.sl_test_bots.func(name, "2")
-		end
+		invoke_command(name, "sl_test_bots", "2")
 		return true
 	end
 
@@ -445,37 +463,27 @@ local function handle_comms_fields(player, fields)
 			end
 		else
 			-- Fallback to chatcommand
-			if minetest.registered_chatcommands.sl_dm then
-				minetest.registered_chatcommands.sl_dm.func(name, target .. " " .. msg)
-			end
+			invoke_command(name, "sl_dm", target .. " " .. msg)
 		end
 		return true
 	end
 
 	if fields.comms_open_full then
-		if minetest.registered_chatcommands.sl_dm_ui then
-			minetest.registered_chatcommands.sl_dm_ui.func(name)
-		end
+		invoke_command(name, "sl_dm_ui")
 		return true
 	end
 
 	if fields.comms_matchmaking then
-		if minetest.registered_chatcommands.sl_matchmaking then
-			minetest.registered_chatcommands.sl_matchmaking.func(name)
-		end
+		invoke_command(name, "sl_matchmaking")
 		return true
 	end
 	if fields.comms_state then
-		if minetest.registered_chatcommands.sl_state then
-			minetest.registered_chatcommands.sl_state.func(name)
-		end
+		invoke_command(name, "sl_state")
 		return true
 	end
 	if fields.comms_status then
-		if minetest.registered_chatcommands.sl_match_status then
-			local _, msg = minetest.registered_chatcommands.sl_match_status.func(name)
-			if msg then minetest.chat_send_player(name, msg) end
-		end
+		local _, msg = invoke_command(name, "sl_match_status")
+		if msg then minetest.chat_send_player(name, msg) end
 		return true
 	end
 
@@ -489,9 +497,7 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		if fields.summon_ghost_close or fields.quit then return end
 		if fields.summon_ghost_do then
 			local ghost_name = fields.summon_ghost_name or ""
-			if minetest.registered_chatcommands.sl_summon_ghost then
-				minetest.registered_chatcommands.sl_summon_ghost.func(name, ghost_name)
-			end
+			invoke_command(name, "sl_summon_ghost", ghost_name)
 		end
 		return
 	end

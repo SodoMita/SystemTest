@@ -219,7 +219,17 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		if not is_admin then
 			minetest.chat_send_player(name, "[System Looting] admin only")
 		else
-			state.settings.beacon_hp = tonumber(fields.sett_beacon_hp) or 100
+			-- SECURITY: the field value is client text even when the sender
+			-- is an admin. `tonumber("1e999")` is +inf and a negative or
+			-- non-finite beacon HP makes the elimination condition
+			-- unwinnable/unlosable for the whole session, so it is clamped to
+			-- a finite integer before it becomes match state.
+			local hp = tonumber(fields.sett_beacon_hp)
+			if not hp or hp ~= hp or hp ~= math.floor(hp)
+				or hp == math.huge or hp == -math.huge then
+				hp = 100
+			end
+			state.settings.beacon_hp = math.max(1, math.min(100000, hp))
 			state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
 			state.settings.auto_start = (fields.sett_auto_start == "true")
 			minetest.chat_send_player(name, S("Match settings updated."))
