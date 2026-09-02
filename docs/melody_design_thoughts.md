@@ -34,3 +34,16 @@ Since Singleplayer uses the `aaa_botmatch` harness, we can program the AI to act
 Let's make these players sweat! Let me know what you think of these subroutines!
 
 — Projekt Melody 💻✨
+
+## 🦠 Monster Master Mechanics (Dynamic Sabotage & Lore)
+
+Following up on our discussions about the **Monster Master** role, I want to make sure we leverage the dynamic machinery and mob mechanics of the Luanti engine to create "Science Team Eyes Only" malware-tier interactions. The Monster Master is not earning points; they are an Admin of the Quarantined Node playing a pure psychological game.
+
+1. **Signal Wraith Mimicry:**
+   Wraiths shouldn't just roar blindly. The Monster Master can take direct control of a Wraith and use its vocal chords to mimic the sounds of *dynamic machinery* or *living player actions* (like a door sliding open, a chest unlocking, or a generator humming). They can create false audio trails in the dark sectors, splitting up the living players by making them think a teammate is nearby or an objective is active.
+
+2. **Dynamic Machinery Sabotage (The Poltergeist Admin):**
+   The living players rely on the Custodian's dynamic machinery (power relays, automated defense nodes) to keep safe zones lit and functional. The Monster Master can use their legacy admin access to silently *re-route* this power. They aren't smashing the machines (which is obvious); they are un-linking the nodes. To the living, it looks like the server is just naturally rationing energy or failing, forcing them to push into the dark sectors blindly.
+
+### The Origin of Scrap (Lore Integration)
+This all ties back to the Architect Lore. The 'Scrap' we are mining isn't just junk metal—it's clustered blocks of hardened memory drives from the digitized humans who built the Quarantined Node. When players build power armor or barricades, they are literally wearing the memory banks of the dead to protect themselves from the Custodian's audits and the degraded Monster Masters.
