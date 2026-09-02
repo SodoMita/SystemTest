@@ -72,3 +72,32 @@ sl_map.mm_base_pos (Procedural MM redoubt position) string
 # worldgen around the origin. Off by default — mobs are match
 # entities now: purged at match end, respawned at match start.
 sl_map.mapgen_mobs (Worldgen monsters (legacy)) bool false
+
+
+# ---------------------------------------------------------------
+# sl_chatplay — headless / text-only play
+# ---------------------------------------------------------------
+# Play the whole game through /cp chat commands and read the result
+# as text, with no client and no screenshots.
+#
+# Join a headless console player (a botmatch fake player driven by
+# /cp commands) so an agent can enter real matches without a client.
+sl_chatplay.console (Chatplay headless console player) bool true
+sl_chatplay.console_name (Chatplay console player name) string cmd_agent
+sl_chatplay.move_speed (Chatplay movement speed) float 4.0
+
+# Auto status reports pushed to the event feed every N seconds.
+# 0 disables the pulse entirely.
+sl_chatplay.pulse (Chatplay auto-status interval (0 = off)) int 0 0 3600
+
+# Agent transport: file inbox at world/agent_inbox/ and an optional
+# HTTP endpoint. The file inbox is on by default; HTTP is opt-in.
+sl_chatplay.mailbox (Chatplay agent file inbox) bool true
+sl_chatplay.http (Chatplay HTTP transport) bool false
+
+# /cp trace and /cp probe replicate the engine's ray and fire path
+# and leak internals (ray endpoints, aim vectors, node names). They
+# are the only way to diagnose a missed shot without a client, so
+# they default on for development; set false to hide them from a
+# shipped build.
+sl_chatplay.debug_verbs (Chatplay debug verbs (trace, probe)) bool true

@@ -831,7 +831,6 @@ minetest.register_entity("sl_scary:dredger", {
         pointable = true,
         hp_max = 40,
         makes_footstep_sound = false,
-        automatic_rotate = false,
         automatic_face_movement_dir = false,
     },
 
@@ -1075,7 +1074,6 @@ minetest.register_entity("sl_scary:containment", {
         pointable = true,
         hp_max = 80,
         makes_footstep_sound = true,
-        automatic_rotate = false,
         automatic_face_movement_dir = false,
     },
 
@@ -1220,7 +1218,6 @@ minetest.register_entity("sl_scary:signal_wraith", {
         pointable = true,
         hp_max = 20,
         makes_footstep_sound = false,
-        automatic_rotate = false,
         automatic_face_movement_dir = false,
     },
 

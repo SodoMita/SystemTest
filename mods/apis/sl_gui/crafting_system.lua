@@ -464,3 +464,63 @@ register_craft_recipe({
 
 minetest.log("action", "[crafting_system] System Looting crafting loaded — "
     .. #crafting_recipes .. " recipes.")
+
+
+-- =============================================================
+-- sl_chatplay bridge: expose the recipe table and a direct craft
+-- step so the button-crafting system is reachable from chat
+-- (/cp craft) without opening the formspec. Same logic as the
+-- formspec branch: no node outputs from inventory, quantity-
+-- aware ingredient consumption, XP and achievements included.
+-- =============================================================
+function get_craft_recipes()
+	local out = {}
+	for i, r in ipairs(crafting_recipes) do
+		out[i] = {
+			id = i,
+			output = r.output,
+			output_count = r.output_count,
+			ingredients = r.ingredients,
+			description = r.description,
+			category = r.category,
+		}
+	end
+	return out
+end
+
+function craft_recipe_by_id(player, recipe_id, quantity)
+	quantity = math.max(1, math.min(999, math.floor(tonumber(quantity) or 1)))
+	local recipe = crafting_recipes[recipe_id]
+	if not recipe then
+		return false, "Unknown recipe."
+	end
+	if minetest.registered_nodes[recipe.output] then
+		return false, "Machine required: this output cannot be crafted in inventory."
+	end
+	local inv = player:get_inventory()
+	for item_name, count in pairs(recipe.ingredients) do
+		if not inv:contains_item("main", ItemStack(item_name .. " " .. (count * quantity))) then
+			return false, "Not enough ingredients for " .. quantity .. "x " .. recipe.description .. "!"
+		end
+	end
+	for item_name, count in pairs(recipe.ingredients) do
+		inv:remove_item("main", ItemStack(item_name .. " " .. (count * quantity)))
+	end
+	inv:add_item("main", ItemStack(recipe.output .. " " .. (recipe.output_count * quantity)))
+	if give_experience then give_experience(player, 5 * quantity) end
+	if achievement_progress then
+		achievement_progress(player, "first_craft", 1)
+		achievement_progress(player, "craft_10_items", quantity)
+		achievement_progress(player, "craft_100_items", quantity)
+		if recipe.category == "equipment" then
+			achievement_progress(player, "craft_equipment", 1)
+		elseif recipe.category == "tactical" then
+			achievement_progress(player, "craft_tactical", 1)
+		elseif recipe.category == "objective" then
+			achievement_progress(player, "craft_objective_core", 1)
+		end
+	end
+	minetest.chat_send_player(player:get_player_name(),
+		"Crafted " .. quantity .. "x " .. recipe.description .. " (+" .. (5 * quantity) .. " XP)")
+	return true, "Crafted " .. quantity .. "x " .. recipe.description .. "."
+end
