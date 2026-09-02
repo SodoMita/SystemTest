@@ -141,8 +141,15 @@ bounds, plus a static audit of all `mods/**/*.lua`) · `tests/minetest_stub.lua`
 (privs made explicit; fabricator negative cases; `io.popen` pcall-guarded) ·
 `tests/run_lua51.py` (exit-code interception).
 
-**CI** — `.github/workflows/soak.yml` runs `security_test.lua` before the smoke
-test, with a comment explaining why it is first.
+**CI** — `.github/workflows/soak.yml` gains a step that runs
+`security_test.lua` before the smoke test, with a comment explaining why it is
+first. **Status: written and verified locally, not yet on the branch.** GitHub
+rejected the push with *"refusing to allow a GitHub App to create or update
+workflow `.github/workflows/soak.yml` without `workflows` permission"*, so the
+hunk is kept as an uncommitted working-tree change rather than dropped: the
+rest of the audit is published, and the gate lands the moment someone with that
+permission commits the file (or the token is reconnected with `workflows`).
+Until then `security_test.lua` must be run by hand — it is not gated.
 
 ## Verification
 

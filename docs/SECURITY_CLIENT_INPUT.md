@@ -5,8 +5,10 @@ handler, an inventory-field callback, or a formspec that a player can reach.
 **Why this doc exists:** five of these holes shipped at once, all reachable by a
 player with **no privileges** on a public server, and three of them hang or OOM
 the server rather than merely cheat. Read this before adding a new input
-surface. The regression suite is `tests/security_test.lua` (runs in CI before
-the smoke test).
+surface. The regression suite is `tests/security_test.lua` — meant to run in CI before
+the smoke test; the `soak.yml` step is written but **not yet pushed**, because
+updating `.github/workflows/` needs the `workflows` permission this branch's
+token does not have. Run it by hand until that lands.
 
 ---
 
