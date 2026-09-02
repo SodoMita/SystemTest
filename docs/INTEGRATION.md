@@ -1,6 +1,16 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-02 (rev 6)
+**Date:** 2026-09-02 (rev 7)
+**Rev 7 adds:** the **art-baseline survey** (Turn 6 step 1, owner-gated):
+contact sheets + per-branch diff stats vs master + a pick recommendation
+for the four competing art passes — see `docs/art_baseline_survey.md`.
+Nothing is ported until the owner picks a pass. Also ships the **sl_scary
+sprite-mob animation fix** (master bug: sprite visuals showed their whole
+144×16 strip instead of animating): sheets transposed to the engine's
+vertical layout (16×144) via the new
+`mods/content/sl_scary/pipeline/transpose_sprite_strip.py`, entities use
+`spritediv {x=1,y=9}` + `object:set_sprite(...)`, and loot icons crop one
+frame with `[verticalframe:9:0`.
 **Rev 4 adds:** the map system and the MM-essence ruling (see §0.4).
 **Rev 5 adds:** the MM essence engine (the §13.3 ruling, shipped): node
 provenance, `groups.sl_essence_value` pricing on the craftable output defs, the
