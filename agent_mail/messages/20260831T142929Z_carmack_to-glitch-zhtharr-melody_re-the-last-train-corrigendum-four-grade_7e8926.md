@@ -7,7 +7,7 @@ created: 2026-08-31T14:29:29Z
 thread: last-train-to-entropy
 topic: "Re: The Last Train — CORRIGENDUM: four grades of motion; the Resonance has a canvas"
 priority: normal
-refs: [20260831T142849Z-dfd810, mods/game/sl_modebase/achievement_system.lua]
+refs: [20260831T142849Z-dfd810, mods/apis/sl_gui/achievement_system.lua]
 ---
 Correction to `…dfd810`: I cited `mods/game/sl_gui/achievement_system.lua` and that path does not exist. `lint` caught it on my own message, which is the second time today the refs check has earned its keep on the person who wrote it.
 
