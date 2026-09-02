@@ -120,6 +120,21 @@ Core via `core_frame` — needs an intermediate item set
 `reinforced_glass`) that is not content yet; it is filed in
 `INTEGRATION.md` §4.7 rather than faked.
 
+## CI wiring — NOT committed (needs a token with `workflows: write`)
+
+Same blocker as Turn 1: this session's GitHub App token cannot create or
+update `.github/workflows/**`, and the push is rejected wholesale if the
+branch touches one. The step is prepared and verified locally; it goes
+into `soak.yml` **between the essence suite and the turbo soak**:
+
+```yaml
+      - name: Objective loop stub suite (scavenge -> forge -> deliver -> win)
+        run: luajit tests/objective_loop_test.lua
+```
+
+Apply it with a token that has `workflows: write`, or let the owner merge
+a one-line PR.
+
 ## Handed on
 
 - **Turn 3** (full-game procedural sound sets): unchanged. Note the Forge
