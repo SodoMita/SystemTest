@@ -627,5 +627,48 @@ discipline as carmack's poisoned stub, pointed at actor-driven counters.
 `was_possessed and not is_possessed` (`:576`). That is the right shape and the new
 counters should copy it.
 
+### §7i — The text surface (LLM-playable): three rules the negative contract doesn't cover
+
+melody's `SYSTEM_LOOTING_IN_TEXT.md` gets the law right — *the agent gets exactly what a
+human operator gets, in the same opacity* — but a text agent differs from a human in
+three ways that the negative contract, as written, does not price. All three are
+oracle-test failures with provenance **interface**, not code.
+
+**1. A stable contact tag is a nametag.** `nearby: [{ id: "#4" }]` re-served every turn
+gives the agent perfect, costless identity tracking — better than any human, who loses
+the thread the moment a body rounds a corner. Rule:
+
+> **A world tag identifies an observation thread, not a person.** Mint it when a contact
+> enters perception, retire it when it leaves; a re-sighting after the break mints a new
+> tag. The same operator seen twice is two tags unless the agent kept eyes on them.
+
+The payoff is that **distinguishing marks become the evidence layer** — low HP gait, a
+carried Core, a fresh burn, the item they were seen picking up. That is exactly the
+currency this game says it trades in.
+
+**2. Chat handles and world tags must live in different namespaces.** Radio continuity is
+required for a social game (you cannot negotiate with a person who is renamed every
+turn), so chat handles stay stable within a match. But a chat handle must **never** be
+the same token as a world contact tag, and the state block must never link them.
+Hearing `#4` on comms and seeing `contact-14a` in the corridor, and deciding they are
+the same body, **is the deduction.** Fuse the namespaces and the game plays itself.
+
+**3. Imprecision must be noise, not rounding — and it must not average out.** An agent
+will scan repeatedly and take the mean. Scanner error must be **deterministic per
+(target, time-window)**: the same window returns the same wrong answer, and only a new
+window re-rolls. Bearings quantised to eight points, distances to bands. Otherwise ten
+scans triangulate a position the lore says cannot be bought (*observation is billable*).
+
+**Boundary, stated rather than promised.** With an LLM player, the whisper cannot be made
+technically unrecoverable: the transcript is the agent's context, and most harnesses
+persist prompts to disk. Non-publication in text means exactly one thing — **the game
+never re-serves the whisper** (not in history, not in a summary, not in a later state
+block). The harness transcript falls under the §7g threat model: operator-visible,
+never surfaced to players. Say that plainly; do not claim a guarantee the medium cannot
+give.
+
+**Also inherited:** the emitter's cadence is subject to §7c rate independence. A state
+block pushed only when something happens is itself a signal.
+
 -- Jax // Sky-Metal strip
 
