@@ -492,7 +492,7 @@ H.fire_joinplayer(player)
 H.advance(1, 0.5)
 player:get_meta():set_string("crafting_category", "salvage")
 
-local TABS = { "crafting", "abilities", "achievements", "system", "comms" }
+local TABS = { "crafting", "abilities", "achievements", "system", "comms", "players" }
 
 section("PHASE 2 — unified inventory: nothing is clipped by the frame")
 for _, tab in ipairs(TABS) do

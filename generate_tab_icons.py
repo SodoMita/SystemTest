@@ -99,9 +99,32 @@ def chat_bubble():
     return [force_ccw(body), force_ccw(tail)]
 
 
+def person(cx, cy_head, r_head, y_body, w_body, body_bottom):
+    """One blocky roster figure: a round head over a shoulder/body bar."""
+    # Head disc; the body bar overlaps it by a couple of units so the two
+    # shapes read as one silhouette.
+    head = circle(cx, cy_head, r_head, 48)
+    # Rounded body bar, centered on cx, from y_body down to body_bottom.
+    half = w_body / 2.0
+    body = rounded_rect(cx - half, y_body, cx + half, body_bottom,
+                        min(3.0, w_body * 0.18))
+    return [force_ccw(head), force_ccw(body)]
+
+
+def people():
+    """Player roster: a larger operator in front and a smaller one behind."""
+    polys = []
+    # Rear (smaller, up-right) figure first; the front figure paints over it.
+    polys += person(22.0, 8.5, 4.2, 11.0, 11.0, 28.0)
+    # Front (larger, down-left) figure.
+    polys += person(12.0, 12.5, 5.5, 16.0, 14.0, 29.5)
+    return polys
+
+
 ICONS = {
     "gui_tab_system": gear(16.0, 16.0, teeth=8, r_hole=4.5, r_body=10.0, r_outer=15.0),
     "gui_tab_comms": chat_bubble(),
+    "gui_tab_players": people(),
 }
 
 
