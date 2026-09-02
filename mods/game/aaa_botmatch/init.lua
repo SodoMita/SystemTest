@@ -159,6 +159,13 @@ botmatch.config = {
 	mob_mode = minetest.settings:get_bool("sl_botmatch.mob_mode"),
 	auto_start = minetest.settings:get_bool("sl_botmatch.auto_start"),
 	beacon_spacing = tonumber(minetest.settings:get("sl_botmatch.beacon_spacing") or "24") or 24,
+	-- Pathfinding tuning. Defaults below are calibrated for the
+	-- build_arena auto-arena; bespoke handmade maps can override
+	-- via minetest.conf. See mob_player.lua pathfind_walk for
+	-- why these specific values.
+	path_searchdistance = tonumber(minetest.settings:get("sl_botmatch.path_searchdistance") or "80") or 80,
+	path_max_jump       = tonumber(minetest.settings:get("sl_botmatch.path_max_jump") or "1") or 1,
+	path_max_drop       = tonumber(minetest.settings:get("sl_botmatch.path_max_drop") or "2") or 2,
 	disconnect_test = minetest.settings:get_bool("sl_botmatch.disconnect_test")
 		or minetest.settings:get("sl_botmatch.disconnect_test") == nil,
 }
@@ -246,13 +253,25 @@ end
 -- record for bots so builtin HUD code (minimap gating etc.) works.
 local engine_get_player_information = minetest.get_player_information
 minetest.get_player_information = function(name)
-	if botmatch.bots[name] then
+	local bot = botmatch.bots[name]
+	if bot then
+		-- version_string carries the bot's kind so HUD code or
+		-- any caller inspecting the synthetic record can see
+		-- whether this is a stub (no engine body) or a mob
+		-- (real entity with pathfinding) without poking at
+		-- botmatch internals. The kind was stamped at spawn
+		-- time by spawn_one_bot; if it's missing for any
+		-- reason (legacy bot from an older version) we
+		-- fall back to "stub" because that's the safe
+		-- default — a stub never claims capabilities it
+		-- doesn't have.
+		local kind = (bot.bm and bot.bm.kind) or "stub"
 		return {
 			protocol_version = 44,
 			formspec_version = 4,
 			lang_code = "en",
 			major = 5, minor = 10, patch = 0,
-			version_string = "botmatch",
+			version_string = "botmatch:" .. kind,
 			address = "127.0.0.1",
 			ip_version = 4,
 			connection_time = 0,
@@ -345,6 +364,16 @@ local function spawn_one_bot(name, team)
 		local pl = game_mode.get_player_state(name)
 		pl.team = team
 	end
+	-- Stamp the bot's "kind" so /sl_bots list, in-world nametags,
+	-- and the player_information synthetic record can all show
+	-- whether this bot is a stub (headless Lua state, no engine
+	-- body, straight-line step_toward) or a mob (engine entity,
+	-- A* pathfinding, GLB model). The kind is decided at spawn
+	-- time from botmatch.config.mob_mode and is immutable for
+	-- the life of the bot: a mid-match config flip should never
+	-- make a stub become a mob or vice versa.
+	bot.bm = bot.bm or {}
+	bot.bm.kind = botmatch.config.mob_mode and "mob" or "stub"
 	botmatch.bots[name] = bot
 	table.insert(botmatch.bot_order, name)
 	table.insert(botmatch.connected, name)
@@ -450,13 +479,42 @@ function botmatch.clear_bots()
 	return true
 end
 
+-- Return the kind label ("stub" or "mob") for a bot, decided at
+-- spawn time. Returns "stub" if the bot is unknown or the kind
+-- was never stamped (defensive default — a missing bot should
+-- never advertise itself as the more capable kind).
+function botmatch.kind_of(name)
+	local bot = botmatch.bots[name]
+	if not bot or not bot.bm or not bot.bm.kind then return "stub" end
+	return bot.bm.kind
+end
+
+-- Human-readable display form of a bot name, with its kind in
+-- brackets. Used by /sl_bots list, the in-world nametag (mob
+-- bodies only — stub bots have no world presence), and any
+-- future admin UI. Format: "[kind] name" so the kind is the
+-- first thing the reader sees. Example: "[mob] bot_alpha" or
+-- "[stub] bot_alpha".
+function botmatch.display_name(name)
+	return string.format("[%s] %s", botmatch.kind_of(name), name)
+end
+
 -- Human-readable listing for /sl_bots list and the formspec.
 function botmatch.list_pool_lines()
 	local lines = {}
 	for _, entry in ipairs(botmatch.pool) do
 		local connected = botmatch.bots[entry.name] and "connected" or "lobby"
-		table.insert(lines, string.format("%s -> %s (%s)",
-			entry.name, entry.team, connected))
+		-- The kind tag tells the admin at a glance which bots
+		-- will get a physical body with engine pathfinding
+		-- ("mob") versus which are headless Lua stubs that
+		-- straight-line toward their target ("stub"). Without
+		-- this tag, two pools with the same bot names look
+		-- identical in /sl_bots list even though one walks
+		-- around the arena and the other teleports in a Lua
+		-- table.
+		local tag = botmatch.kind_of(entry.name)
+		table.insert(lines, string.format("[%s] %s -> %s (%s)",
+			tag, entry.name, entry.team, connected))
 	end
 	return lines
 end

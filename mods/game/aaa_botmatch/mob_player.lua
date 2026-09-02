@@ -113,7 +113,45 @@ local function pathfind_walk(self, bot, dtime)
 	local need_path = (not self.path) or now >= (self.repath_at or 0)
 		or (self.path[#self.path] and vector.distance(pos, self.path[#self.path]) < 1.0)
 	if need_path then
-		self.path = minetest.find_path(pos, target, 64, 1, 2, "A*_single")
+		-- minetest.find_path tuning for the botmatch arena:
+		--   searchdistance = 80: the auto-arena scales with
+		--     sl_botmatch.beacon_spacing (default 24, turbo 4).
+		--     A spacing of 24 puts the beacons 24 nodes apart, plus
+		--     ~6 nodes of midfield per side, so the worst-case
+		--     point-to-point distance is ~36 nodes. 80 is a
+		--     comfortable ceiling for the largest layout AND for
+		--     future handmade maps whose bastions are 30+ apart.
+		--   max_jump = 1: bots are full-size player entities
+		--     (collisionbox 1.75 tall, half-width 0.3) and can't
+		--     step over the 2-block-tall cobble cover that
+		--     build_arena drops in the midfield; routing AROUND is
+		--     the right behavior. If a future map needs bots that
+		--     jump 2+, the caller can override via
+		--     sl_botmatch.path_max_jump.
+		--   max_drop = 2: the team spawn is at y = 2 (beacon top)
+		--     and the arena floor is at y = 0, so the bot must
+		--     drop 2 to reach the floor. 2 is the minimum that
+		--     works on every current layout; bumping it is fine.
+		--   algorithm = "A*": the engine accepts "A*" (pre-fetch
+		--     variant), "A*_noprefetch" (default), and "Dijkstra".
+		--     The previous value "A*_single" is NOT a valid
+		--     algorithm name and find_path silently returned nil
+		--     for it, which made the bot fall through to the
+		--     straight-line fallback every tick. "A*" matches
+		--     what mods/content/sl_scary/init.lua uses for the
+		--     horror mobs, so the arena's pathfinder surface is
+		--     uniform.
+		-- The searchdistance, max_jump, and max_drop can be
+		-- overridden via sl_botmatch.path_searchdistance /
+		-- .path_max_jump / .path_max_drop in minetest.conf for
+		-- bespoke handmade maps. Defaults here are tuned for the
+		-- build_arena auto-arena.
+		local cfg = botmatch.config
+		local searchdist = (cfg and cfg.path_searchdistance) or 80
+		local max_jump   = (cfg and cfg.path_max_jump)       or 1
+		local max_drop   = (cfg and cfg.path_max_drop)       or 2
+		self.path = minetest.find_path(pos, target,
+			searchdist, max_jump, max_drop, "A*")
 		self.path_i = 2
 		self.repath_at = now + 1.5
 		if not self.path or #self.path < 2 then
@@ -198,6 +236,13 @@ minetest.register_entity(MOB_NAME, {
 		hp_max = 20,
 		makes_footstep_sound = true,
 		static_save = false,
+		-- The mob body shows its name in-world so the admin can
+		-- tell which bot is which. The default sl_modebase
+		-- spawn_player path hides player nametags; we override
+		-- that with a bright yellow tag in on_activate so mob
+		-- bots stand out from real players. (Stub bots have no
+		-- body and so are invisible in-world by design — they're
+		-- a headless harness, not a presence.)
 		nametag = "",
 	},
 
@@ -213,6 +258,18 @@ minetest.register_entity(MOB_NAME, {
 		if self.bot_name then
 			botmatch.mobs[self.bot_name] = self.object
 			self.object:set_armor_groups({ immortal = 1 }) -- damage flows through handlers, not entity HP
+			-- Show the display name in-world so the admin can
+			-- distinguish bots from real players at a glance.
+			-- The [mob] tag matches the /sl_bots list output
+			-- (see botmatch.display_name).
+			if botmatch.display_name then
+				self.object:set_nametag_attributes({
+					color = { a = 255, r = 255, g = 220, b = 80 },
+				})
+				self.object:set_properties({
+					nametag = botmatch.display_name(self.bot_name),
+				})
+			end
 		end
 	end,
 
