@@ -45,6 +45,118 @@ function strand.find_bot(run, name)
 	return nil
 end
 
+-- ================================================================
+-- Parsing a player action (SECURITY: never evaluate client text)
+-- ================================================================
+-- `/sl_strand_act` used to run `minetest.deserialize("return " .. param)`,
+-- i.e. it handed a raw chat string to loadstring(). The engine's sandbox
+-- hides `minetest`/`io`/`os`, but it bounds nothing: one chat line could
+-- `while true do end` the server thread (pcall cannot interrupt a running
+-- chunk) or allocate hundreds of megabytes. Actions are a closed vocabulary
+-- of seven verbs with a handful of string keys, so they are PARSED.
+--
+-- Both spellings below are data, and both produce the same table:
+--   /sl_strand_act vote accused=Crew-3 player_vote=true
+--   /sl_strand_act { type = "vote", accused = "Crew-3", player_vote = true }
+local ACTION_SCHEMA = {
+	read_tell = { bot = "name", target = "name" },
+	confide   = { bot = "name" },
+	observe   = { bot = "name", target = "name" },
+	build     = { socket = "name", kind = "name" },
+	reveal    = {},
+	choose    = { choice = "name" },
+	vote      = { accused = "name", player_vote = "bool" },
+}
+strand.ACTION_SCHEMA = ACTION_SCHEMA
+
+local ACTION_MAX_LEN = 256   -- a whole action fits in one line of chat
+local VALUE_MAX_LEN  = 64    -- crew/socket/kind identifiers are short
+local NAME_PATTERN   = "^[%w_%-]+$"
+
+-- The legacy table spelling carries punctuation. Strip it as text: the
+-- tokenizer never evaluates anything, so a stray brace is just a character.
+local function strip_decorations(word)
+	return (word:gsub('[{}%[%]()"\'`,;]', ""))
+end
+
+-- Returns an action table, or nil + a reason. Total: no loadstring, no
+-- deserialize, no arithmetic on attacker text beyond length checks.
+function strand.parse_action(param)
+	param = tostring(param or "")
+	if #param > ACTION_MAX_LEN then
+		return nil, "action too long (" .. ACTION_MAX_LEN .. " characters max)"
+	end
+
+	local verb
+	local kv = {}
+	-- Normalize " key = value " to "key=value", then split on whitespace
+	-- and commas so both spellings tokenize the same way.
+	for word in (param:gsub("%s*=%s*", "=")):gmatch("[^%s,]+") do
+		local key, value = word:match("^([^=]*)=(.*)$")
+		if key then
+			key = strip_decorations(key)
+			value = strip_decorations(value)
+			if key == "type" then
+				if verb then return nil, "duplicate action type" end
+				verb = value
+			elseif kv[key] ~= nil then
+				return nil, "duplicate key '" .. key .. "'"
+			else
+				kv[key] = value
+			end
+		else
+			local bare = strip_decorations(word)
+			if bare ~= "" then
+				if verb then return nil, "unexpected token '" .. bare .. "'" end
+				verb = bare
+			end
+		end
+	end
+
+	if not verb or verb == "" then
+		return nil, "no action given"
+	end
+	local schema = ACTION_SCHEMA[verb]
+	if not schema then
+		local known = {}
+		for name in pairs(ACTION_SCHEMA) do known[#known + 1] = name end
+		table.sort(known)
+		return nil, "unknown action '" .. verb .. "' (known: " .. table.concat(known, " ") .. ")"
+	end
+
+	local action = { type = verb }
+	for key, value in pairs(kv) do
+		local kind = schema[key]
+		if not kind then
+			return nil, "action '" .. verb .. "' takes no '" .. key .. "'"
+		end
+		if #value > VALUE_MAX_LEN then
+			return nil, "value for '" .. key .. "' is too long (" .. VALUE_MAX_LEN .. " characters max)"
+		end
+		if kind == "bool" then
+			if value ~= "true" and value ~= "false" then
+				return nil, "'" .. key .. "' must be true or false"
+			end
+			action[key] = (value == "true")
+		else
+			if not value:match(NAME_PATTERN) then
+				return nil, "'" .. key .. "' must be letters, digits, '_' or '-'"
+			end
+			action[key] = value
+		end
+	end
+	return action
+end
+
+-- The schema and the dispatcher must never drift apart: a verb in one and
+-- not the other is either a dead command or an unparsed action.
+for schema_verb in pairs(ACTION_SCHEMA) do
+	assert(TURN_ACTIONS[schema_verb], "strand: ACTION_SCHEMA verb without a handler: " .. schema_verb)
+end
+for handler_verb in pairs(TURN_ACTIONS) do
+	assert(ACTION_SCHEMA[handler_verb], "strand: TURN_ACTIONS verb missing from ACTION_SCHEMA: " .. handler_verb)
+end
+
 -- Execute one player action for the current phase, then advance the
 -- phase machine if the action was terminal for that phase.
 function strand.turn(run, action)

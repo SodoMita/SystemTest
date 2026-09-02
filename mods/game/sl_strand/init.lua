@@ -88,7 +88,20 @@ minetest.register_chatcommand("sl_strand_start", {
 	params = "[seed]",
 	description = "Start a Simulacrum Strand singleplayer run",
 	func = function(name, param)
-		local seed = tonumber(param) or nil
+		-- SECURITY: the seed is client text. `tonumber("1e999")` is +inf and
+		-- `inf % 0xFFFFFFFF` is NaN, which silently degenerates the whole
+		-- run's RNG; only a finite integer is a seed.
+		local seed
+		local raw = tonumber((param or ""):match("^%s*(%-?[%d%.eE%+]+)%s*$") or "")
+		if raw then
+			if raw ~= raw or raw == math.huge or raw == -math.huge or raw ~= math.floor(raw) then
+				return false, "seed must be a whole number"
+			end
+			if math.abs(raw) > 2 ^ 31 then
+				return false, "seed must be within +/- 2147483648"
+			end
+			seed = math.floor(raw)
+		end
 		local run, err = strand.start_solo(seed)
 		if not run then return false, tostring(err) end
 		strand.active_player = name
@@ -97,10 +110,18 @@ minetest.register_chatcommand("sl_strand_start", {
 })
 
 minetest.register_chatcommand("sl_strand_act", {
-	params = "<action>",
+	params = "<action> [key=value ...]",
 	description = "Issue a strand action (read_tell/confide/observe/build/vote/choose/reveal)",
 	func = function(name, param)
-		local a = minetest.deserialize("return " .. param) or {}
+		-- SECURITY: the action is parsed, never evaluated. This used to be
+		-- `minetest.deserialize("return " .. param)`, which ran attacker Lua
+		-- on the server thread: an infinite loop in a chat line hangs the
+		-- whole server (pcall cannot interrupt it) and an allocation loop
+		-- exhausts its memory. See strand.parse_action.
+		local a, err = strand.parse_action(param)
+		if not a then
+			return false, tostring(err or "unparsable action")
+		end
 		local result, extra = strand.do_solo(a)
 		if result == nil then return false, tostring(extra) end
 		local msg = strand.describe_result(result)
