@@ -56,6 +56,13 @@ if not ok then
 	os.exit(1)
 end
 
+-- Machine crafting is a map anchor now (the Objective Forge is placed
+-- by the map system), so the map suites need it loaded.
+H.current_modname = "sl_machine_crafting"
+local okm, errm = pcall(dofile, "mods/game/sl_machine_crafting/init.lua")
+check(okm, "sl_machine_crafting loads" .. (okm and "" or (" -> " .. tostring(errm))))
+H.current_modname = "sl_modebase"
+
 local gm = game_mode
 local state = game_mode.state
 
@@ -628,6 +635,13 @@ check(H.voxels[H.vhash({ x = place_min.x, y = place_min.y, z = place_min.z })] =
 	"schematic floor materialized")
 check(#sd.mobs == 3 and sd.mobs[1].variant == "stalker" and sd.mobs[3].variant == "brute",
 	"map.conf defines the initial mob population")
+-- Machine crafting is a map anchor like any other: a handmade map
+-- declares it in map.conf (forge.pos) and the placement follows.
+check(sd.anchor.forge ~= nil and sd.anchor.forge.x == place_min.x + 10
+	and sd.anchor.forge.z == place_min.z + 14,
+	"the Objective Forge anchor comes from map.conf (schematic-relative)")
+check(H.voxels[H.vhash(sd.anchor.forge)] == "sl_machine_crafting:objective_forge",
+	"the Objective Forge is placed on the handmade map")
 -- Reset contract on the handmade map: re-place + journal restore.
 local hm_outside = { x = 400, y = 8, z = 400 }
 H.fire_placenode(hm_outside, { name = "default:stone" })

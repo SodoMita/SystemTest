@@ -262,14 +262,17 @@ minetest.register_node(game_mode.modname .. ":objective_core", {
 	mesh = "item.obj", -- Use a mesh for the cube if possible
 	paramtype = "light",
 	light_source = 14,
-	-- sl_essence_value = 5: destroying a delivered/placed core pays the
-	-- MM pool 5 (essence ruling §13.3 rule 1 — the crew's biggest
-	-- statement pays out). sl_craft_in_inventory = 1: this node opts
-	-- out of the "machine required" gate so the named +3 craft (rule 2)
-	-- can actually complete in the button crafting UI until the machine
-	-- chain lands (objective-loop turn).
+	-- MACHINE-ONLY (the objective-loop turn removed the temporary
+	-- sl_craft_in_inventory opt-in): placeables are made at the
+	-- Objective Forge, never in the inventory (MASTER_DESIGN_FULL
+	-- §6.5 / §6.10). The Forge fires game_mode.on_craft_essence on
+	-- completion, which is what pays the named +3 (ruling §13.3
+	-- rule 2); sl_essence_value = 5 prices the crew's biggest
+	-- statement for rule 1 if the MM destroys a placed core.
 	groups = {cracky = 1, oddly_breakable_by_hand = 1,
-		sl_essence_value = 5, sl_craft_in_inventory = 1},
+		sl_essence_value = 5, objective = 1},
+	-- §6.10 A: one Core per team, never hoarded.
+	stack_max = 1,
 	is_ground_content = false,
 
 	after_place_node = function(pos, placer)

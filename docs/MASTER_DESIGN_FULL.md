@@ -386,9 +386,23 @@ That closes the §6.5 violation — `power_cell`, `blast_shield`, `barricade`,
 `signal_relay`, `sensor_array` move behind the Assembly Station and lose their
 inventory recipes.
 
-**C. Form items (revival forms).** One craftitem per underground form, consumed on
-use in the cloud cage, mutually exclusive per death:
-`form_key_stalker`, `form_key_scout`, `form_key_brute`. Cost: monster spoils only,
+> **Implementation status (2026-09-02, objective-loop turn).** The rule is
+> enforced on **both** sides now. The inventory UI refuses any recipe whose
+> output is a registered node, and `sl_machine_crafting` — the **Objective
+> Forge**, one per map at the `forge` anchor — runs exactly those recipes
+> (same predicate, same registry, so they cannot drift). The Objective Core
+> lost its temporary `sl_craft_in_inventory` opt-in and is machine-only.
+> Salvage veins on the procedural/test arenas supply the raw neon, and the
+> refine branch is batched so a full Core costs five forge runs / twenty dug
+> nodes. **Still to do here:** the five-station table above collapses to one
+> station today, and the two-step Core (`core_frame` at an Assembly Station,
+> then the Forge) is not built. The blocker is **supply, not content**:
+> `metal_ingot`, `circuit_board`, `energy_crystal`, `hardened_plate` and
+> `reinforced_glass` all exist as craftitems, but nothing *makes* them —
+> they come only from `MONSTER_LOOT`, and `hardened_plate` /
+> `reinforced_glass` have no source at all. Routing the win condition
+> through them turns the Core from a scavenging objective into a hunting
+> one. Tracked in `docs/INTEGRATION.md` §4.7.
 so a form is paid for by the living player *before* they die — a bet, not a menu.
 Evil Ghost stays the fourth option and keeps its points forfeit.
 
