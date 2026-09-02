@@ -26,6 +26,16 @@ broken strips, so the fix ships here regardless (see §7).
 > sprite re-ink at 64×64 (§7) — sprites are flat billboards, so hi-res
 > AI-derived art is safe there. Everything else from the four passes is
 > rejected or reverted (per-file triage §10).
+>
+> **Rev D (2026-09-03, owner direction):** mobs regenerated at **even
+> higher resolution — 256px frames — with 3 frames per sheet** (down
+> from 9), in the **boxman neon wire-glow style** (reference render
+> committed: `docs/art_baseline/boxman_style_render.png`, produced by
+> `pipeline/render_boxman_ref.py` from the actual `SimpleOutlinedBoxman.glb`
+> + `sl_boxman_neon.png` material). All states replay the one 3-frame
+> loop at different speeds. Weapon textures: **new hi-res art pending**
+> (the AI-image budget is 10 images/turn; mob set consumed it —
+> `docs/art_baseline/weapons_hires_plan.md` queues the 37 files).
 
 ---
 
@@ -37,7 +47,7 @@ broken strips, so the fix ships here regardless (see §7).
 | 1 | ~~Pick `01a04c31` as the node/content art slice~~ | **Superseded.** Its modebase/workshop tiles are 16×16 where master's surfaces are 64×64 → off-spec under the 32px+ ruling; excluded along with every other 16×16 pass re-author (incl. the beacons it adds for a sky/beacon system master does not have). |
 | 2 | **UI restyles (`01a04bfa` sl_gui/formspec/dignodes) removed** | UI-only no-blur rule: master's icons are 1-bit by design and stay; the pass restyle is anti-aliased (semi up to 0.7) → forbidden. The interim boxman "fill" was reverted — it textures the player GLB model (owner: no AI flat art on 3D models). |
 | 3 | `01a0487d` (default family) still **deferred** | 241 files; only relevant if the world is re-skinned neon; keep stock unless ruled. |
-| 4 | **Companion fix + mob art on this branch** | Sprite strips now play (§7); mobs re-inked at 64×64 strict palette to match the wire-glow theme. |
+| 4 | **Companion fix + mob art on this branch** | Sprite strips now play (§7); mobs regenerated at 256×768 (3×256 frames/sheet) in the boxman wire-glow style — rev D. |
 
 The "owner gate" questions are collected in §8.
 
@@ -174,8 +184,11 @@ strip rendered whole); bottom 3 rows = the corrected frame sequences
 (dredger, containment, wraith), columns 0-8 = frames: 0-2 idle, 3-5
 walk, 6-7 attack, 8 death. This is the animation this PR turns on.
 
-**`cs_mobs_v2.png`** (rev B) — old soft 16px frames vs the new 64×64
-strict-palette wire-glow re-ink, per mob, frames 0-8.
+**`cs_mobs_v2.png`** (rev B, superseded) — old soft 16px frames vs the
+64×64 strict-palette wire-glow re-ink, per mob, frames 0-8. The rev-D
+sheets (256×768, 3 frames) replace them; preview in **`cs_mobs_v3.png`**.
+**`boxman_style_render.png`** — software render of the actual boxman
+model used as the mob art style reference (rev D).
 
 *(rev B's `cs_ported.png` — clothing/boxman AI fills — was removed in
 rev C: those textures wrap 3D models (b3d clothing props, the boxman
@@ -213,20 +226,25 @@ No branch ever fixed this, so the fix is pass-independent.
    row 8.
 3. Loot icons (`dredger_badge`, `containment_shard`, `corrupted_data`)
    used `^[resize:16x16` on the whole strip (a squashed-sheet icon);
-   now `^[verticalframe:9:0` — a clean crop of the idle frame.
-4. **Mob art re-ink:** `pipeline/reink_mobs.py` re-inks each 16×16
-   frame onto a strict palette — black silhouette + the two spec accent
-   colours (dredger rust `#CC6622`/neon-green `#00FF41`; wraith
-   void-purple `#1A0033`/neon-cyan `#00FFFF`; containment crimson
-   `#8B0000`/neon-amber `#FFBF00`) — and scales 4× nearest to 64×64
-   frames. Strips are now **64×576**. Sprites are flat billboards, so
-   hi-res art is safe here (no UV to respect); the strict binary-alpha
-   palette is a stylistic choice (no-blur is a UI-only rule, and other
-   mob treatments — e.g. smoother AI hi-res sheets — remain open).
-   Preview: `docs/art_baseline/cs_mobs_v2.png` (old vs new per mob,
-   frames 0-8).
+   now `^[verticalframe:3:0` — a clean crop of the idle frame.
+4. **Mob art rev C (superseded by rev D):** the strict-palette 64×576
+   re-ink (black silhouette + two spec accents, binary alpha) — history
+   in commit `c819070`; replaced below.
+4b. **Mob art rev D (owner):** `pipeline/process_sprite.py` +
+   AI-generated frames deliver **256×768 sheets (3 frames of 256×256
+   per mob)** in the **boxman wire-glow style**: dark tinted boxy body
+   panels with bright neon rim outlines, per-mob accent colours (dredger
+   rust `#CC6622` + neon-green `#00FF41`; wraith void-purple `#1A0033`
+   + neon-cyan `#00FFFF`; containment crimson `#8B0000` + neon-amber
+   `#FFBF00`). All states replay the single 3-frame alive loop at
+   different speeds (`sprite_animations`); death freezes the last frame.
+   Each file is ≤ ~250 KB. Style reference committed:
+   `docs/art_baseline/boxman_style_render.png` (rendered from the actual
+   `SimpleOutlinedBoxman.glb` by `pipeline/render_boxman_ref.py`), which
+   is also used as the image-model's reference. Preview:
+   `docs/art_baseline/cs_mobs_v3.png`.
 5. `pipeline/README.md` and `GENERATED_ASSETS.md` document the vertical
-   layout, the re-ink, and why.
+   3-frame layout, the rev-D AI workflow, and why.
 
 Side note: `sl_scary_signal_wraith.png` (16×16, single frame) has no Lua
 reference on master — legacy leftover from before the strip rebuild;
@@ -311,7 +329,7 @@ palette ≤ ~12 colours, semi-transparent share ≈ 0.
 
 | File | From | Why |
 |---|---|---|
-| `sl_scary_*_strip.png` (3) | this branch | animation fix + re-ink at 64×64 frames (see §7). Sprites are flat billboards — no UV mapping — so hi-res (and AI-derived) art is safe here, per the owner. |
+| `sl_scary_*_strip.png` (3) | this branch | animation fix + rev-D art: 256×768, three 256×256 frames per mob, boxman wire-glow style (see §7). Sprites are flat billboards — no UV mapping — so hi-res AI art is safe here. |
 
 ### Reverted after rev B (owner: no AI flat art on 3D models)
 
@@ -342,9 +360,11 @@ palette ≤ ~12 colours, semi-transparent share ≈ 0.
 
 ### Numeric verification (current branch state)
 
-- `sl_scary_*_strip.png`: 64×576 vertical strips, 9 frames of 64×64,
-  strict per-mob palette (black + 2 spec accents), binary alpha chosen
-  as a sprite style — note AA/blur is only *forbidden* for UI, so this
-  palette is a stylistic option, not a compliance requirement.
+- `sl_scary_*_strip.png`: 256×768 vertical strips, 3 frames of 256×256,
+  AI-generated boxman-style neon art; each file 150-250 KB (limit is
+  1 MB/asset). Per-frame centring normalised (cx 127-128, identical
+  frame heights). Containment frame 3 is currently a lurch out-and-back
+  (frames f0-f1-f0) until the queue regenerates a dedicated return
+  frame (`weapons_hires_plan.md` carries the TODO).
 - Clothing (`character_tool_*`) and `sl_boxman_neon.png` reverted to
   master originals (byte-identical).

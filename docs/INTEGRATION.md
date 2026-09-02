@@ -1,6 +1,20 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-02 (rev 9)
+**Date:** 2026-09-03 (rev 10)
+**Rev 10 adds (owner direction 2026-09-03):** mobs regenerated at
+**256px frames — 3 frames of animation per sheet** (was 64×64 × 9),
+in the **boxman neon wire-glow style**. The style reference render
+(`docs/art_baseline/boxman_style_render.png`) is produced from the
+actual `SimpleOutlinedBoxman.glb` + its 2×2 material by the committed
+`pipeline/render_boxman_ref.py` (software render — no engine in this
+sandbox). New sheets are 256×768 (3×256 cells), ~150-250 KB each;
+`pipeline/process_sprite.py` (new) keys/grooms AI sticker frames and
+stacks them vertically; all alive states replay the one 3-frame loop at
+different speeds, death freezes; loot icons now `^[verticalframe:3:0`.
+Weapons hi-res textures (owner): **queued** — the AI-image budget is 10
+images/turn and the mob set used it; `docs/art_baseline/weapons_hires_plan.md`
+categories the 37 files (16 item icons + 7 node faces + 2 pad rings +
+3 decals via AI; 9 effects procedural).
 **Rev 9 (correction of rev 8):** the owner art-gate rulings, re-read
 correctly on 2026-09-02: "no blur/AA" is a **UI-only** rule; other
 surfaces (nodes, mobs, craftitems, world) keep normal rendering and may
@@ -22,7 +36,7 @@ sprite-mob animation fix** (master bug: sprite visuals showed their whole
 vertical layout (16×144) via the new
 `mods/content/sl_scary/pipeline/transpose_sprite_strip.py`, entities use
 `spritediv {x=1,y=9}` + `object:set_sprite(...)`, and loot icons crop one
-frame with `[verticalframe:9:0`.
+frame with `^[verticalframe:9:0` (rev-D sheets later made it `^[verticalframe:3:0`, rev 10).
 **Rev 4 adds:** the map system and the MM-essence ruling (see §0.4).
 **Rev 5 adds:** the MM essence engine (the §13.3 ruling, shipped): node
 provenance, `groups.sl_essence_value` pricing on the craftable output defs, the
