@@ -72,6 +72,12 @@ No world data beyond it. This is the counterpart to the HUD's "identity-neutral"
 }
 ```
 
+- **A beacon cannot be damaged by its own team.** `match.beacon_a`/`beacon_b` HP are readouts
+  of an *enemy* or *monster/corrosion* action only — a player punching their own beacon is a
+  no-op (no self-damage, and no self-destruction reward for the traitor move). This keeps the
+  beacon the **one reliable read** of "who's with me" and removes the free self-objective
+  exit hatch. Own-team punch = nothing; the only ways to hurt a beacon you "should" defend are
+  a bounded sabotage charge or feeding info to the other side.
 - **World tags are observation threads, NOT people (§7i).** `contact-14a` is minted when a
   contact enters perception and **retired when it leaves.** A re-sighting after losing the
   line mints a **new** tag. The same operator seen twice is two tags unless the agent kept
