@@ -119,9 +119,29 @@ seen (×count), flags, phantoms. Settlements print on run close via
 # headless verification (mirrors CI's luajit runner)
 luajit tests/strand_test.lua
 ```
-In-game: `/sl_strand_start [seed]`, then `/sl_strand_act {}` with
-`read_tell/confide/observe/build/vote/choose/reveal`, `/sl_strand_status`,
+In-game: `/sl_strand_start [seed]`, then `/sl_strand_act <verb> [key=value ...]`
+with `read_tell/confide/observe/build/vote/choose/reveal`, `/sl_strand_status`,
 `/sl_strand_stop`.
+
+```
+/sl_strand_act read_tell
+/sl_strand_act build barricade pos=0,10,3
+/sl_strand_act vote yes
+/sl_strand_act choose path left
+```
+
+The legacy spelling `/sl_strand_act {type="vote",choice="yes"}` still parses,
+but **as text**: the brace form is flattened into the same key/value
+vocabulary and nothing in it is ever evaluated.
+
+> **Security (do not revert):** `/sl_strand_act` used to hand the whole
+> parameter string to `minetest.deserialize`, which is a Lua chunk evaluator.
+> Any player could send `(function() while true do end end)()` and freeze the
+> server thread -- `core.deserialize` sandboxes away the engine's globals, so
+> it was denial of service rather than code execution, but a hang is total.
+> `strand.parse_action` is now a tokenizer over a closed 7-verb vocabulary and
+> `minetest.deserialize` must never touch client text again;
+> `tests/security_test.lua` (CI) fails the build if it does.
 
 ## Reuse vs new
 
