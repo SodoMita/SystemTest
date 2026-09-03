@@ -48,6 +48,16 @@ local function current_line(player_name)
 end
 
 function M.show(player_name)
+  -- Belt and braces behind the on_leaveplayer cleanup: a chain that outlives
+  -- its player is pure waste (it prints to nobody and re-arms a timer forever
+  -- if the scene loops), so the first sign that the name is gone ends it.
+  if not minetest.get_player_by_name(player_name) then
+    M.cleanup(player_name)
+    if dialogue and dialogue.dialogue and dialogue.dialogue.stop_for_player then
+      dialogue.dialogue.stop_for_player(player_name)
+    end
+    return
+  end
   local ln = current_line(player_name)
   if not ln then return end
   print_line(player_name, ln)
@@ -89,6 +99,9 @@ function M.cleanup(player_name)
   if not S then return end
   if S.timer then S.timer:cancel(); S.timer=nil end
   if S.sound_handle then minetest.sound_stop(S.sound_handle); S.sound_handle=nil end
+  -- Free the entry too: cancelling without dropping it keeps one table per
+  -- player who ever spoke, which is the leak the cleanup exists to stop.
+  state[player_name] = nil
 end
 
 return M
