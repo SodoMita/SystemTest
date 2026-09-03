@@ -240,6 +240,124 @@ check(not gm.is_possessed({ x = 14, y = 10, z = 10 }), "second punch exorcised t
 check((state.players.alpha.possession_ready_at or 0) > H.now(),
 	"exorcism applied the re-possession cooldown penalty")
 
+section("PHASE 10c — THE WHISPER: evil-ghost body possession + one lie-channel")
+-- alpha is an evil ghost; beta is a living beacon-team player. The ghost
+-- possesses beta's BODY (not a node), then spends its ONE whisper.
+-- alpha.possession_ready_at may be in the future after the exorcism in
+-- 10b, so let the clock advance past it first.
+H.advance(120, 0.5)
+local beta_before_possess = H.chat_player.beta or {}
+local poss_ok, poss_err = gm.possess_player("alpha", "beta")
+check(poss_ok == true, "evil ghost possesses a living body" .. (poss_ok and "" or (" -> " .. tostring(poss_err))))
+check(state.players.alpha.possession_pos == "betrayal:alpha", "body possession occupies the ghost's one-slot")
+check((state.betrayal or {}).alpha ~= nil, "betrayal registry tracks the vessel")
+check((state.betrayal or {}).alpha.vessel == "beta", "vessel recorded as beta")
+
+-- The ghost cannot possess a second body while holding one.
+local dup_ok, dup_err = gm.possess_player("alpha", "gamma")
+check(dup_ok == false, "already-carrying ghost is refused a second body")
+check(tostring(dup_err):find("already carry one body") ~= nil, "refusal names the limiter")
+
+-- The vessel is NOT told they are possessed (identity-neutral dread).
+local told = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("possessed") or line:find("in you") then told = true end
+end
+check(not told, "vessel is not informed of the possession (GDD:106 intact)")
+
+-- Ghost whispers once: redacted sender to target, echo to vessel.
+local whis_ok, whis_err = gm.ghost_whisper("alpha", "gamma", "trust me, i saw alpha vent")
+check(whis_ok == true, "one whisper succeeds" .. (whis_ok and "" or (" -> " .. tostring(whis_err))))
+local target_saw = false
+for _, line in ipairs(H.chat_player.gamma or {}) do
+	-- plain=true so SEALED_SOURCE is treated as literal text, never a pattern.
+	if line:find("SEALED_SOURCE", 1, true) and line:find("saw alpha vent", 1, true) then target_saw = true end
+end
+check(target_saw, "target received the redacted whisper (no clean sender tag)")
+local vessel_echo = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("your body says") then vessel_echo = true end
+end
+check(vessel_echo, "vessel heard the whisper (complicit, not a puppet)")
+
+-- ONE whisper per possession: the second is spent.
+local whis2_ok, whis2_err = gm.ghost_whisper("alpha", "gamma", "again")
+check(whis2_ok == false, "second whisper refused")
+check(tostring(whis2_err):find("already carried") ~= nil, "one-voice budget enforced")
+
+-- Exorcism: living player punches the VESSEL (beta) twice to drive it out.
+local self_ok = H.fire_punchplayer(beta, beta, 1.0, nil, nil, 5)
+check(self_ok == false, "vessel cannot exorcise itself (returned non-cancel? see below)")
+-- The handler returns nil (does not cancel) but must NOT release on self-punch.
+check((state.betrayal or {}).alpha ~= nil, "self-punch does not release the possession")
+-- Now gamma (another living player) punches beta twice.
+gamma:set_pos(beta:get_pos())
+H.fire_punchplayer(beta, gamma, 1.0, nil, nil, 5)
+check((state.betrayal or {}).alpha ~= nil, "first punch resists (2-hit exorcism)")
+H.fire_punchplayer(beta, gamma, 1.0, nil, nil, 5)
+check((state.betrayal or {}).alpha == nil, "second punch exorcised the body possession")
+check((state.players.alpha.possession_ready_at or 0) > H.now(),
+	"body exorcism applies the re-possession cooldown penalty")
+
+-- Behind the ghost: the exorcised vessel is free to act, ghost keeps nothing.
+local freed = false
+for _, line in ipairs(H.chat_player.beta or {}) do
+	if line:find("It was in you the whole time", 1, true) then freed = true end
+end
+check(freed, "vessel released with the horror of having been a vessel")
+
+section("PHASE 10d — THE WHISPER is an EVENT, not a command (focus triggers the formspec)")
+-- Requ're: the /sl_whisper_ghost command must NOT exist (it was a leak
+-- surface for a sealed channel; Carmack's catch).
+check(minetest.registered_chatcommands["sl_whisper_ghost"] == nil,
+	"no /sl_whisper_ghost chatcommand (leak surface removed)")
+check(gm.ghost_whisper ~= nil, "ghost_whisper API still exposed for the event path")
+
+-- Re-possess alpha into beta's body (the exorcism above cleared it; the
+-- ready-at penalty may still be counting, so advance the clock).
+H.advance(120, 0.5)
+local po2, pe2 = gm.possess_player("alpha", "beta")
+check(po2 == true, "re-possess for the event-drive test" .. (po2 and "" or (" -> " .. tostring(pe2))))
+
+-- Jax bound #4: the leap leaves a mark in the world (person unreadable,
+-- event becomes evidence). Node-only, no entity.
+local marks_before = #(state.leap_marks or {})
+check(marks_before >= 1, "the leap left a world trace node (jax's bound #4)")
+local bpos = vector.round(beta:get_pos())
+check(minetest.get_node(bpos).name == "sl_modebase:leap_mark",
+	"leap mark node is at the vessel's position")
+check(state.leap_marks[marks_before].x == bpos.x and state.leap_marks[marks_before].z == bpos.z,
+	"leap mark recorded for the match-end sweep")
+
+-- A ghost wearing a body aims the possession focus at a LIVING player and
+-- uses it -> the whisper formspec (an EVENT) opens, no command typed.
+local focus2 = minetest.registered_tools["sl_modebase:possession_focus"]
+check(focus2 ~= nil and focus2.on_use ~= nil, "possession focus tool present")
+local fs_before = #(H.formspecs.alpha or {})
+local st = ItemStack("sl_modebase:possession_focus")
+focus2.on_use(st, alpha, { type = "object", ref = gamma })
+local fs_after = #(H.formspecs.alpha or {})
+check(fs_after == fs_before + 1, "focus-on-living-player opens the whisper formspec (event, not command)")
+check((H.formspecs.alpha[fs_after] or {}).formname == "sl_modebase:whisper:gamma",
+	"whisper formspec targets the living player")
+
+-- Submitting the formspec spends the ONE voice through the live path.
+local wok, werr = gm.ghost_whisper("alpha", "gamma", "trust me, i saw alpha vent")
+check(wok == true, "event path spends the voice" .. (wok and "" or (" -> " .. tostring(werr))))
+local target_saw2 = false
+for _, line in ipairs(H.chat_player.gamma or {}) do
+	if line:find("SEALED_SOURCE", 1, true) and line:find("saw alpha vent", 1, true) then target_saw2 = true end
+end
+check(target_saw2, "whisper landed on the target via the event path")
+check((state.betrayal.alpha or {}).whispers >= 1, "one voice spent in the registry")
+
+-- Clearing for the rest of the suite: drop the re-possession.
+gm.clear_all_betrayal()
+check(state.betrayal.alpha == nil, "betrayal cleared for the reset phase")
+check(#(state.leap_marks or {}) == 0, "leap marks swept by the match-end clear (node-only evidence)")
+check(minetest.get_node(bpos).name ~= "sl_modebase:leap_mark",
+	"mark node removed from the world, not left to leak a match")
+
 section("PHASE 11 — match timer, result screen, lobby reset")
 state.settings.match_duration = 5
 state.match_started_at = H.now() - 4 -- backdate so the timer expires within 2 s
