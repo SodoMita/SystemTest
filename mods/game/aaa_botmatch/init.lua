@@ -407,9 +407,31 @@ end
 -- live_spawn=true spawns the body immediately (so the admin can see
 -- them in the lobby before the next match); false just records the
 -- preference for the next spawn_bots() call.
+-- SECURITY: a bot name is game-generated, so it never passed through the
+-- engine's connect-time name validation (src/player.h: PLAYERNAME_SIZE = 20,
+-- PLAYERNAME_ALLOWED_CHARS = a-zA-Z0-9-_). It is then rendered into formspecs
+-- that EVERY player can open -- and the matchmaking roster built it into a
+-- `textlist` unescaped, so a name like `x];label[0,0;SERVER WIPE IN 5 MIN`
+-- closed the element and injected a label into every viewer's form (verified:
+-- the injected element appeared verbatim in the form sent to a player with no
+-- privileges). Holding bot names to the same charset and length the engine
+-- holds real player names to means a bot can never carry a character a player
+-- name cannot, which closes the class rather than the one instance.
+local BOTNAME_ALLOWED = "^[%w_%-]+$"
+local BOTNAME_MAX = 20
+
+function botmatch.is_valid_bot_name(name)
+	return type(name) == "string" and #name > 0 and #name <= BOTNAME_MAX
+		and name:match(BOTNAME_ALLOWED) ~= nil
+end
+
 function botmatch.add_bot(name, team, live_spawn)
 	if type(name) ~= "string" or name == "" then
 		return false, "name must be a non-empty string"
+	end
+	if not botmatch.is_valid_bot_name(name) then
+		return false, "name must be 1-" .. BOTNAME_MAX
+			.. " characters of a-z A-Z 0-9 - _ (same rules as a player name)"
 	end
 	if not POOL_VALID_TEAMS[team] then
 		return false, "team must be beacon_a or beacon_b"
