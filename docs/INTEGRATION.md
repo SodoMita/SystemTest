@@ -228,7 +228,7 @@ here is a history merge across roots.
 | `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors; map RNG pinned for a deterministic bot stream) |
 | `luajit tests/essence_test.lua` | 69/69 (rev 5: provenance, pricing, pool reset, +3 core craft — now routed through the Forge, ambient hazard thresholds, scoreboard untouched, readouts) |
 | `luajit tests/objective_loop_test.lua` | 128/128 (rev 6: forge anchor + materialization, salvage veins on **both** the test and procedural arenas, inventory refuses every placeable, single-job/time-gated/loud forge runs, refine + core assembly, +3 essence on the core, delivery refusals, winning delivery, reset, forfeit, access control, `/sl_test_objective` performs the chain, hardening regressions, the Core survives death, output spill, stations as forge outputs) |
-| sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 37 textures are 16×16 solid-colour placeholders (art baseline still deferred) |
+| sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 16 of 37 textures are hi-res 256×256 neon-flat icons (rev H: pistol…targeting_log); the rest are still 16×16 placeholders (batches B–E queued in `docs/art_baseline/weapons_hires_plan.md`) |
 
 CI runs the new suites: `agent-mail` workflow (lint + unit tests) and the `soak`
 workflow now gates smoke, strand, weapons, the stub turbo soak and the live-engine

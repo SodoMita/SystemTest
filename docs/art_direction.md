@@ -89,6 +89,13 @@ all < 1 MB). Preview: `docs/art_baseline/cs_mobs_v5_revF.png`.
 Wraith needed one regen after the model collapsed its grid to 2 rows
 (ask for a square image). Waiting on the owner eyeball gate.
 
+Rev H (2026-09-03): the same realistic→neonize workflow applied to the
+sl_weapons **batch A inventory icons** (16 files) via
+`weapon_icons.py` (per-item palettes in `ICON_STYLES`; two 3×3 grids +
+white twins = 4 AI calls). Icons are 256×256 transparent RGBA,
+18–53 KB each. Preview: `docs/art_baseline/cs_weapons_v1.png`.
+Palette tweaks need no regeneration.
+
 Per-mob palette used by the neonize stage (`matte_sheet.py` MOB_STYLE):
 dredger amber rim + green feature accents; wraith cyan rim + ice;
 containment amber rim + ember. All fills are near-black single colours.

@@ -335,7 +335,13 @@ def compose_cell(brows, wrows, bK, bW, dx, dy, style, out_row):
                     if av > 0.55:
                         sat = _sat(*bq)
                         LB = 0.2126 * bq[0] + 0.7152 * bq[1] + 0.0722 * bq[2]
-                        if sat >= SAT_FEATURE or LB >= LUM_FEATURE:
+                        # Feature = saturated colour (eyes/visor/maw/neon
+                        # bits). Neutral-bright pixels (studio highlights,
+                        # light metal, white-hot blades) are NOT features:
+                        # recolouring them would break the single-flat-fill
+                        # look. Only ~pure-white cores (LB > 250) pass so a
+                        # white-hot edge still reads as a glint accent.
+                        if sat >= SAT_FEATURE or LB >= 250:
                             c = _nearest_accent(*bq, accents)
                         else:
                             c = fill
