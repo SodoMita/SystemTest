@@ -751,8 +751,10 @@ minetest.register_node("sl_scary:hide_spot", {
 --   Row 0 (y 0-256):     FRONT view    (idle turn pose 1)
 --   Row 1 (y 256-512):   BACK view     (idle turn pose 2)
 --   Row 2 (y 512-768):   SIDE view     (idle turn pose 3)
---   Rows 3-5 (y 768-1536): walk cycle  (3 frames)
---   Rows 6-7 (y 1536-2048): attack     (2 frames)
+--   Rows 3-5 (y 768-1536): walk cycle  (3 frames, FRONT-facing advance
+--                        — camera-facing billboard like Doom, so not a
+--                        sidescroller side-profile)
+--   Rows 6-7 (y 1536-2048): attack     (2 frames, FRONT-facing)
 --   Row 8 (y 2048-2304): death         (1 frame)
 --
 -- Luanti plays `sprite` visuals through `object:set_sprite(...)`, and the
@@ -763,10 +765,17 @@ minetest.register_node("sl_scary:hide_spot", {
 --
 -- State mapping: idle slowly cycles FRONT→BACK→SIDE (a scanning turn);
 -- chase uses the walk cycle; close combat the 2-frame attack; on death
--- the entity freezes on the death frame.  Art is AI-generated in the
--- boxman wire-glow style (reference render
--- docs/art_baseline/boxman_style_render.png), assembled per sheet by
--- mods/content/sl_scary/pipeline/build_mob_sheet.py.
+-- the entity freezes on the death frame.
+--
+-- Art direction (owner 2026-09-03): realistic dark-horror silhouette,
+-- NOT cartoon; body interior is a single flat colour; bright neon rim +
+-- scary effects keep the mob readable; Doom-style usage (the sprite
+-- always faces the camera via billboard, so even the walk rows are
+-- drawn FRONT-facing — not sidescroller side-profiles). Sheets are
+-- produced by matte_sheet.py: every pose is rendered twice on a black
+-- and a white grid, the cells are sliced and alpha-solved from the two
+-- backgrounds (triangulation, per GENERATED_ASSETS.md), then stacked
+-- vertically into this 9-row strip.
 
 local sprite_animations = {
     idle   = {row = 0, frames = 3, framelength = 0.45},  -- slow turn

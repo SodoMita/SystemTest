@@ -1,15 +1,28 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-03 (rev 11)
-**Rev 11 (owner correction of rev 10):** mob sheets are **9 frames each
-— FRONT, BACK, SIDE, WALK×3, ATTACK×2, DEATH** (256×2304 vertical,
-`spritediv {x=1,y=9}`) — not the rev-10 3-frame loops. `init.lua` maps
-idle→front/back/side turn, chase→walk cycle, melee→2-frame attack,
-death→freeze; loot icons `^[verticalframe:9:0`. `pipeline/build_mob_sheet.py`
-slices multi-panel AI art, keys it, normalises 256px cells and stacks
-the rows. Files: dredger 434 KB, wraith 391 KB, containment 498 KB (< 1
-MB cap). Containment ATTACK×2/DEATH rows are interim (lurch-pose
-reuse) until the next art batch replaces them. Style reference stays
+**Date:** 2026-09-03 (rev 12)
+**Rev 12 (owner art-direction correction of rev 11):** the mob sheets
+keep the **9-frame layout — FRONT, BACK, SIDE, WALK×3, ATTACK×2,
+DEATH** (256×2304 vertical, `spritediv {x=1,y=9}`) — but the art style
+is reworked. New direction: **realistic dark-horror silhouette — NOT
+cartoon** (explicitly negate everything 2D-stylized/cartoon), **body
+fill is one single flat colour**, **bright neon rim + scary effects
+kept** ("keep neon"). Mobs are camera-facing billboards — **used like a
+Doom monster, not a sidescroller** — so WALK and ATTACK rows are
+drawn **FRONT-facing** (not side-profile locomotion). Sheets are built
+by `pipeline/matte_sheet.py` with the **two-background alpha
+triangulation** (black-grid + white-grid renders per pose; the white
+twin keeps pure-black gutters/border; alpha solved per cell from both
+backgrounds; an optional bottom text-verdict strip such as WALKOK /
+WALKRETRY sits outside the detected outer border and is cropped out).
+This supersedes the boxman wire-glow style reference and the white-key
+`build_mob_sheet.py` workflow.
+**Rev 11 (owner correction of rev 10, superseded by rev 12):** mob
+sheets are **9 frames each — FRONT, BACK, SIDE, WALK×3, ATTACK×2,
+DEATH** (256×2304 vertical, `spritediv {x=1,y=9}`) — not the rev-10
+3-frame loops. `init.lua` maps idle→front/back/side turn, chase→walk
+cycle, melee→2-frame attack, death→freeze; loot icons
+`^[verticalframe:9:0`. Style reference stayed
 `docs/art_baseline/boxman_style_render.png`; preview `cs_mobs_v4.png`.
 **Rev 10 (superseded by rev 11):** mobs were 256px 3-frame loops.
 **Rev 9 (correction of rev 8):****Rev 9 (correction of rev 8):** the owner art-gate rulings, re-read

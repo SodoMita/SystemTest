@@ -35,6 +35,19 @@ broken strips, so the fix ships here regardless (see §7).
 > vertical, `spritediv {x=1,y=9}`), not a 3-frame loop. The old 3-frame
 > sheets were replaced. Weapon textures remain queued (AI budget:
 > `docs/art_baseline/weapons_hires_plan.md`).
+> **Rev F (2026-09-03, owner art-direction correction):** the boxman
+> wire-glow style is **superseded** for mob art. New direction:
+> **realistic dark-horror silhouette, NOT cartoon** (prompts must negate
+> everything 2D-stylized/cartoon); body interior is **one single flat
+> colour**; **bright neon rim + scary effects kept** ("keep neon"). Mobs
+> are camera-facing billboards — **used like a Doom monster, not a
+> sidescroller** — so the WALK×3 and ATTACK×2 rows are **FRONT-facing**,
+> not sidescroller side-profiles. Sheet assembly moved from the white-key
+> `build_mob_sheet.py` to **two-background alpha triangulation** in
+> `matte_sheet.py`: black + white 3×3 grids per mob (white twin keeps
+> pure-black gutters/border), border-aware slicing, per-cell alpha solve;
+> an optional bottom text-verdict strip (WALKOK/WALKRETRY) is cropped
+> out. See `mods/content/sl_scary/pipeline/README.md`.
 
 ---
 

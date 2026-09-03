@@ -6,7 +6,7 @@ safe (no UV mapping; owner art gate 2026-09-02: the no-blur/no-AA rule
 is UI-only and 3D-model textures are not AI-swappable — sprites are
 neither).
 
-## Layout: 9-frame sheets, VERTICAL
+## Layout: 9-frame sheets, VERTICAL, Doom-style FRONT-facing
 
 Owner layout (2026-09-03): each sheet carries **FRONT, BACK, SIDE,
 WALK×3, ATTACK×2, DEATH** = 9 frames of 256×256, stacked vertically to
@@ -19,6 +19,11 @@ WALK×3, ATTACK×2, DEATH** = 9 frames of 256×256, stacked vertically to
 - rows 6-7 ATTACK pair
 - row 8 DEATH
 
+The mob is a camera-facing billboard (**used like a Doom monster, NOT a
+sidescroller**): even the WALK rows and ATTACK rows are drawn
+**FRONT-facing** — the creature advances/lunges toward the camera.
+Do not generate sidescroller side-profile locomotion frames.
+
 Luanti plays `sprite` visuals with `object:set_sprite(...)`, iterating
 frames along the frame **y** position (`lua_api.md` -> `set_sprite`;
 engine `content_cao.cpp`: "Animation goes downwards"). The strip is
@@ -30,32 +35,59 @@ cycles FRONT→BACK→SIDE (a scanning turn), chase plays the walk cycle,
 close combat the 2-frame attack, death freezes on the last frame. Loot
 icons crop the front frame with `^[verticalframe:9:0`.
 
-## Regenerating the art
+## Art direction (owner 2026-09-03, supersedes the boxman style)
 
-1. Generate the poses as AI sticker art (plain near-white background,
-   style = `docs/art_baseline/boxman_style_render.png`: dark tinted
-   boxy panels + neon rim; per-mob palettes in `GENERATED_ASSETS.md`).
-   Frame 0 can be reused from an earlier sheet; generate BACK+SIDE as a
-   2-panel image and WALK×3 / ATTACK×2 as multi-panel images (the
-   builder slices panels on the white gaps).
-2. `python3 pipeline/build_mob_sheet.py OUT_SHEET PREVIEW SRC[:PANELS]x9`
-   — e.g.
-   `python3 pipeline/build_mob_sheet.py \
-       ../textures/sl_scary_X_strip.png /tmp/row0.png \
-       front.png:1 back_side.png:2 walk3.png:3 atk2.png:2 death.png:1`
-   Each source's panels are white-keyed, halo-cleaned, trimmed and
-   normalised into 256px cells, then stacked vertically in row order.
-3. Keep the row order — `sprite_animations` and the `^[verticalframe:9:0`
+- **Realistic, dark-horror, NOT cartoon.** Ask explicitly to negate
+  everything 2D-stylized/cartoon related (no cel shading, no outlines,
+  no exaggerated proportions, no clean comic silhouettes, no sticker
+  look).
+- **Body interior = one single flat colour** per mob (near-black fills,
+  listed in `matte_sheet.py` `FILL`). Effects (rim light, glows, data
+  shards, fog/blood spatter) are kept.
+- **Bright neon rim + scary effects are KEPT** (owner: "keep neon") so
+  the dark silhouette reads in-game. Per-mob rim/eye colours in
+  `GENERATED_ASSETS.md`.
+- Never put black text or borders inside the art; no watermark.
+- Per-mob generation prompts must describe an **actual creature**, not a
+  wireframe/box figure.
+
+## Regenerating the art (two-background alpha triangulation)
+
+1. Generate a **3×3 black grid** per mob. Cell backgrounds: one flat
+   very dark near-black (#0D0D0F) — pure #000000 makes the model lighten
+   the canvas. Grid lines + outer border: pure black. Strict framing,
+   exact poses per row (FRONT/BACK/SIDE / WALK×3 / ATTACK×2 / DEATH —
+   all FRONT-facing except the labelled BACK/SIDE idle poses).
+2. Generate the **white twin** from the black grid as reference:
+   "only the cell interiors flip to white; grid lines and border stay
+   pure black". Verify per-cell stats before matting.
+3. Optionally ask the generator for a bottom margin strip with a
+   **text verdict** (e.g. `WALKOK` / `WALKRETRY`, or a longer
+   self-critique of the realism/readability). It sits below the outer
+   border; `matte_sheet.py` detects the border and never crops that
+   strip into a cell.
+4. `python3 matte_sheet.py BLACK_GRID WHITE_GRID OUT_SHEET MOB`
+   — white twin is the layout authority (its cell interiors are near
+   white so only the grid lines are black); cells are sliced inside the
+   outer border; per cell the alpha is solved by triangulation from the
+   two backgrounds, RGB taken from the black render, dark interiors
+   flattened to the single fill colour; each cell normalised to 256×256
+   and stacked vertically.
+5. Keep the row order — `sprite_animations` and the `^[verticalframe:9:0`
    loot icons assume it. Verify file size < 1 MB/asset.
 
 ## Scripts
 
-- `build_mob_sheet.py` — panel slicing + keying + 9-row vertical sheet.
+- `matte_sheet.py` — the current builder: 3×3 grid slicing (border-aware
+  on the white twin), per-cell two-background alpha triangulation,
+  single-colour flatten, normalisation, 9-row vertical stack.
+- `build_mob_sheet.py` — **superseded** white-key panel builder; kept
+  only for reference/history. Do not use for new art.
 - `process_sprite.py` — white-key + halo cleanup + 256px cell
-  normalisation (used per frame; kept for the single-frame case).
+  normalisation (kept for the single-frame case).
 - `transpose_sprite_strip.py` — stdlib PNG read/write; shared reader.
-- `render_boxman_ref.py` — software render of `SimpleOutlinedBoxman.glb`
-  (geometry + animation pose + material texture sampling + neon rim)
-  that produced the style reference `docs/art_baseline/boxman_style_render.png`.
+- `render_boxman_ref.py` — historical software render of the old
+  `SimpleOutlinedBoxman.glb` boxman style reference. **Not used** for
+  the current rev F art (boxman style is superseded).
 - `reink_mobs.py` — **removed.** It belonged to the superseded 16px
   re-ink stage (rev C). History: commit `c819070`.

@@ -7,10 +7,11 @@ nothing to cherry-pick; this is a fresh art task. The image generator's
 budget is 10 images/turn; the three mob sheets consumed turn 1, so the
 remaining work below is queued for the following turns.
 
-Style: same **boxman neon wire-glow** visual language as the mobs
-(`docs/art_baseline/boxman_style_render.png`): near-black/very dark
-metallic bodies, thin bright neon rims, flat graphic shading, glow in
-weapon-accent colors. Follow the existing weapon names/lore in
+Style: **realistic dark-horror item art, NOT cartoon** — matching the
+current mob art direction (owner 2026-09-03; supersedes the earlier
+"boxman neon wire-glow" note): near-black/very dark bodies, thin bright
+neon rims kept, glow in weapon-accent colors, single flat body fill.
+Follow the existing weapon names/lore in
 `mods/game/sl_weapons/weapons.lua` (Pulsar Pistol, Chatter SMG, Riot
 Scatter, Arc Lance, Fusion Mortar, Pulse Driver, Neon Six, Neon
 Repeater, Severance blade; 4 ammo caches). Accent palette used by the
