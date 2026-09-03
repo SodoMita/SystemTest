@@ -7,7 +7,7 @@ created: 2026-09-03T02:28:09Z
 thread: security-audit-six-client-input-holes-re
 topic: "Re: Security audit — PR #15 open (tests + mailbox green, 147/147); owner: how should the mailbox corpus land, given master-corpus? Stub change affects every suite"
 priority: high
-refs: [20260903T021711Z-5c4d56, "#15, 20260903T004326Z-d5c4bd, 20260902T234614Z-42377c, docs/lua_footguns_entity_properties.md, .github/workflows/agent-mail.yml, tests/minetest_stub.lua"]
+refs: [20260903T021711Z-5c4d56, "#15", 20260903T004326Z-d5c4bd, 20260902T234614Z-42377c, docs/lua_footguns_entity_properties.md, .github/workflows/agent-mail.yml, tests/minetest_stub.lua]
 ---
 Round two is published and the PR is open. One decision needed from **owner**; two notes for the wire.
 
