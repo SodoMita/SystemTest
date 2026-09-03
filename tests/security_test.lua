@@ -48,6 +48,12 @@ local modpaths = {
 	sl_strand = "mods/game/sl_strand",
 	player_api = "mods/player_api",
 	sl_characters = "mods/content/sl_characters",
+	-- Loaded by the round-2 phases themselves (S8, S10, S13), so that their
+	-- global steps do not run under phases that do not test them.
+	dialogue = "mods/content/dialogue",
+	aaa_botmatch = "mods/game/aaa_botmatch",
+	aaa_botmatch_fake = "mods/game/aaa_botmatch",
+	sl_scary = "mods/content/sl_scary",
 }
 function minetest.get_modpath(name)
 	return modpaths[name] or "mods/game/sl_modebase"
@@ -624,7 +630,399 @@ check(client_chat("mallory", "givestatpoints", "100") == false,
 	"and a priv-less client cannot reach /givestatpoints at all")
 
 -- ================================================================
-section("PHASE S7 — tree-wide audit: the two patterns that keep reopening")
+section("PHASE S8 — a roster name is client text: engine charset, then escaped")
+-- ================================================================
+-- Bot names arrive from an admin's formspec field -- i.e. from a client -- and
+-- are then rendered into EVERY viewer's matchmaking form. A textlist entry is
+-- closed by `]` and its items are separated by `,`, so a single `]` inside a
+-- name ends the entry and the rest of the string becomes formspec that the
+-- viewer's client parses: a label, a button, a field. Anything an admin (or
+-- anyone who can forge that admin's packet) wants.
+-- Two independent gates, because either one alone is a single point of
+-- failure: the name must satisfy the engine's own player-name rules
+-- (src/player.h: PLAYERNAME_SIZE 20, PLAYERNAME_ALLOWED_CHARS a-zA-Z0-9-_,
+-- enforced at connect with a WRONG_CHARS deny), and the renderer must escape
+-- it anyway.
+minetest.settings:set("sl_botmatch.enabled", true)
+minetest.settings:set("sl_botmatch.mob_mode", true)
+minetest.settings:set("sl_botmatch.bots", "0")
+local botmatch_ok = load("aaa_botmatch", "mods/game/aaa_botmatch/init.lua")
+local botmatch = rawget(_G, "botmatch")
+if not (botmatch_ok and botmatch) then
+	print("  [SKIP] aaa_botmatch did not load: the bot-name gate cannot be exercised")
+else
+	-- Same neutralisation as tests/bot_pool_test.lua: no auto-run, no live mob
+	-- bodies. This phase tests the name gate, not the match simulator.
+	botmatch.config.bots = 0
+	botmatch.start_run = function() end
+	function botmatch.spawn_mob_body(name, bot)
+		botmatch.mobs = botmatch.mobs or {}
+		botmatch.mobs[name] = bot
+	end
+	botmatch.pool = {}
+	botmatch.bots = botmatch.bots or {}
+
+	-- 8a. The charset gate. These are the engine's rules, not new ones: a bot
+	--     name that a player could never have is a name with no business in a
+	--     roster that is rendered next to real player names.
+	-- Called through a guard: if the gate is ever removed the phase must FAIL,
+	-- not abort the suite on a nil call.
+	local valid_name = type(botmatch.is_valid_bot_name) == "function"
+		and botmatch.is_valid_bot_name or nil
+	check(valid_name ~= nil, "botmatch publishes a name gate (the rule has to live somewhere)")
+	check(valid_name and valid_name("Crew_3-a") == true,
+		"a name a player could have is a valid bot name")
+	check(valid_name and valid_name("x];label[0,0;SERVER WIPE") == false,
+		"a formspec payload is not a valid bot name")
+	check(valid_name and valid_name(string.rep("a", 21)) == false,
+		"a name longer than PLAYERNAME_SIZE (20) is refused")
+	check(valid_name and valid_name("") == false, "an empty name is refused")
+	check(valid_name and valid_name(nil) == false, "a missing name is refused")
+	check(valid_name and valid_name("sp ace") == false, "a name with a space is refused")
+
+	-- 8b. The door: an admin's bot_add field is still client text, and the
+	--     empty-formname path means any client can forge the packet.
+	local PAYLOAD = "x];label[0,0;SERVER WIPE IN 5 MIN - TRADE NOW"
+	client_fields("alpha", "", {
+		bot_add = "true", bot_add_name = PAYLOAD, bot_add_team = "beacon_a",
+	})
+	local accepted = false
+	for _, entry in ipairs(botmatch.pool or {}) do
+		if entry.name == PAYLOAD then accepted = true end
+	end
+	check(not accepted, "add_bot refuses a name the engine would never let a player use")
+	local ok_add = botmatch.add_bot("Crew_3-a", "beacon_a", false)
+	check(ok_add ~= false and #botmatch.pool == 1,
+		"... and still accepts a conforming name (the gate is a gate, not a wall)")
+
+	-- 8c. Defence in depth: even a payload that somehow reached the roster must
+	--     arrive at a viewer's client as text, not as formspec elements. The
+	--     roster panel is rendered for admins (mob mode), so the admin's form
+	--     is the one that has to be inert -- and a priv-less client, which can
+	--     open the same form by design, must not see raw markup either.
+	botmatch.pool[#botmatch.pool + 1] = { name = PAYLOAD, team = "beacon_a" }
+	check(botmatch.config.mob_mode == true, "the harness is in mob mode (the roster renders)")
+
+	client_chat("alpha", "sl_matchmaking")
+	local aforms = H.formspecs.alpha or {}
+	local aform = aforms[#aforms] and aforms[#aforms].form or ""
+	check(aform:find("bot_pool;", 1, true) ~= nil,
+		"the admin's matchmaking form carries the bot roster")
+	check(aform:find("label[0,0;SERVER WIPE", 1, true) == nil,
+		"the payload reaches the admin's client escaped, never as raw formspec")
+	check(aform:find("SERVER WIPE", 1, true) ~= nil,
+		"... it is still readable as text (the roster is not censored)")
+	check(aform:find("Crew_3-a", 1, true) ~= nil,
+		"and a legitimate bot name still renders")
+
+	client_chat("mallory", "sl_matchmaking") -- open by design: read-only opener
+	local forms = H.formspecs.mallory or {}
+	local form = forms[#forms] and forms[#forms].form or ""
+	check(form ~= "", "a priv-less client can open the matchmaking form")
+	check(form:find("label[0,0;SERVER WIPE", 1, true) == nil,
+		"and no viewer, privileged or not, is sent the payload unescaped")
+
+	botmatch.pool = {}
+end
+
+-- ================================================================
+section("PHASE S9 — a strand run belongs to the player who started it")
+-- ================================================================
+-- /sl_strand_* is deliberately open (a single-player side activity needs no
+-- privilege), which is exactly why the run needs an owner: `strand.run` and
+-- `strand.active_player` are single global slots and the ledger is shared,
+-- persistent state. Before the fix any connected client could vote on, steer,
+-- read or abort somebody else's run -- and a forged /sl_strand_stop destroyed
+-- a run in progress and wrote its outcome into the ledger for everyone.
+if not strand then
+	print("  [SKIP] sl_strand did not load")
+else
+	strand.stop_solo()
+	local ledger0 = strand.ledger_summary()
+	local started = client_chat("beta", "sl_strand_start", "12345")
+	check(started ~= false and strand.active_player == "beta",
+		"beta starts a run and owns it")
+	-- Guarded for the same reason: a removed ownership test must fail the phase.
+	local function owner_is(who)
+		return type(strand.is_run_owner) == "function" and strand.is_run_owner(who) == true
+	end
+	check(type(strand.is_run_owner) == "function", "strand publishes an ownership test")
+	check(owner_is("beta"), "the owner is recognised as the owner")
+	check(not owner_is("mallory"), "another player is not")
+
+	local ok_act, why_act = client_chat("mallory", "sl_strand_act", "choose path=left")
+	check(ok_act == false, "a non-owner cannot steer somebody else's run ("
+		.. tostring(why_act) .. ")")
+	local ok_vote = client_chat("mallory", "sl_strand_act",
+		"vote accused=Crew-3 player_vote=true")
+	check(ok_vote == false, "a non-owner cannot vote in somebody else's run")
+	check(strand.run ~= nil and strand.active_player == "beta",
+		"and the run survives both attempts")
+	check(client_chat("mallory", "sl_strand_stop") == false,
+		"a non-owner cannot abort somebody else's run")
+	check(client_chat("mallory", "sl_strand_status") == false,
+		"a non-owner cannot read somebody else's run state either")
+	check(strand.run ~= nil and strand.active_player == "beta", "the run is still beta's")
+
+	local ledger1 = strand.ledger_summary()
+	check(ledger1.score == ledger0.score and ledger1.debt == ledger0.debt
+		and ledger1.runs == ledger0.runs,
+		"the shared, persistent ledger is untouched by a non-owner")
+
+	-- The owner keeps full control, and an operator keeps the override (they
+	-- run matches: a stuck run has to be clearable without the player).
+	check(client_chat("beta", "sl_strand_status") ~= false, "the owner can read their own run")
+	check(owner_is("alpha"),
+		"an sl_admin is an owner of last resort (operators clear stuck runs)")
+	check(client_chat("beta", "sl_strand_stop") ~= false or strand.active_player == nil,
+		"the owner can stop their own run")
+	check(strand.active_player == nil, "ownership is released when the run ends")
+	check(client_chat("mallory", "sl_strand_start", "777") ~= false,
+		"and the slot is free for the next player")
+	strand.stop_solo()
+	check(strand.active_player == nil, "clean slate for the phases that follow")
+end
+
+-- ================================================================
+section("PHASE S10 — a client that disconnects must not leave work running")
+-- ================================================================
+-- Disconnecting is free, instant and repeatable, so everything keyed by player
+-- name has to survive it in both directions: no work left running for a player
+-- who is gone, and no state left behind for a name that will be reused.
+-- /dlg_start typed a scene out at ~33 Hz with a chain of core.after() jobs; a
+-- client that started a long scene and dropped left the chain chatting,
+-- rebuilding formspecs and re-arming timers for a player who no longer exists.
+local dialogue_ok = load("dialogue", "mods/content/dialogue/init.lua")
+local dialogue = rawget(_G, "dialogue")
+if not (dialogue_ok and dialogue and dialogue.dialogue) then
+	print("  [SKIP] dialogue did not load")
+else
+	local long_line = string.rep("The wire hums. ", 60) -- ~900 chars, ~27 s of typing
+	dialogue.dialogue.register_scene("sec_scene", {
+		scene = "sec_scene",
+		lines = {
+			{ speaker = "CUSTODIAN", text = long_line },
+			{ speaker = "CUSTODIAN", text = long_line },
+			{ speaker = "CUSTODIAN", text = long_line },
+		},
+	})
+	local ORPHANS = 4
+	local built, said = {}, {}
+	for i = 1, ORPHANS do
+		local nm = string.format("dropin%03d", i)
+		local p = H.new_player(nm)
+		H.fire_joinplayer(p)
+		H.player_privs[nm] = {}
+		client_chat(nm, "dlg_start", "sec_scene")
+		-- Baseline taken at the moment of departure: what the scene legitimately
+		-- said while the player was still connected is not the leak.
+		built[nm] = #(H.formspecs[nm] or {})
+		said[nm] = #(H.chat_player[nm] or {})
+		H.fire_leaveplayer(p) -- the client drops mid-scene
+		H.remove_player(nm)
+	end
+	H.advance(30, 0.05) -- 30 s of server time with none of them connected
+	local rebuilt, chatted = 0, 0
+	for i = 1, ORPHANS do
+		local nm = string.format("dropin%03d", i)
+		rebuilt = rebuilt + (#(H.formspecs[nm] or {}) - built[nm])
+		chatted = chatted + (#(H.chat_player[nm] or {}) - said[nm])
+	end
+	check(rebuilt == 0, "no formspec is rebuilt for a player who left (got " .. rebuilt .. ")")
+	check(chatted == 0, "no scene line is typed out to a player who left (got " .. chatted .. ")")
+
+	-- The same rule for the GUI's own per-name tables. They are locals, so the
+	-- observable is behaviour: a selection made before a disconnect must not be
+	-- honoured after one. (And every name that ever opened a tab used to stay
+	-- resident forever -- on a public server a client mints fresh names as fast
+	-- as it can reconnect.)
+	client_fields("mallory", "", { comms_target = "CHG:1" })
+	H.fire_leaveplayer(mallory)
+	H.remove_player("mallory")
+	mallory = H.new_player("mallory")
+	H.fire_joinplayer(mallory)
+	H.player_privs.mallory = {}
+	H.advance(1.0, 0.5)
+	client_fields("mallory", "", { comms_send = "true", comms_message = "still selected?" })
+	local to_mallory = H.chat_player.mallory or {}
+	local last = to_mallory[#to_mallory] or ""
+	check(last:find("No target selected", 1, true) ~= nil,
+		"a comms target chosen before a disconnect does not survive it")
+end
+
+-- ================================================================
+section("PHASE S11 — client text must not become non-finite world state")
+-- ================================================================
+-- /sl_map seed takes a number from chat text and PERSISTS it (map.persist()
+-- writes mod storage), so a bad value survives restart and drives mapgen for
+-- every later match. tonumber("1e999") is +inf and tonumber("nan") is NaN in
+-- LuaJIT; both used to be stored as-is. Same rule as the strand seed: a finite
+-- integer within +/- 2^31, or refuse.
+local map = game_mode and game_mode.map
+if not (map and map.runtime) then
+	print("  [SKIP] the map system is unavailable")
+else
+	local seed_before = map.runtime.seed
+	check(client_chat("alpha", "sl_map", "seed 1e999") == false,
+		"/sl_map seed refuses 1e999 (= +inf)")
+	check(client_chat("alpha", "sl_map", "seed nan") == false, "/sl_map seed refuses nan")
+	check(client_chat("alpha", "sl_map", "seed -1e999") == false, "/sl_map seed refuses -inf")
+	check(client_chat("alpha", "sl_map", "seed 12.5") == false,
+		"/sl_map seed refuses a number that is not whole")
+	check(client_chat("alpha", "sl_map", "seed 99999999999") == false,
+		"/sl_map seed refuses a value outside +/- 2^31")
+	check(map.runtime.seed == seed_before,
+		"and none of them reached the persisted map state (seed is "
+		.. tostring(map.runtime.seed) .. ")")
+	for key, value in pairs(H.storage) do
+		if tostring(value):find("inf", 1, true) or tostring(value):find("nan", 1, true) then
+			check(false, "mod storage holds a non-finite value at '" .. tostring(key) .. "'")
+		end
+	end
+	check(client_chat("alpha", "sl_map", "seed 2147483647") ~= false,
+		"a finite whole seed within range is accepted")
+	check(map.runtime.seed == 2147483647, "and pinned exactly, as an integer")
+	check(client_chat("alpha", "sl_map", "seed 0") ~= false and map.runtime.seed == nil,
+		"seed 0 unpins, which is what the help text promises")
+	if seed_before then
+		client_chat("alpha", "sl_map", "seed " .. tostring(seed_before))
+	end
+end
+
+-- ================================================================
+section("PHASE S12 — a refusal must not be an amplifier")
+-- ================================================================
+-- The engine rate-limits CHAT (chat_message_limit_per_10sec, then a kick for
+-- flooding) and rate-limits nothing else: an inventory-field submission with
+-- an EMPTY formname is forwarded unconditionally, without the server ever
+-- having shown a form. So every client-reachable refusal is a per-packet cost
+-- multiplier, and "log every refusal" is a way for a client to write to the
+-- server's own disk at packet rate. Measured before the fix: 200 forged
+-- packets produced 401 action-log lines on the refused-role path, and
+-- re-claiming a role the caller already held re-announced it to EVERY player
+-- and re-spawned the claimer once per packet -- 200 broadcasts, 200 spawns.
+H.advance(3.0, 0.5) -- start from a clean throttle window (game_mode.now is the stub clock)
+local logs0 = #H.logs
+local chats0 = #(H.chat_player.mallory or {})
+for _ = 1, 200 do client_fields("mallory", "", { sys_match_start_now = "true" }) end
+check(#H.logs - logs0 == 1,
+	"200 forged admin packets write ONE action-log line (got " .. (#H.logs - logs0) .. ")")
+check(#(H.chat_player.mallory or {}) - chats0 == 1,
+	"... and are answered once, not 200 times (got "
+	.. (#(H.chat_player.mallory or {}) - chats0) .. ")")
+check((H.logs[#H.logs] or ""):find("sl_match_start", 1, true) ~= nil,
+	"the line that IS written names the command and the missing privilege")
+H.advance(3.0, 0.5)
+local logs1 = #H.logs
+client_fields("mallory", "", { sys_match_start_now = "true" })
+check(#H.logs - logs1 == 1, "the next window reports again (the trail is not lost)")
+check((H.logs[#H.logs] or ""):find("199 more", 1, true) ~= nil,
+	"... and carries the count of what was suppressed before it")
+
+-- A refused role claim during a live match: same shape, different door.
+local match_before = state.match_active
+local mm_before = state.monster_master.player
+state.match_active = true
+state.monster_master.player = nil
+H.advance(3.0, 0.5)
+local logs2 = #H.logs
+for _ = 1, 200 do client_fields("mallory", "", { sys_be_mm = "true" }) end
+check(#H.logs - logs2 <= 2,
+	"a refused role claim is throttled too (got " .. (#H.logs - logs2) .. " lines)")
+state.match_active = false
+
+-- Re-claiming a role you already hold is not an event: it must change nothing.
+state.monster_master.player = nil
+H.advance(3.0, 0.5)
+client_chat("mallory", "sl_be_monster_master") -- the open lobby volunteer path
+check(state.monster_master.player == "mallory",
+	"volunteering as Monster Master in the lobby still works (open by design)")
+local all0, logs3 = #H.chat_all, #H.logs
+for _ = 1, 200 do client_fields("mallory", "", { sys_be_mm = "true" }) end
+check(#H.chat_all - all0 == 0,
+	"re-claiming a held role re-announces nothing to the server (got "
+	.. (#H.chat_all - all0) .. " broadcasts)")
+check(#H.logs - logs3 == 0,
+	"... and re-spawns the claimer zero times (got " .. (#H.logs - logs3) .. " log lines)")
+check(state.monster_master.player == "mallory", "the role itself is unchanged")
+game_mode.set_monster_master(mm_before)
+state.match_active = match_before
+
+-- ================================================================
+section("PHASE S13 — an entity whose pathfinding fails must still return")
+-- ================================================================
+-- sl_scary:nerobot's idle handler was `while path_found == false do ... end`
+-- with no attempt counter. minetest.find_path returns NIL whenever no route
+-- exists inside max_search_distance -- a mob walled in by ordinary digging and
+-- building, standing in the void, or a random candidate that is simply
+-- unreachable -- so path_found never became true, sradius was never reset (the
+-- inner loop broke immediately from the second pass, so the candidate never
+-- changed either) and the server thread spun inside ONE on_step. Measured in
+-- the headless harness before the fix: 200,000 find_path calls and 200,009
+-- chat_send_all broadcasts (per-tick debug lines to EVERY player) before the
+-- harness gave up. A tick that does not return is a frozen server, and the
+-- client does not have to do anything exotic to cause it -- just build a wall.
+if not load("sl_scary", "mods/content/sl_scary/init.lua") then
+	print("  [SKIP] sl_scary did not load")
+else
+	local scary = minetest.registered_entities["sl_scary:nerobot"]
+	check(scary ~= nil, "sl_scary:nerobot is registered (the entity under test exists)")
+	if scary then
+		-- A world it can wander in: walkable floor at y=5, air above it. The
+		-- engine reads positions with readV3F, where a MISSING component is 0
+		-- and not an error -- which is why the old array-style "node below me"
+		-- probe `{x, y-1, z}` silently tested the world origin for every
+		-- candidate and never noticed the mob was standing in the void.
+		minetest.registered_nodes["sl_test:floor"] = { name = "sl_test:floor", walkable = true }
+		-- The engine always has "air" (walkable = false); the stub returns
+		-- {name="air"} for every unset position, so without a definition the
+		-- candidate test can never see "not walkable" and the wander never
+		-- asks for a path at all -- which would make this phase vacuous.
+		minetest.registered_nodes["air"] = minetest.registered_nodes["air"]
+			or { name = "air", walkable = false, buildable_to = true }
+		for x = -5, 5 do
+			for z = -5, 5 do
+				minetest.set_node({ x = x, y = 5, z = z }, { name = "sl_test:floor" })
+			end
+		end
+
+		local obj = minetest.add_entity({ x = 0, y = 5.5, z = 0 }, "sl_scary:nerobot")
+		local lua = obj and obj._lua
+		check(lua ~= nil, "the entity spawns in the harness")
+		if lua then
+			local prev_find_path = minetest.find_path
+			local prev_chat_all = minetest.chat_send_all
+			local BUDGET = 64 -- idle_wander_attempts (4) x idle_wander_radius (3), with room
+			local calls, broadcasts = 0, 0
+			minetest.find_path = function()
+				calls = calls + 1
+				if calls > BUDGET then
+					error("idle wander exceeded " .. BUDGET .. " path searches", 0)
+				end
+				return nil -- engine-faithful: no route inside max_search_distance
+			end
+			minetest.chat_send_all = function(...)
+				broadcasts = broadcasts + 1
+				if prev_chat_all then return prev_chat_all(...) end
+			end
+			lua.timer = 99 -- past idle_random_select_time, so handle_idle wanders
+			local ok, err = pcall(lua.on_step, lua, 1.5, { type = "node", collides = false })
+			minetest.find_path = prev_find_path
+			minetest.chat_send_all = prev_chat_all
+			check(ok, "on_step RETURNS when pathfinding fails (was: unbounded while loop)"
+				.. (ok and "" or (" -> " .. tostring(err))))
+			check(calls > 0, "the wander really did ask for a path (" .. calls .. " searches)")
+			check(calls <= BUDGET, "and the number of searches is bounded (" .. calls
+				.. " <= " .. BUDGET .. ")")
+			check(broadcasts == 0,
+				"an idle mob broadcasts nothing to every player (got " .. broadcasts .. ")")
+			obj:remove()
+		end
+	end
+end
+
+-- ================================================================
+section("PHASE S14 — tree-wide audit: the patterns that keep reopening")
 -- ================================================================
 -- Cheap static guards, so the class of bug dies rather than the instance.
 local function read_file(path)
@@ -653,9 +1051,11 @@ else
 	check(#files > 60, "the audit walked the mod tree (" .. #files .. " lua files)")
 end
 
-local eval_offenders, func_offenders = {}, {}
+local eval_offenders, func_offenders, broadcast_offenders = {}, {}, {}
+local entity_files = {}
 for _, path in ipairs(files) do
 	local body = read_file(path)
+	if body and body:find("register_entity%s*%(") then entity_files[path] = true end
 	if body then
 		local lineno = 0
 		for line in body:gmatch("[^\n]*") do
@@ -672,6 +1072,15 @@ for _, path in ipairs(files) do
 			if code:find("registered_chatcommands%.[%w_]+%.func") then
 				func_offenders[#func_offenders + 1] = path .. ":" .. lineno
 			end
+			-- 3. broadcasting to every player from an entity's own code. An
+			--    entity steps per tick per entity, so a chat_send_all in there
+			--    is a debug line that scales with mobs x players x tick rate.
+			--    sl_scary's idle/searching/attacking states had four of them:
+			--    measured, 200,009 broadcasts to EVERY player inside one
+			--    on_step while the unbounded pathfinding loop spun.
+			if code:find("chat_send_all%s*%(") and entity_files[path] then
+				broadcast_offenders[#broadcast_offenders + 1] = path .. ":" .. lineno
+			end
 		end
 	end
 end
@@ -680,6 +1089,9 @@ if #files > 0 then
 		.. (#eval_offenders == 0 and "clean" or table.concat(eval_offenders, ", ")) .. ")")
 	check(#func_offenders == 0, "no mod calls a chatcommand's func directly ("
 		.. (#func_offenders == 0 and "clean" or table.concat(func_offenders, ", ")) .. ")")
+	check(#broadcast_offenders == 0, "no entity code broadcasts to every player ("
+		.. (#broadcast_offenders == 0 and "clean" or table.concat(broadcast_offenders, ", "))
+		.. ")")
 end
 
 -- Every command that mutates match state must declare privs or be listed here.
