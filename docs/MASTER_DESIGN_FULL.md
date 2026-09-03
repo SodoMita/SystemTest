@@ -843,8 +843,8 @@ or during the port:
 | G3 | MM contraband is **dropped**, never destroyed; one predicate, both paths (severance included) | unit (`drops` stub) | machine |
 | G4 | Sentry spares only a transponder carrier; token burns on first spare; log line names no player | unit | machine |
 | G5 | `/sl_be_monster_master` refuses while `match_active` | unit | machine |
-| G6 | Durable-store grep clean (`get_mod_storage` / `get_meta():set_string` / `minetest.log`), `aaa_botmatch` allowlisted | review + CI grep | machine |
-| G7 | HUD renders no team/role/possession string | `git grep` over `hud.lua` | machine |
+| G6 | Durable-store grep clean (`get_mod_storage` / `get_meta():set_string` / `minetest.log`), `aaa_botmatch` allowlisted — **must run in CI, not once.** Known hits: mod storage `spawns`, player meta `sl_mm_hands`, **`sl_strand:persisted`** (§7k: a whole serialized season under one key, found late because the gate was scoped to a moment) | review + **CI grep** | machine |
+| G7 | **Every player-delivered surface** renders no team/role/phase/points/HP/possession string for anyone but the viewer | surface registry + per-renderer assertion (**not** a path grep — §7j: the violation arrived in `mods/apis/sl_gui/players_tab.lua`, a new file in a new mod) | machine |
 | G8 | Ambient scheduler signature takes `(match_active, elapsed)` only; poisoned-stub test asserts exact call counts with `state.betrayal` populated | unit, **filed before the scheduler exists** | machine |
 | G9 | `ambient_plays` equal within noise between possessions-forced-0 and normal runs | soak | machine |
 | G10 | `ambient_plays_in_whisper_window >= 5` | soak | machine |
@@ -854,6 +854,10 @@ or during the port:
 | G14 | Blind listening check; blind presence check | playtest | human |
 | G15 | `MONSTER_TYPES` matches the registered `sl_scary` entity stats | startup check | machine |
 | G16 | Match end normalises phases, points, inventories, sabotages, possessions, whisper state, MM assignment | integration | machine |
+| G17 | Durable-store audit re-run tree-wide and in CI; `sl_strand:persisted` either documented as an operator-only store or moved behind the §7g boundary | CI grep | machine |
+| G18 | Text-state emitter validated against a **declared schema allowlist**, not a list of forbidden field names (§7l L4) | unit, emitter↔parser | machine |
+| G19 | Point table in the master cites `tools/point_economy_model.py` output at a commit hash — never a figure typed into a mail (§7l L1) | review | machine |
+| G20 | The dominance gate can **fail**: the model contains a path whose dominant action is repeatable, and the shroud path exists (§7l L2) | unit on the model | machine |
 
 Two validity rules govern the table: **a usage gate is only valid if the actor can
 perform the action** (else it measures the bot, not the design), and **a counter over a

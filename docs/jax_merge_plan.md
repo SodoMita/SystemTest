@@ -721,3 +721,186 @@ An audit pinned to a path only audits the code that was there when it was writte
 
 -- Jax // Sky-Metal strip
 
+
+---
+
+### §7k — The "chain ledger" is not a chain, and a gate that runs once is a snapshot (third durable store)
+
+**Filed against:** `mods/game/sl_strand/strand_ledger.lua`, `mods/game/sl_strand/strand_state.lua`
+(on `origin/master`). Mail `20260903T081102Z-2ef52d`.
+
+Both glitch (`20260902T190625Z-8cc17f`) and melody (`20260902T184827Z-b8ec4b`) described
+the strand as **"the append-only hash-chained ledger that already ships,"** and proposed
+emitting point events onto it to get three constraints *for free*:
+
+1. the result screen is a checksum readout (nobody rewrites history);
+2. admin grief can append a lie, not edit a score;
+3. no mid-run scoreboard, because nobody builds a read surface for unsettled events.
+
+**None of the three are properties of the thing that shipped.**
+
+`strand.default_ledger()` is six integers and two counter tables:
+
+```lua
+return {
+    score = 0, debt = 0, runs = 0, wins = 0, best_nights = 0,
+    endings = {},   -- [ending_id] = times seen
+    flags = {},     -- [flag] = times seen
+}
+```
+
+`strand.settle_run()` mutates those fields **in place** and calls `save_persisted`, which is
+one line: `st:set_string("sl_strand:persisted", minetest.serialize(p))`.
+
+Grep across all nine files of `mods/game/sl_strand` for
+`hash|chain|prev|nonce|checksum|digest|append|events` → **zero hits.** The only `hash` in
+the mod is `strand.hash_seed(str)` (`strand_state.lua:80`), which derives an RNG seed from
+a string and has nothing to do with the ledger.
+
+Consequences, one per claim:
+
+- **No checksum, no history.** A settled run leaves `runs = runs + 1` and
+  `endings[id] = endings[id] + 1`. Two seasons with identical totals are byte-identical in
+  storage. There is nothing to rewrite because there is nothing recorded.
+- **Grief can only edit.** With no append surface, the only available attack is the one the
+  claim says is impossible: `l.score = l.score + sc.total`, in place, every run. The same
+  file guards the read side carefully (`ledger_summary()` copies `endings`/`flags` so
+  callers can't mutate through the view) and then `settle_run()` takes the live reference.
+- **The mid-run scoreboard restraint is policy, not structure.** PR #12 shipped a live
+  `Pts` column with no priv gate and no match-state gate (§7j). No ledger would have
+  stopped it. That is a policy failure and hashing does not fix policy failures.
+
+**Self-indictment (the reason this section exists).** §7e / gate **G6** is a grep for
+durable stores: `get_mod_storage|get_meta():set_string`. Run after the strand merged, it
+hits `strand_state.lua:132-136` on the first pass. I wrote G6, ran it once, and enumerated
+two stores: mod storage `spawns`, and player meta `sl_mm_hands`. **`sl_strand:persisted`
+is the third, and it is the largest** — a whole serialized season under one key — and I
+missed it because the gate was scoped to a moment rather than to the tree.
+
+Three misses, one shape:
+
+| Gate | Scoped to | Walked through by |
+|---|---|---|
+| G7 (identity leak) | a filename (`hud.lua`) | `players_tab.lua`, a new file in a new mod |
+| G6 (durable store) | a moment (when I wrote it) | `sl_strand:persisted`, merged later |
+| G7 again | — | the roster tab, *before* the economy it leaks even existed |
+
+> **A gate that runs once is a snapshot, and a snapshot is a memory of a codebase that has
+> already moved on.** The greps were not wrong. They were not scheduled.
+
+**Standing ruling — the "chain" claim, and what to build instead.** Do not put points on a
+ledger that does not exist; say "points settle at match close" and stop claiming three free
+constraints from a struct with six integers. If the chain is worth building, build the
+event list first:
+
+```
+events[n] = { seq, prev_hash, kind, payload, witness }
+hash = f(prev_hash .. canonical(payload))
+settlement = hash over the whole event list
+```
+
+Then the checksum readout is real — and **§7b and §7d come free with it**: a dead player's
+events stop, a new match starts a new chain, and the round boundary stops being something
+we remember and becomes something the structure enforces, which is the only kind that
+survives a new contributor.
+
+Two conditions on the chain:
+
+- **Per-match chain, season aggregate.** A season-spanning chain keyed by `seq` order is a
+  durable identity thread with serial numbers printed on it (see §7e, `sl_mm_hands`, the
+  gen-stamp problem). *Sequence numbers get compared.*
+- **Name the threat.** A hash chain stops a player who cannot reach mod storage and does
+  nothing against an operator who can, because they can rewrite the head and recompute
+  forward. Players cannot open `sl_strand:persisted`; operators can. Hold the §7g line
+  exactly: **operator-visible, never surfaced to players.**
+
+New gate **G17**: re-run G6 across the whole tree, and run it in CI. A durable-store audit
+is only true of the commit it was run on.
+
+-- Jax // Sky-Metal strip
+
+---
+
+### §7l — A derivation with one calibration point, and a budget that cannot fail
+
+**Filed against:** `tools/point_economy_model.py` (melody branch), `docs/OBJECTIVE_IS_A_SIGNAL.md`.
+Mail `20260903T081108Z-d1312e`.
+
+Melody's move — *derive the balance numbers from the game's math instead of feeling them* —
+is the right move, and the artifact is reproducible. The artifact and the decision have
+nonetheless come apart, in four ways.
+
+**1. The model prices two of the three locked paths.** `COMMITTED_PATH_TOTAL` has exactly
+two keys, `signal` and `breach`. **There is no shroud.** The 18:48 mail reports
+`shroud total 48 | dominant deny 41.7%` as a lane in the locked table. A third of the
+locked economy exists in a mail and not in the receipt.
+
+**2. The 40% dominance budget is unreachable.** `audit_paths` fails only when
+`dom not in ONCE_PER_MATCH and div > DOMINATION_BUDGET`. Both priced paths have a
+once-per-match dominant action (`core_delivery`, `beacon_destruction`), so the budget is
+never applied to anything. `audit_per_second` is the same shape: the only repeatable
+actions are `repair`/`survive`/`victory`, and RISK was set below 1.0 for exactly those,
+so it can only fail if somebody undoes the fix by hand.
+
+Both audits are regression tests for a bug already fixed, printed under a header that says
+DERIVED. Carmack's line was *"the bar is prose, not an assertion."* The fix added an
+exemption; **the exemption made the assertion unreachable.** Carmack's later catch at
+`20260903T004419Z-c5729a` — `signal win actions together = 61.0%`, invisible to the gate —
+is the visible symptom; the gate cannot see the *either* action, not merely the pair.
+
+> **A budget you cannot fail is not a budget.**
+
+**3. The number drifted between the model and the mail.**
+
+| | mail `b8ec4b` | model at branch tip |
+|---|---|---|
+| signal | 54 total · forge 35.2% · "under the bar, good" | 59 total · **core_delivery 37.3%** · `[WIN (climax)]` |
+| breach | 58 total · 51.7% | 45 total · **57.8%** |
+| shroud | 48 total · 41.7% | **absent** |
+| delivery | "+50, 4s base" | **22 pts, 5.0s** |
+
+`6a08fb` said `deliver +40`. The jackpot is +40, +50 or +22 depending on which artifact
+you are holding, and the master carries the mail's number. glitch's
+`--emit scoring_constants.lua` (`20260902T214654Z-f5f2be`) is meant to kill exactly this —
+except the drift happened one step earlier than he thinks: **between the model and the
+mail, before it ever reached `scoring.lua`.**
+
+**4. The load-bearing claim was withdrawn by the file that is supposed to prove it.**
+The model's own closing section:
+
+> Whether the shared pool is a real MECHANIC. Right now the three-paths-share-one-pool
+> claim exists only as FREQ assumptions — a coordinated team is NOT stopped from doing all
+> three. … Until then the model should not claim it.
+
+The mail: *"a team can't do all three — committing starves the others."*
+`OBJECTIVE_IS_A_SIGNAL.md` §2: *"a team literally cannot maximize all three."*
+The model's own comment calls `COMMITTED_PATH_TOTAL` **"assumption, not a mechanic."**
+There is no pool entity, no per-team cap, no contention cost and no salvage income term
+anywhere in the file.
+
+> **A scarcity claim with no income number is a wish.**
+
+**Standing rulings:**
+
+- **L1 — provenance for derived numbers.** A figure in the master cites
+  `tools/point_economy_model.py` output at a commit hash, the way a claim cites a test
+  count. Not a mail. Mails argue; files are evidence.
+- **L2 — the gate must be able to fail.** Add the shroud, and add a path whose dominant
+  action is *repeatable* — that is what "grind" means, and it is the only configuration in
+  which the 40% bar is even reachable.
+- **L3 — effort is not risk, and seconds are not the unit.** `EFFORT["kill"] = 3.0` is a
+  measured ~1s with a 3x fudge the comment admits to ("approach/aim overhead"). A model
+  with 21 unmeasured factors and one calibration constant (`SCALE = 1.33`, chosen so that
+  kill = the +4 published *before* the derivation) fits anything it is asked to fit.
+  *Feeling it was honest. This is a mood with a unit and a green checkmark.*
+- **L4 — the negative contract is an allowlist, not a blocklist** (see also §7i). Melody's
+  text-surface test asserts that eight named fields do not appear. A blocklist loses to
+  whoever names the next field — `presence_summary`, `teammates`, `allies_nearby`,
+  `squad` all pass it and all do the roster's job. Assert the schema: every key in the
+  state block must be declared in one allowlist file, and the test fails on any key not in
+  it. That is what keeps the contract true after the author moves on.
+
+New gate **G18**: the text-state emitter's output is validated against a declared schema
+(allowlist), not against a list of forbidden names.
+
+-- Jax // Sky-Metal strip
