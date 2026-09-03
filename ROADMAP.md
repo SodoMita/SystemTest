@@ -102,29 +102,40 @@ Cheap, unblocks everything, makes the project shareable.
 ## Phase 1 — The crafting → final-goal loop (the headline milestone)
 Connect existing pieces; little needs to be built from scratch.
 
-1. **Define the "final goal" item.** e.g. `sl_modebase:objective_core` — the thing a team
-   crafts (and optionally delivers to their beacon) to win.
-2. **Author a real recipe tree** in `sl_gui/crafting_system.lua` (replace demo recipes):
-   - raw loot → intermediate components → the goal item.
-   - Use items that already exist (MTG ores/ingots) as placeholders for now.
-3. **Make crafting accessible in-match:** either via the existing button UI bound to a
-   key/command, or revive ONE station from `workshops` (uncomment + give it textures).
-4. **Add a new win condition** in `sl_modebase/match.lua`:
-   - new `state.win_mode = "objective"` alongside the existing elimination check;
-   - fire `game_mode.end_match(team, "crafted/delivered the objective")` when a team
-     crafts (or places at beacon) the goal item.
-   - This is the GDD's planned **"Item Delivery Objective"** mode — start here.
-5. **Make loot exist to craft from:** simplest version = `give_initial_stuff` + a few
-   loot nodes/chests hand-placed on the test map. (Procedural loot can come later.)
+1. ~~**Define the "final goal" item.**~~ **Done:** `sl_modebase:objective_core`
+   exists (`sl_modebase/nodes.lua`), is `stack_max = 1`, `groups.objective = 1`
+   per `MASTER_DESIGN_FULL` §6.10 A, and delivering it within 8 blocks of your
+   own beacon ends the match.
+2. ~~**Author a real recipe tree**~~ **Done + rebalanced:** raw neon → components
+   → the Core. The refine branch is *batched* (4 neon → 8 components) so a full
+   Core is five machine runs and twenty dug nodes instead of thirty.
+3. ~~**Make crafting accessible in-match**~~ **Done:** `sl_machine_crafting`
+   ships the **Objective Forge** — one per map, placed at the neutral `forge`
+   anchor, with input slots, a run clock (`sl_machine.forge_time`), and a
+   broadcast so both teams know when it is hot. `content/workshops` stays
+   shelved; `sl_machine_crafting` is the machine home.
+4. ~~**Add a new win condition**~~ **Done:** `state.win_conditions.objective`
+   (set from the lobby terminal) + `game_mode.deliver_objective()`. Covered
+   end-to-end by `tests/objective_loop_test.lua` (99 assertions).
+5. ~~**Make loot exist to craft from**~~ **Done:** the procedural and test
+   arenas seed mirrored **salvage veins** of all four raw neon types. Before
+   this the three exotic types existed on no map, so the chain was
+   unwinnable.
 
 **Exit check:** 2 players, 2 teams; a team can gather → craft the goal item → win, and the
-match ends correctly and announces the winner.
+match ends correctly and announces the winner. — **MET** headlessly
+(`tests/objective_loop_test.lua`, `luajit tests/objective_loop_test.lua`);
+still to be confirmed with two human clients in a playtest.
 
 ---
 
 ## Phase 2 — Make it testable multiplayer (stability pass)
 1. **Build a small hand-made test map** (singlenode arena with two bases + loot points).
    Ship it as a saved map or a one-command builder, since there's no mapgen.
+   *Done: the match map system ships three types — procedural (seeded), test
+   (deterministic builder) and handmade `.mts` schematics — with committed
+   example maps (`mods/game/sl_modebase/maps/`) and full initial-state reset
+   between matches (see `MATCH_LOOP_SPEC.md`).*
 2. **Match lifecycle UX:** clear "how to start" (commands exist: `/sl_be_monster_master`,
    match start). Add an on-screen HUD for phase state, objective progress.
 3. **Convert menu audio to `.ogg`**, name it `menu_music.ogg`; add `menu/header.png` +

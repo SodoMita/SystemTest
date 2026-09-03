@@ -23,3 +23,153 @@ sl_cube_size (Underground cube size) int 8 4 32
 # Total monsters spawned once during mapgen (not per cube / per chunk).
 # They are placed in underground cubes around the origin, then never again.
 sl_cube_monsters (Mapgen monster count) int 12 0 64
+
+# Map type used for matches. procedural = seeded generated arena;
+# test = deterministic test arena; schematic = handmade .mts map
+# (see /sl_map list).
+sl_map.type (Match map type) enum procedural procedural,test,schematic
+
+# Which handmade map to use when sl_map.type = schematic. "random"
+# picks one per match (seeded).
+sl_map.schematic (Handmade map) string random
+
+# Procedural map seed. 0 = a fresh arena every match; any other value
+# pins the same arena (and the same handmade-map pick).
+sl_map.seed (Map seed) int 0 0 2000000000
+
+# Full edge width of the generated procedural arena, in nodes.
+sl_map.arena_size (Procedural arena size) int 48 32 128
+
+# Initial mob population of a match map (procedural scatter, test
+# arena, and handmade maps without explicit mobs.N entries).
+sl_map.mobs (Map mob population) int 6 0 24
+
+# Arena build origin override for procedural/schematic maps, "x,y,z".
+# Leave empty for defaults (procedural {0,30,0}, schematic centered
+# with its floor at {0,30,0}; the test arena always builds at origin).
+sl_map.origin (Map origin) string
+
+# MM essence engine (§13.3): ambient-hazard thresholds, comma-separated.
+# A match with no Monster Master accrues the essence pool into automated
+# security units spawned from the Node — one at each threshold (default:
+# pool 10, 25 and 50). Empty = the default set.
+sl_essence.thresholds (Essence hazard thresholds) string 10,25,50
+
+# Procedural layout overrides, each an "x,z" position on the arena
+# floor (the Y is derived from the map origin). Unset entries keep
+# the stock arrangement: cloud cage above the centre, beacon A/B at
+# the midfield line (origin.x -+ (W-8)), MM redoubt at +Z. The same
+# resolved layout is carried by the map descriptor, so a match-end
+# rebuild (reset) reproduces the overridden anchors exactly even if
+# the settings were edited mid-match. beacon_a and beacon_b must
+# differ; if both are set to the same spot, beacon B falls back.
+sl_map.cage_pos (Procedural cloud cage position) string
+sl_map.beacon_a_pos (Procedural beacon A position) string
+sl_map.beacon_b_pos (Procedural beacon B position) string
+sl_map.mm_base_pos (Procedural MM redoubt position) string
+sl_map.forge_pos (Procedural Objective Forge position) string
+
+# Machine crafting (§6.5 / §6.10): the Objective Forge is the only
+# place a placeable output can be made. This is the processing time of
+# one run, in seconds — the run is announced to every player when it
+# starts, so this is how long the whole arena knows where you are.
+sl_machine.forge_time (Objective Forge run time) int 20 1 300
+
+# Legacy behavior: spawn a fixed budget of monsters once during
+# worldgen around the origin. Off by default — mobs are match
+# entities now: purged at match end, respawned at match start.
+sl_map.mapgen_mobs (Worldgen monsters (legacy)) bool false
+
+# Botmatch harness (mods/game/aaa_botmatch). The harness exposes TWO
+# distinct bot kinds. The kind is stamped at spawn time and is
+# visible in /sl_bots list output, the player_information synthetic
+# record (version_string), and the in-world nametag for mob bodies.
+#   * "stub" — headless Lua state, no engine body. step_toward in
+#     behavior.lua moves the bot's logical position in a straight
+#     line. Used for soak regression in CI / headless mode.
+#   * "mob"  — a real engine entity with A* pathfinding, GLB model,
+#     gravity, and collision. Used when an admin joins to play
+#     against the bots, or when running the mob-mode soak.
+# All botmatch settings require sl_botmatch.enabled = true to take
+# effect; mob_mode further requires the aaa_botmatch mod to be loaded
+# with mob_player.lua (it is, by default).
+
+# Master switch for the botmatch harness. When false, /sl_bots is
+# still registered (so the admin can prep a pool) but no bots are
+# spawned, no soak loop runs, and the arena isn't built.
+sl_botmatch.enabled (Botmatch harness enabled) bool false
+
+# Spawn each bot as a real engine entity with A* pathfinding
+# (mods/game/aaa_botmatch/mob_player.lua). When false, bots are
+# pure-Lua stubs that move in a straight line via set_pos — fine
+# for headless soak but they never collide, never gravity-fall,
+# and never block the admin's path. /sl_bots rejects with a clear
+# error if this is false.
+sl_botmatch.mob_mode (Botmatch mob mode (engine entities)) bool false
+
+# How many bots the pool starts with (only consulted when enabled
+# is true and the pool is empty). Bot names default to bot_alpha,
+# bot_beta, bot_gamma, bot_delta, bot_epsilon, bot_zeta; the
+# /sl_bots add / remove subcommands mutate the pool at runtime.
+sl_botmatch.bots (Default bot count) int 4 0 6
+
+# Distance between the two beacons in the auto-arena. Larger = more
+# midfield for brawls. Turbo profile overrides to 4 for fast
+# regression (default 24).
+sl_botmatch.beacon_spacing (Auto-arena beacon spacing) int 24 4 64
+
+# Number of matches the soak loop runs in headless mode. The harness
+# exits cleanly when this count is reached. Real players
+# (admin-driven) ignore this and run until the server stops.
+sl_botmatch.matches (Soak match count) int 3 1 1000
+
+# Per-match wall-clock budget (seconds). When the timer expires the
+# beacon with higher HP wins; if HP is tied, the match is a draw.
+sl_botmatch.match_duration (Match duration (s)) int 120 10 1800
+
+# Bot horizontal walk speed in nodes per second. Mob bots honor
+# this in the pathfind_walk velocity; stub bots honor this in
+# step_toward's set_pos delta.
+sl_botmatch.bot_speed (Bot walk speed (n/s)) float 4 0.5 20
+
+# A* pathfinder tuning. Only consulted in mob mode. Defaults are
+# tuned for the build_arena auto-arena; bespoke handmade maps can
+# override each value in minetest.conf.
+sl_botmatch.path_searchdistance (Mob pathfinder search distance) int 80 8 256
+sl_botmatch.path_max_jump (Mob pathfinder max jump (nodes)) int 1 0 4
+sl_botmatch.path_max_drop (Mob pathfinder max drop (nodes)) int 2 0 8
+
+# Engine hit damage applied per bot attack swing in soak mode.
+sl_botmatch.combat_damage (Bot combat damage) int 5 1 50
+
+# Seconds between two consecutive attack swings from the same bot.
+sl_botmatch.attack_interval (Bot attack interval (s)) float 2.5 0.1 10
+
+# Seconds a dead bot waits in the lobby before respawning. Matches
+# the respawn_delay settings of the corresponding sl_modebase
+# settings so the soak can interleave bot respawns with match ends.
+sl_botmatch.respawn_delay (Bot respawn delay (s)) float 2 0 60
+
+# Seconds of intermission between two auto-started matches.
+sl_botmatch.inter_match_delay (Inter-match intermission (s)) int 4 0 60
+
+# Toggle: bots auto-mark ready in the lobby and the soak loop starts
+# the next match without admin input. Off = admin drives matches
+# with /sl_match_start. Only takes effect in mob mode.
+sl_botmatch.auto_start (Auto-start matches) bool false
+
+# If true, randomly disconnect a bot mid-match to exercise the
+# disconnect-and-rejoin code paths. Soak-only setting; does not
+# affect real players.
+sl_botmatch.disconnect_test (Soak disconnect test) bool true
+
+# Turbo profile: beacons placed next to each other (spacing 4),
+# smaller HP, faster swings, faster respawn. A full match cycle
+# completes in roughly 5 seconds. Same code paths, compressed
+# clocks. Individual settings above still override.
+sl_botmatch.turbo (Turbo soak profile) bool false
+
+# Deterministic seed for the soak's PRNG. Same seed + same config
+# = same match outcomes; the regression harness uses this to
+# replay failing runs.
+sl_botmatch.seed (Soak PRNG seed) int 20260827

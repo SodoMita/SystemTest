@@ -320,15 +320,40 @@ minetest.register_node(modname .. ":platform", {
 	collision_box = { type = "fixed", fixed = { -0.5, -0.5, -0.5, 0.5, 0.5, 0.5 } },
 })
 
--- Item pickup: a small glowing object that gives random salvage on right-click
+-- Item pickup: a small glowing object that gives random salvage on
+-- right-click. Rolls are weighted; other mods may append entries
+-- (sl_weapons adds a small weapons section, spec WEAPONS_SPEC §5 —
+-- the Grapple Lash is never on any random table).
 local pickup_loot = {
-	modname .. ":scrap_metal",
-	modname .. ":electronic_waste",
-	modname .. ":raw_crystal",
-	modname .. ":plastic_scrap",
+	{ item = modname .. ":scrap_metal", count = 1, weight = 1 },
+	{ item = modname .. ":electronic_waste", count = 1, weight = 1 },
+	{ item = modname .. ":raw_crystal", count = 1, weight = 1 },
+	{ item = modname .. ":plastic_scrap", count = 1, weight = 1 },
 }
 
-minetest.register_node(modname .. ":item_pickup", {
+function game_mode.register_pickup_roll(item, count, weight)
+	table.insert(pickup_loot, { item = item, count = count or 1, weight = weight or 1 })
+end
+
+function game_mode.get_pickup_rolls()
+	local copy = {}
+	for i, e in ipairs(pickup_loot) do copy[i] = { item = e.item, count = e.count, weight = e.weight } end
+	return copy
+end
+
+local function roll_pickup()
+	local total = 0
+	for _, e in ipairs(pickup_loot) do total = total + (e.weight or 1) end
+	local r = math.random() * total
+	for _, e in ipairs(pickup_loot) do
+		r = r - (e.weight or 1)
+		if r <= 0 then return e.item, (e.count or 1) end
+	end
+	local last = pickup_loot[#pickup_loot]
+	return last.item, (last.count or 1)
+end
+
+	minetest.register_node(modname .. ":item_pickup", {
 	description = S("Loose Item"),
 	drawtype = "mesh",
 	mesh = "item.obj",
@@ -342,9 +367,9 @@ minetest.register_node(modname .. ":item_pickup", {
 
 	on_rightclick = function(pos, node, clicker, itemstack, pointed_thing)
 		if not clicker or not clicker:is_player() then return itemstack end
-		local loot = pickup_loot[math.random(1, #pickup_loot)]
+		local loot, n = roll_pickup()
 		local inv = clicker:get_inventory()
-		inv:add_item("main", ItemStack(loot .. " 1"))
+		inv:add_item("main", ItemStack(loot .. " " .. n))
 		minetest.remove_node(pos)
 		minetest.sound_play("click", { pos = pos, gain = 0.5, max_hear_distance = 8 })
 		minetest.chat_send_player(clicker:get_player_name(),
@@ -480,12 +505,18 @@ function game_mode.spawner_activate(name, pos, variant)
 	local now = game_mode.now()
 	local _, min_essence = spawner_node_settings(meta)
 
-	-- Node setting: minimal resource quantity to spawn.
+	-- The match essence pool is the MM's primary fuel: each creature
+	-- burns one essence pool-first; the unit's feed covers the rest
+	-- (essence ruling §13.3 — the pool is the spawner's feed).
+	local pool = game_mode.essence_pool and game_mode.essence_pool() or 0
 	local in_feed = game_mode.count_feed_essence(feed)
-	if in_feed < min_essence then
+	local fuel = in_feed + pool
+
+	-- Node setting: minimal resource quantity to spawn.
+	if fuel < min_essence then
 		minetest.chat_send_player(name,
-			S("The unit needs at least @1 Monster Essence in the feed to run (has @2).",
-				tostring(min_essence), tostring(in_feed)))
+			S("The unit needs at least @1 essence to run (feed has @2, match pool @3).",
+				tostring(min_essence), tostring(in_feed), tostring(pool)))
 		return false
 	end
 
@@ -511,8 +542,13 @@ function game_mode.spawner_activate(name, pos, variant)
 		return false
 	end
 
-	-- Spawn confirmed: now burn the essence and start the spool-down.
-	feed:remove_item("feed", ItemStack(game_mode.ESSENCE_ITEM .. " 1"))
+	-- Spawn confirmed: now burn the essence (match pool first, then
+	-- the unit's feed) and start the spool-down.
+	if pool > 0 then
+		game_mode.state.monster_master.essence_pool = pool - 1
+	else
+		feed:remove_item("feed", ItemStack(game_mode.ESSENCE_ITEM .. " 1"))
+	end
 	local cooldown = spawner_node_settings(meta)
 	meta:set_int("sl_spawner_ready_at", math.floor(now + cooldown))
 	meta:set_string("infotext",
@@ -540,7 +576,8 @@ local function spawner_formspec(pos, meta)
 		"bgcolor[#120a14ee;true]",
 		"label[0.3,0.2;MONSTER SPAWNER UNIT]",
 		"label[0.3,0.7;Essence in unit: " .. tostring(essence) .. "  (needs "
-			.. tostring(min_essence) .. ", 1 per spawn)]",
+			.. tostring(min_essence) .. ", 1 per spawn)  |  Match pool: "
+			.. tostring(game_mode.essence_pool and game_mode.essence_pool() or 0) .. "]",
 	}
 	local y = 1.3
 	for _, id in ipairs(game_mode.MONSTER_TYPE_ORDER) do
@@ -581,7 +618,9 @@ minetest.register_node(modname .. ":monster_spawner", {
 	tiles = { "sl_monster_spawner.png" },
 	paramtype = "light",
 	light_source = 10,
-	groups = { cracky = 2, oddly_breakable_by_hand = 1 },
+	-- sl_essence_value: price paid to the MM pool when the crew's
+	-- spawner unit is destroyed (essence ruling §13.3 rule 1).
+	groups = { cracky = 2, oddly_breakable_by_hand = 1, sl_essence_value = 4 },
 	is_ground_content = false,
 	selection_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },
 	collision_box = { type = "fixed", fixed = { -0.55, -0.5, -0.55, 0.55, 0.8, 0.55 } },

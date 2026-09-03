@@ -41,6 +41,24 @@ jobs:
       - name: Headless stub smoke test
         run: luajit tests/smoke_test.lua
 
+      - name: Simulacrum Strand stub suite
+        run: luajit tests/strand_test.lua
+
+      - name: Bot roster stub suite (pool validation, apply_pool reconciliation, /sl_bots end-to-end)
+        run: luajit tests/bot_pool_test.lua
+
+      - name: Scoring stub suite (K/D-weighted kills, objectives, end-match bonuses, banking split)
+        run: luajit tests/scoring_test.lua
+
+      - name: sl_weapons stub suite (fire pipeline, corpses, pads, turrets, lash, fabricator, tournament)
+        run: luajit tests/weapons_test.lua
+
+      - name: MM essence stub suite (provenance, pricing, pool, hazard)
+        run: luajit tests/essence_test.lua
+
+      - name: Weapons stub turbo soak (40 matches, kill-share + lash gates)
+        run: luajit tests/soak_stub_turbo.lua
+
       - name: Live-engine soak test (AI players, 3 matches)
         run: |
           python3 tests/soak/run_soak.py \

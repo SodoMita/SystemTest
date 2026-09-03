@@ -12,6 +12,22 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
 - Match sequencing: ready check (`/sl_ready`) -> countdown -> insertion;
   `/sl_match_start now` bypasses for admins; roster requires >= 2 players on
   both beacon teams.
+- Map system (`sl_modebase/map.lua`): three map types feed the loop —
+  `procedural` (seeded generated arena, fresh each match or pinned via
+  `sl_map.seed`), `test` (the deterministic test arena) and `schematic`
+  (handmade `.mts` WorldEdit schematics with a `map.conf`, MTCTF-style;
+  see `mods/game/sl_modebase/maps/README.md`). `/sl_map` selects the
+  type/map/seed; `/sl_map save` exports the current arena as a new
+  handmade map. Reset contract (all types): at match end the map
+  returns to its initial state — the arena volume is re-materialized
+  (generator re-run or schematic re-placed) so nodes created or dug
+  during the match are replaced with initial nodes, out-of-volume edits
+  are journaled and restored node-for-node, every mob is purged, the
+  beacons return to full integrity, and the map's initial mob
+  population respawns at the next match start. The ambient worldgen
+  monster budget (`sl_cube_monsters`) is legacy and off by default —
+  mobs are match entities now (`sl_map.mapgen_mobs` restores the old
+  behavior).
 - Cloud cage: ghosts are held at `ghost_spawn`, immortal, invisible,
   untargetable, flight-enabled, and a containment platform is materialized
   around the spawn on load (`/sl_build_cage` to rebuild).
@@ -50,8 +66,11 @@ Implemented and covered by `tests/smoke_test.lua` (66 assertions, run with
 
 Still open (Phase A remainder):
 
-- Hand-built arena map committed to the repo (two beacons, lobby, cage,
-  routes, cover, hand-placed pickups).
+- ~~Hand-built arena map committed to the repo (two beacons, lobby, cage,
+  routes, cover, hand-placed pickups).~~ Done via the map system:
+  `mods/game/sl_modebase/maps/neon_crossfire/` (binary .mts) and
+  `maps/mini_test/` (plain-Lua schematic) ship committed handmade maps;
+  `/sl_map save` exports more from a live arena.
 - Direct-message UI polish and reconnect hardening pass.
 
 Known design gaps vs. the GDD (not yet implemented):
@@ -324,6 +343,13 @@ The harness should support deterministic scenarios:
 9. A match ends and resets cleanly.
 10. The same match is started again without stale state.
 11. The objective path collects resources, routes them through a machine-only craft step, creates the Objective Core, and wins by delivery.
+
+The machine step is the **Objective Forge** (`sl_machine_crafting`), one per
+map at the neutral `forge` anchor: place the charge in its input slots, run
+it (time-gated, one job at a time, announced to every player with the
+forge's coordinates), collect the output. The charge is consumed up front
+and a run abandoned by the match end is forfeit — the machine owns the
+risk. Placeables cannot be made in the inventory at all.
 
 Headless objective smoke test command, creative mode only:
 

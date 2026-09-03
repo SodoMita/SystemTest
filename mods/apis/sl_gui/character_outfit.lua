@@ -292,14 +292,21 @@ function handle_character_outfit_fields(player, formname, fields)
     local selected_slot = nil
 
     -- Tab switching: close this and return to the unified inventory
-    if fields.tab_crafting or fields.tab_abilities or fields.tab_achievements then
-        local meta = player:get_meta()
-        local new_tab = "crafting"
-        if fields.tab_abilities then new_tab = "abilities"
-        elseif fields.tab_achievements then new_tab = "achievements" end
+    local tab_switch = {
+        tab_crafting = "crafting",
+        tab_abilities = "abilities",
+        tab_achievements = "achievements",
+        tab_system = "system",
+        tab_comms = "comms",
+        tab_players = "players",
+    }
+    local new_tab
+    for field, tab in pairs(tab_switch) do
+        if fields[field] then new_tab = tab break end
+    end
+    if new_tab then
+        player:get_meta():set_string("current_tab", new_tab)
 
-        meta:set_string("current_tab", new_tab)
-        
         if get_unified_inventory then
             minetest.show_formspec(player:get_player_name(), "", get_unified_inventory(player))
         end

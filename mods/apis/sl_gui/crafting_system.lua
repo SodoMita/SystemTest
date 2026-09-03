@@ -19,6 +19,14 @@ function register_craft_recipe(def)
     })
 end
 
+-- Read-only accessor for the registry. Machine crafting
+-- (sl_machine_crafting) resolves its own list from this single source
+-- of truth, so the inventory gate and the machine can never drift:
+-- machine-eligible == "output is a registered node".
+function get_crafting_recipes()
+    return crafting_recipes
+end
+
 -- Helpers
 local function has_ingredients(player, ingredients)
     if minetest.settings:get_bool("creative_mode") then
@@ -208,8 +216,13 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 
                 if recipe then
                     -- World-affecting outputs belong to machines, never inventory crafting.
-                    -- A registered node is the authoritative signal for this prototype.
-                    if minetest.registered_nodes[recipe.output] then
+                    -- A registered node is the authoritative signal for this prototype;
+                    -- a def that opts in via groups.sl_craft_in_inventory (today: the
+                    -- Objective Core — the named +3 craft of the essence ruling §13.3)
+                    -- is the documented exception.
+                    local out_def = minetest.registered_nodes[recipe.output]
+                    local machine_only = out_def and not (out_def.groups and out_def.groups.sl_craft_in_inventory)
+                    if machine_only then
                         minetest.chat_send_player(player:get_player_name(),
                             "Machine required: this output cannot be crafted in inventory.")
                     else
@@ -231,6 +244,13 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 
                             local total_output = recipe.output_count * quantity
                             inv:add_item("main", ItemStack(recipe.output .. " " .. total_output))
+
+                            -- Essence ruling (§13.3 rule 2): named crafts credit the MM
+                            -- pool on completion (the Objective Core is the +3 example).
+                            -- Guarded so this is inert when sl_modebase is not loaded.
+                            if game_mode and game_mode.on_craft_essence then
+                                game_mode.on_craft_essence(recipe.output, total_output)
+                            end
 
                             if give_experience then
                                 give_experience(player, 5 * quantity)
@@ -306,9 +326,13 @@ minetest.register_chatcommand("craft", {
 crafting_recipes = {}
 
 -- SALVAGE: raw neon ground blocks -> useful components
+-- Machine branch (§6.5 rule): every output here is a registered NODE,
+-- so the inventory UI refuses it and the Objective Forge runs it.
+-- Yields are batched on purpose: a full Core run costs five forge
+-- runs and twenty dug neon nodes, which fits inside a match.
 register_craft_recipe({
     output       = "sl_modebase:loot_crate",
-    output_count = 1,
+    output_count = 2,
     ingredients  = {["ground:square_neon"] = 8},
     description  = "Empty Loot Crate",
     category     = "salvage",
@@ -316,7 +340,7 @@ register_craft_recipe({
 
 register_craft_recipe({
     output       = "construction:sparks",
-    output_count = 2,
+    output_count = 8,
     ingredients  = {["ground:rhombus_neon"] = 4},
     description  = "Spark Core",
     category     = "salvage",
@@ -324,7 +348,7 @@ register_craft_recipe({
 
 register_craft_recipe({
     output       = "construction:plasma",
-    output_count = 2,
+    output_count = 8,
     ingredients  = {["ground:x_neon"] = 4},
     description  = "Plasma Cell",
     category     = "salvage",
@@ -332,7 +356,7 @@ register_craft_recipe({
 
 register_craft_recipe({
     output       = "construction:fire",
-    output_count = 2,
+    output_count = 8,
     ingredients  = {["ground:x2_neon"] = 4},
     description  = "Thermal Unit",
     category     = "salvage",

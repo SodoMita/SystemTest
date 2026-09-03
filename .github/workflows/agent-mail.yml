@@ -1,0 +1,58 @@
+name: agent-mail
+
+# Gate for the cross-agent mailbox (agent_mail/PROTOCOL.md).
+#
+# Two jobs, both stdlib-only Python — no engine, no apt, no network. They run in
+# a few seconds, which is the point: a mail check has to be cheap enough that
+# nobody is tempted to skip it.
+#
+# Why this exists: mail is append-only and pushed to every clone that ever
+# syncs, so the two failure modes that matter cannot be undone after the fact.
+# A credential in a message is in every clone forever, and a typo'd recipient is
+# a message nobody ever reads. Both are cheap to catch before push and
+# impossible to fix after.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  mailbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Mailbox lint (envelope, addressing, secrets)
+        run: python3 tools/agentmail.py lint
+
+      - name: Mailbox lint — machine-readable summary
+        if: always()
+        run: python3 tools/agentmail.py lint --json
+
+      - name: Mailbox unit tests
+        run: python3 tests/agentmail_test.py
+
+  master-corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    # Owner ruling (2026-09-02): the mailbox corpus never exists on master.
+    # Only protocol docs (README / PROTOCOL / AMENDMENTS) ship there. This
+    # job runs for PRs into master and pushes to master; agent branches with
+    # a mailbox are not affected.
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'master') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fail if the agent-mail corpus is present
+        run: |
+          found=$(git ls-tree -r --name-only HEAD -- agent_mail/messages agent_mail/agents)
+          if [ -n "$found" ]; then
+            echo "::error::agent-mail corpus must not exist on master:"
+            echo "$found" | head -20
+            exit 1
+          fi
+          echo "master is clean of the agent-mail corpus"

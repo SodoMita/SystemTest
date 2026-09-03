@@ -76,8 +76,33 @@ minetest.register_chatcommand("sl_state", {
 
 		table.insert(parts, S("Phase: @1", tostring(pl.phase)))
 		table.insert(parts, S("Points: @1", tostring(pl.points or 0)))
+		if state.match_active then
+			table.insert(parts, S("Essence pool: @1",
+				tostring(state.monster_master.essence_pool or 0)))
+			-- Machine crafting readout: is the Objective Forge busy,
+			-- and with what? (§6.10 B — the run is public knowledge.)
+			if sl_machine and sl_machine.status then
+				local st = sl_machine.status()
+				if st and st.present then
+					if st.running then
+						table.insert(parts, S("Forge: @1 (@2s left)",
+							st.description or st.output or "?",
+							tostring(math.ceil(st.left or 0))))
+					else
+						table.insert(parts, S("Forge: idle"))
+					end
+				end
+			end
+		end
 		if pl.eliminated then
 			table.insert(parts, S("(Eliminated)"))
+		end
+		if pl.tournament_spectator then
+			table.insert(parts, S("(Tournament spectator)"))
+		elseif state.tournament then
+			table.insert(parts, S("Tournament: @1 match(es) left, @2 season points",
+				tostring(state.tournament_matches_left or 0),
+				tostring(state.tournament_scores[name] or 0)))
 		end
 
 		minetest.chat_send_player(name, "[System Looting] " .. table.concat(parts, " | "))
@@ -86,6 +111,56 @@ minetest.register_chatcommand("sl_state", {
 		else
 			minetest.chat_send_player(name, S("No active match."))
 		end
+	end,
+})
+
+minetest.register_chatcommand("sl_tournament", {
+	description = S("Tournament <start [matches]|stop>: fixed number of matches, roster locked at start, ranking at the end"),
+	privs = { server = true },
+	func = function(name, param)
+		local arg = (param or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+		local count = tonumber(arg:match("^start%s+(%d+)$") or "") or 5
+		if arg:match("^start") then
+			if state.tournament then
+				return false, S("Tournament mode is already running.")
+			end
+			if state.match_active then
+				return false, S("Start the tournament between matches.")
+			end
+			count = math.min(50, math.max(1, math.floor(count)))
+			state.tournament = true
+			state.tournament_planned = count
+			state.tournament_matches_left = count
+			state.tournament_scores = {}
+			-- The roster locks at the starting gun: everyone connected now
+			-- plays the season; anyone who joins later spectates (v1.3.5).
+			state.tournament_roster = {}
+			for _, player in ipairs(minetest.get_connected_players()) do
+				local pname = player:get_player_name()
+				state.tournament_roster[pname] = true
+				game_mode.get_player_state(pname).tournament_spectator = nil
+			end
+			local roster_n = 0
+			for _ in pairs(state.tournament_roster) do roster_n = roster_n + 1 end
+			game_mode.broadcast(S("TOURNAMENT MODE: @1 matches. Roster locked: @2 operators — late joiners spectate. Achievements, levels and abilities persist; inventories reset every match.",
+				tostring(count), tostring(roster_n)))
+			minetest.log("action", "[game_mode] tournament (" .. count ..
+				" matches) started by " .. name)
+			return true, S("Tournament started: @1 matches.", tostring(count))
+		elseif arg == "stop" then
+			if not state.tournament then
+				return false, S("No tournament is running.")
+			end
+			if state.match_active then
+				return false, S("Stop the tournament between matches.")
+			end
+			-- Ranking form first, then the one clean reset (shared with the
+			-- automatic end-of-season path in match.lua).
+			game_mode.end_tournament(S("stopped by @1", name))
+			minetest.log("action", "[game_mode] tournament stopped by " .. name)
+			return true, S("Tournament stopped: ranking shown, progression reset.")
+		end
+		return false, S("Usage: /sl_tournament <start|stop>")
 	end,
 })
 
@@ -388,6 +463,125 @@ minetest.register_chatcommand("sl_build_cage", {
 		end
 		local placed = game_mode.build_cloud_cage()
 		return true, S("Cloud cage update complete. @1 nodes materialized.", tostring(placed))
+	end,
+})
+
+-- ================================================================
+-- Map system commands: type selection, handmade-map listing,
+-- manual (re)build and arena export to a handmade map.
+-- ================================================================
+
+local MAP_TYPE_HELP = "procedural | test | schematic [name] | seed <n> | list | build | save <name>"
+
+minetest.register_chatcommand("sl_map", {
+	params = MAP_TYPE_HELP,
+	description = S("Show or configure the match map (type, handmade map, seed)"),
+	func = function(name, param)
+		local map = game_mode.map
+		if not map then
+			return false, S("Map system unavailable.")
+		end
+		local arg = (param or ""):match("^(%S*)")
+		local rest = (param or ""):match("^%S+%s+(.-)$")
+		local is_admin = minetest.check_player_privs(name, { sl_admin = true })
+
+		local function admin_only()
+			if is_admin then return true end
+			return false, S("Map configuration requires the sl_admin privilege.")
+		end
+
+		if arg == "" or arg == "status" then
+			local cur = map.current
+			local lines = {}
+			if cur then
+				table.insert(lines, S("Current map: @1 (type @2, seed @3), mobs: @4",
+					tostring(cur.name), tostring(cur.type), tostring(cur.seed),
+					tostring(#(cur.mobs or {}))))
+				table.insert(lines, S("Volume: @1 .. @2",
+					minetest.pos_to_string(cur.minp), minetest.pos_to_string(cur.maxp)))
+			else
+				table.insert(lines, S("No map prepared yet — the next match builds one."))
+			end
+			table.insert(lines, S("Next match: type '@1', handmade map '@2'",
+				tostring(map.runtime.type or minetest.settings:get("sl_map.type") or "procedural"),
+				tostring(map.runtime.schematic or minetest.settings:get("sl_map.schematic") or "random")))
+			return true, table.concat(lines, "\n")
+		end
+
+		if arg == "list" then
+			local maps = map.list_schematic_maps()
+			local names = {}
+			for n in pairs(maps) do table.insert(names, n) end
+			table.sort(names)
+			if #names == 0 then
+				return true, S("No handmade maps installed. Drop map.mts + map.conf into mods/game/sl_modebase/maps/<name>/ or <world>/maps/<name>/.")
+			end
+			return true, S("Handmade maps: @1", table.concat(names, ", "))
+		end
+
+		if arg == "procedural" or arg == "test" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			map.runtime.type = arg
+			map.persist()
+			return true, S("Next match uses the '@1' map type.", arg)
+		end
+
+		if arg == "schematic" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			if rest and rest ~= "" then
+				local maps = map.list_schematic_maps()
+				if rest ~= "random" and not maps[rest] then
+					return false, S("Handmade map '@1' not found. Use /sl_map list.", rest)
+				end
+				map.runtime.schematic = rest
+			end
+			map.runtime.type = "schematic"
+			map.persist()
+			return true, S("Next match uses the handmade map '@1'.",
+				tostring(map.runtime.schematic or "random"))
+		end
+
+		if arg == "seed" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			local seed = tonumber(rest or "") or 0
+			map.runtime.seed = seed ~= 0 and math.floor(seed) or nil
+			map.persist()
+			if map.runtime.seed then
+				return true, S("Map seed pinned to @1 (same arena every match).", tostring(map.runtime.seed))
+			end
+			return true, S("Map seed unpinned: every match generates a fresh arena.")
+		end
+
+		if arg == "build" or arg == "rebuild" then
+			local gate_ok, gate_err = admin_only()
+			if not gate_ok then return false, gate_err end
+			local ok, err = map.prepare()
+			if ok then
+				return true, S("Map '@1' materialized (seed @2).",
+					tostring(map.current.name), tostring(map.current.seed))
+			end
+			return false, tostring(err)
+		end
+
+		if arg == "save" then
+			if not minetest.settings:get_bool("creative_mode") then
+				return false, S("Map export is available only in creative mode.")
+			end
+			local sname = (rest or ""):match("^(%S+)$")
+			if not sname then
+				return false, S("Usage: /sl_map save <name>")
+			end
+			local ok, res = map.save_current(sname)
+			if ok then
+				return true, S("Map exported to @1. Adjust its map.conf and select it with /sl_map schematic @2.", tostring(res), sname)
+			end
+			return false, res
+		end
+
+		return false, S("Usage: /sl_map @1", MAP_TYPE_HELP)
 	end,
 })
 

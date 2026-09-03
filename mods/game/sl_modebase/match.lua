@@ -14,14 +14,44 @@ function game_mode.end_match(winner, reason)
 	state.match_active = false
 	state.match_ended_at = minetest.get_us_time() / 1000000
 
+	-- Score the match: survival + victory bonuses. Done BEFORE the
+	-- clean reset (which is below) because that normalizes every
+	-- player's phase to "alive" — we'd lose the alive/eliminated
+	-- distinction the survival bonus depends on.
+	if game_mode.award_match_end_points then
+		game_mode.award_match_end_points(winner, state.players)
+	end
+
 	-- Clean reset: cancel any pending ready check and neutralize live sabotages.
 	game_mode.cancel_ready_check()
 	game_mode.clear_all_sabotage()
 	game_mode.clear_all_possession()
 
+	-- Map reset: restore the arena to its initial state (nodes,
+	-- beacons, spawns), purge every mob and any match residue.
+	if game_mode.map and game_mode.map.reset then
+		game_mode.map.reset()
+	end
+
+	-- Release every spawn-search claim (mods/game/sl_modebase/spawn.lua
+	-- game_mode.find_spawn_pos). The map reset restored the nodes,
+	-- so the next match's spawns can reuse the same air pockets
+	-- without colliding with bodies from the just-ended match.
+	if game_mode.clear_spawn_claims then
+		game_mode.clear_spawn_claims()
+	end
+
+	-- Essence pool is per-match: nothing carries into the lobby, and
+	-- no provenance survives the reset (ruling §13.3, pool semantics).
+	if game_mode.essence_reset then
+		game_mode.essence_reset()
+	end
+
+	local restored_from_map = game_mode.map and game_mode.map.current
+
 	-- Restore beacons and spawns from persistent storage
 	local storage = game_mode.storage or minetest.get_mod_storage()
-	if storage then
+	if not restored_from_map and storage then
 		local spawns_str = storage:get_string("spawns")
 		if spawns_str and spawns_str ~= "" then
 			local data = minetest.deserialize(spawns_str)
@@ -40,7 +70,8 @@ function game_mode.end_match(winner, reason)
 		end
 	end
 
-	-- Remove all monsters
+	-- Remove all monsters (belt and braces: the map reset above also
+	-- purges every registered mob entity).
 	for _, obj in pairs(minetest.luaentities) do
 		if obj.name == game_mode.MONSTER_NAME then
 			obj.object:remove()
@@ -97,6 +128,95 @@ function game_mode.end_match(winner, reason)
 		pl.eliminated = false
 		pl.ghost_summoned_by = nil
 		pl.ghost_summon_pos = nil
+		pl.last_puncher = nil
+		-- Per-match score counters reset here (lifetime points / kills /
+		-- deaths are owned by the per-player state and persist across
+		-- matches; the awarded flag only prevents double-credit within
+		-- one match).
+		pl.kills = 0
+		pl.deaths = 0
+		-- pl.points and pl.earned_points are explicitly NOT reset
+		-- here: the result screen reads them before this point and
+		-- the tournament banking reads pl.earned_points just below.
+		-- They are zeroed at lobby-spawn time instead (see
+		-- spawn_player) so the next match starts from a clean slate.
+	end
+	if game_mode.clear_match_end_points_awarded then
+		game_mode.clear_match_end_points_awarded(state.players)
+	end
+
+	-- Tournament bookkeeping (v1.3.5): the tournament runs a fixed number
+	-- of matches. Each finished match banks its EARNED points (kills +
+	-- objective completions) into the roster's season score. End-of-match
+	-- survival and victory bonuses are NOT banked — they show up on the
+	-- per-match result screen via pl.points but the season rank is
+	-- driven by play (kills + objectives), per the §13.3 owner ruling.
+	-- When the last planned match ends, the ranking form pops out and
+	-- one clean reset follows (see end_tournament).
+	if state.tournament then
+		for name, pl in pairs(state.players) do
+			if state.tournament_roster[name] then
+				state.tournament_scores[name] =
+					(state.tournament_scores[name] or 0) + (pl.earned_points or 0)
+			end
+		end
+		state.tournament_matches_left = math.max(0,
+			(state.tournament_matches_left or 1) - 1)
+		if state.tournament_matches_left <= 0 then
+			local planned = state.tournament_planned or 0
+			minetest.after(2.0, function()
+				game_mode.end_tournament(
+					S("all @1 matches played", tostring(planned)))
+			end)
+		else
+			game_mode.broadcast(S("Tournament: @1 match(es) remaining.",
+				tostring(state.tournament_matches_left)))
+		end
+	end
+end
+
+-- End the tournament (v1.3.5): ranking form first, then the one clean
+-- reset — progression and achievements were on loan while it ran.
+function game_mode.end_tournament(reason)
+	if not state.tournament then return end
+	local ranked = {}
+	for name in pairs(state.tournament_roster) do
+		table.insert(ranked, { name = name, pts = state.tournament_scores[name] or 0 })
+	end
+	table.sort(ranked, function(a, b)
+		if a.pts ~= b.pts then return a.pts > b.pts end
+		return a.name < b.name
+	end)
+	local rows = {}
+	for i, entry in ipairs(ranked) do
+		table.insert(rows, { tostring(i), entry.name, tostring(entry.pts) })
+	end
+	local champion = ranked[1] and ranked[1].name or S("nobody")
+	game_mode.show_rank_formspec("sl_modebase:tournament_results",
+		S("TOURNAMENT RESULTS"),
+		S("Champion: @1 (@2)", champion, reason or ""),
+		{ "#", S("Operator"), S("Points") }, rows)
+	if ranked[1] then
+		game_mode.broadcast(S("TOURNAMENT OVER — champion: @1 with @2 points",
+			ranked[1].name, tostring(ranked[1].pts)))
+	end
+	-- The loan ends: progression, achievements and Monster Master grip
+	-- return to per-match rules with one clean reset (v1.3.4 semantics).
+	for _, player in ipairs(minetest.get_connected_players()) do
+		if reset_player_progression then
+			pcall(reset_player_progression, player)
+		end
+		if reset_match_achievements then
+			pcall(reset_match_achievements, player)
+		end
+	end
+	state.tournament = false
+	state.tournament_planned = 0
+	state.tournament_matches_left = 0
+	state.tournament_scores = {}
+	state.tournament_roster = {}
+	for _, pl in pairs(state.players) do
+		pl.tournament_spectator = nil
 	end
 end
 
@@ -106,13 +226,45 @@ local function reset_players_for_new_match()
 		pl.eliminated = false
 		pl.phase = "alive"
 		pl.points = 0
+		pl.earned_points = 0
+		pl.end_match_bonus = 0
 		pl.ghost_summoned_by = nil
 		pl.last_death_pos = nil
-		
-		-- Clear inventory at start of match too
+
 		local player = minetest.get_player_by_name(name)
-		if player and not minetest.settings:get_bool("creative_mode") then
-			player:get_inventory():set_list("main", {})
+		if player then
+			-- Every match starts from zero: inventories clear
+			-- unconditionally (the old creative-mode skip leaked whole
+			-- arsenals from match to match in creative testing), and
+			-- levels reset through the sl_gui hook when present.
+			local inv = player:get_inventory()
+			inv:set_list("main", {})
+			if inv.set_list and inv:get_list("craft") then
+				inv:set_list("craft", {})
+			end
+			if reset_player_progression and not state.tournament then
+				-- Tournament mode (v1.3.4): levels and abilities ride
+				-- across matches; only inventories reset.
+				local ok, err = pcall(reset_player_progression, player)
+				if not ok then
+					minetest.log("error", "[game_mode] progression reset for "
+						.. name .. ": " .. tostring(err))
+				end
+			end
+		end
+	end
+
+	-- The Monster Master's kit was gifted at role assignment, BEFORE
+	-- this reset ran — hand it back (it is role equipment, not loot).
+	local mm_name = state.monster_master.player
+	if mm_name then
+		local mm = minetest.get_player_by_name(mm_name)
+		if mm then
+			local inv = mm:get_inventory()
+			inv:add_item("main", game_mode.modname .. ":summon_monster")
+			if game_mode.ESSENCE_ITEM then
+				inv:add_item("main", game_mode.ESSENCE_ITEM .. " 10")
+			end
 		end
 	end
 end
@@ -143,30 +295,46 @@ function game_mode.send_results(winner, reason)
 		end
 	end
 
-	-- Formspec result screen -- FIX 2026-08-27: continue button too low partially below panel, moved from 5.9/0.7 to 5.8/0.6 and size 6.5->6.6
-	local fs = {
-		"formspec_version[4]",
-		"size[8,6.6]",
-		"bgcolor[#0a0a12ee;true]",
-		"label[0.5,0.4;" .. minetest.formspec_escape(S("MATCH RESULTS")) .. "]",
-		"label[0.5,0.9;" .. minetest.formspec_escape(
-			string.format("%s — %s", winner_label, reason or "")) .. "]",
-		"tablecolumns[text;text;text]",
-	}
 	local rows = {}
 	for name, pl in pairs(state.players) do
 		if minetest.get_player_by_name(name) then
-			table.insert(rows, string.format("%s,%s,%d",
-				minetest.formspec_escape(name), tostring(pl.phase),
-				pl.points or 0))
+			table.insert(rows, { minetest.formspec_escape(name),
+				tostring(pl.phase), tostring(pl.points or 0) })
 		end
 	end
-	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;Player,Phase,Points;"
-		.. table.concat(rows, ";") .. ";0]")
-	table.insert(fs, "button_exit[3,5.8;2,0.6;close;" .. minetest.formspec_escape(S("Continue")) .. "]")  -- FIX 2026-08-27: was 5.9/0.7 ending at 6.6 > 6.5 partially below panel, now 5.8/0.6=6.4 inside 6.6
+	game_mode.show_rank_formspec("sl_modebase:results", S("MATCH RESULTS"),
+		string.format("%s — %s", winner_label, reason or ""),
+		{ S("Player"), S("Phase"), S("Points") }, rows)
+end
+
+-- Shared ranking form (match results and the tournament leaderboard use
+-- the same layout). Rows arrive as arrays of cell strings; a formspec
+-- table[] carries the whole item list as ONE comma-separated element —
+-- ";"-joining rows produced "Invalid table element" on live servers, so
+-- never go back to that.
+function game_mode.show_rank_formspec(formname, title, subtitle, headers, rows)
+	local fs = {
+		"formspec_version[4]",
+		"size[8,6.5]",
+		"bgcolor[#0a0a12ee;true]",
+		"label[0.5,0.4;" .. minetest.formspec_escape(title) .. "]",
+		"label[0.5,0.9;" .. minetest.formspec_escape(subtitle) .. "]",
+		-- Column types are text/image/color/indent/tree and nothing else —
+		-- alignment is an option ("text,align=right"), never a type. An
+		-- unknown type feeds the client parser garbage: v1.3.5 shipped
+		-- 'right' here and the client segfaulted on the form.
+		"tablecolumns[text;text;text]",
+	}
+	local items = { table.concat(headers, ",") }
+	for _, row in ipairs(rows) do
+		table.insert(items, table.concat(row, ","))
+	end
+	table.insert(fs, "table[0.4,1.5;7.2,4.2;results;"
+		.. table.concat(items, ",") .. ";1]")
+	table.insert(fs, "button_exit[3,5.9;2,0.7;close;Close]")
 	local fs_str = table.concat(fs, "")
 	for _, player in ipairs(minetest.get_connected_players()) do
-		minetest.show_formspec(player:get_player_name(), "sl_modebase:results", fs_str)
+		minetest.show_formspec(player:get_player_name(), formname, fs_str)
 	end
 end
 
@@ -222,7 +390,8 @@ function game_mode.start_new_match(initiator)
 		local candidates = {}
 		for _, name in ipairs(connected) do
 			local pl = game_mode.get_player_state(name)
-			if not biggest_team or pl.team == biggest_team then
+			if (not biggest_team or pl.team == biggest_team)
+				and not pl.tournament_spectator then
 				table.insert(candidates, name)
 			end
 		end
@@ -237,7 +406,8 @@ function game_mode.start_new_match(initiator)
 	-- Ensure the active simulation has two actual beacon teams.
 	for _, name in ipairs(connected) do
 		local pl = game_mode.get_player_state(name)
-		if not pl.team and pl.role ~= "monster_master" then
+		if not pl.team and pl.role ~= "monster_master"
+			and not pl.tournament_spectator then
 			game_mode.assign_beacon_team(name)
 		end
 	end
@@ -250,6 +420,23 @@ function game_mode.start_new_match(initiator)
 	game_mode.cancel_ready_check()
 	game_mode.clear_all_sabotage()
 	game_mode.clear_all_possession()
+
+	-- Map: (re)materialize the selected map type to its initial state
+	-- and open the node-change journal for the coming match. Spawns
+	-- (beacons, MM base, ghost cage, lobby) come from the map.
+	if game_mode.map and game_mode.map.prepare then
+		local ok, err = game_mode.map.prepare()
+		if ok == false and err then
+			minetest.log("warning", "[game_mode] map prepare: " .. tostring(err))
+		end
+	end
+
+	-- Essence economy: fresh pool, provenance and hazard counter every
+	-- match (per-match state, like every other match state — ruling
+	-- §13.3, pool semantics).
+	if game_mode.essence_reset then
+		game_mode.essence_reset()
+	end
 
 	-- Beacons start every match at full integrity. Without this, damage
 	-- taken in a previous match persists (stale-state violation of the
@@ -276,11 +463,18 @@ function game_mode.start_new_match(initiator)
 		local player = minetest.get_player_by_name(name)
 		if player then
 			local pl = game_mode.get_player_state(name)
-			if not pl.team and pl.role ~= "monster_master" then
+			if not pl.team and pl.role ~= "monster_master"
+				and not pl.tournament_spectator then
 				game_mode.assign_beacon_team(name)
 			end
 			game_mode.spawn_player(player)
 		end
+	end
+
+	-- The map's initial mob population exists only while a match runs:
+	-- spawned fresh at every game start, purged when it ends.
+	if game_mode.map and game_mode.map.spawn_initial_mobs then
+		game_mode.map.spawn_initial_mobs()
 	end
 
 	local cond_list = {}
@@ -517,12 +711,39 @@ minetest.register_on_punchplayer(function(player, hitter, time_from_last_punch, 
 	if not state.match_active then
 		return true -- Block damage in lobby
 	end
-	
+
 	if hitter and hitter:is_player() then
 		local hname = hitter:get_player_name()
 		local hpl = game_mode.get_player_state(hname)
 		if hpl and (hpl.phase == "ghost" or hpl.phase == "evil_ghost") then
 			return true -- Ghosts cannot directly attack players
+		end
+		-- Track the last non-ghost puncher so on_dieplayer can credit
+		-- the kill (used by the K/D-weighted point formula). Cleared
+		-- at end_match so a previous-match hit doesn't bleed across.
+		if player and player.get_player_name then
+			local vpl = game_mode.get_player_state(player:get_player_name())
+			if vpl then vpl.last_puncher = hname end
+		end
+	elseif hitter and hitter.get_luaentity then
+		-- A monster (or any luaentity hitter) is the source of the
+		-- damage. If the monster was summoned by a Monster Master,
+		-- credit the MM with the kill, not the player. The MM's
+		-- monsters (sl_modebase/entities.lua spawn_monster) carry
+		-- `monster_owner` on the luaentity; sl_scary horror mobs
+		-- spawned via game_mode.spawn_monster do too.
+		local lua = hitter:get_luaentity()
+		if lua and lua.monster_owner then
+			local owner_name = lua.monster_owner
+			-- Resolve the owner through game_mode so the
+			-- "Monster Master" redoubt's identity is whatever the
+			-- player_state.role says right now (the MM can change
+			-- mid-match if a new player takes the role).
+			if state.monster_master.player == owner_name
+				and player and player.get_player_name then
+				local vpl = game_mode.get_player_state(player:get_player_name())
+				if vpl then vpl.last_puncher = owner_name end
+			end
 		end
 	end
 end)
@@ -541,9 +762,15 @@ minetest.register_on_dieplayer(function(player, reason)
 	local name = player:get_player_name()
 	local pl = game_mode.get_player_state(name)
 
-	-- Drop items on death
+	-- Drop items on death. When the corpse system is present
+	-- (WEAPONS_SPEC §7.1), the fountain is redirected into the body
+	-- instead of the floor: the inventory lands in the corpse, a
+	-- third of the loose ammo is smashed, and a residue node stays.
 	local pos = player:get_pos()
 	local inv = player:get_inventory()
+	if sl_weapons and sl_weapons.capture_death_items then
+		sl_weapons.capture_death_items(player, pos, inv)
+	else
 	for i = 1, inv:get_size("main") do
 		local stack = inv:get_stack("main", i)
 		if not stack:is_empty() then
@@ -562,9 +789,19 @@ minetest.register_on_dieplayer(function(player, reason)
 			end
 		end
 	end
+	end
 
 	if not state.match_active then
 		return
+	end
+
+	-- Credit the killer: last_puncher is set by the on_punchplayer
+	-- handler above and is only valid for non-ghost, non-suicide
+	-- kills during an active match. award_kill_points is its own
+	-- gatekeeper, so this call is safe even if last_puncher is nil
+	-- (e.g. environmental death, like falling off the arena).
+	if game_mode.award_kill_points then
+		game_mode.award_kill_points(pl.last_puncher, name)
 	end
 
 	if pl.role == "monster_master" then

@@ -729,7 +729,9 @@ minetest.register_node("sl_scary:hide_spot", {
         fixed = {-0.5, -0.5, -0.5, 0.5, 1.5, 0.5}
     },
 --     tiles = {"hide_spot_top.png", "hide_spot_bottom.png", "hide_spot_side.png"},
-    groups = {cracky = 1},
+    -- sl_essence_value = 2: hideout price paid to the MM pool when a
+    -- crew-placed Shadow Hideout is destroyed (essence ruling §13.3).
+    groups = {cracky = 1, sl_essence_value = 2},
 })
 
 -- minetest.register_entity("sl_scary:codop", {
@@ -829,7 +831,7 @@ minetest.register_entity("sl_scary:dredger", {
         pointable = true,
         hp_max = 40,
         makes_footstep_sound = false,
-        automatic_rotate = false,
+        automatic_rotate = 0, -- degrees per second; 0 = no rotation (number, not bool)
         automatic_face_movement_dir = false,
     },
 
@@ -1073,7 +1075,7 @@ minetest.register_entity("sl_scary:containment", {
         pointable = true,
         hp_max = 80,
         makes_footstep_sound = true,
-        automatic_rotate = false,
+        automatic_rotate = 0, -- degrees per second; 0 = no rotation (number, not bool)
         automatic_face_movement_dir = false,
     },
 
@@ -1218,7 +1220,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
         pointable = true,
         hp_max = 20,
         makes_footstep_sound = false,
-        automatic_rotate = false,
+        automatic_rotate = 0, -- degrees per second; 0 = no rotation (number, not bool)
         automatic_face_movement_dir = false,
     },
 

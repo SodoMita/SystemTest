@@ -1,6 +1,6 @@
 -- =============================================================
 -- System Looting — Unified Inventory (Tab System)
--- Tabs: Crafting | Abilities | Achievements | System | Comms
+-- Tabs: Crafting | Abilities | Achievements | System | Comms | Players
 -- WP5 UPGRADE: Inventory now exposes majority of sl_ commands via GUI
 -- =============================================================
 
@@ -16,15 +16,18 @@ local function set_current_tab(player, tab)
 end
 
 -- Tab button strip (reusable by the outfit menu too)
--- Now 5 tabs: crafting, abilities, achievements, system, comms
--- System tab exposes majority of sl_ commands, Comms tab for DM
+-- Now 6 tabs: crafting, abilities, achievements, system, comms, players
+-- System tab exposes majority of sl_ commands, Comms tab for DM,
+-- Players tab lists the connected operators (roster).
 local TAB_W, TAB_PITCH = 0.75, 0.8
 
 function gui_get_tab_buttons(current_tab, show_label, x0, y0)
     -- The defaults reproduce the original top-right placement used by the
-    -- outfit menu. The unified inventory passes its own origin because it
-    -- reserves a header band for the tabs and the character preview.
-    x0 = x0 or 7.1
+    -- outfit menu, shifted left so all six tab buttons end inside the
+    -- 12-unit frame (6 * 0.8 pitch + 0.75 width = 5.55 units of strip).
+    -- The unified inventory passes its own origin because it reserves a
+    -- header band for the tabs and the character preview.
+    x0 = x0 or 6.4
     y0 = y0 or 0.3
 
     local tabs = {
@@ -33,6 +36,7 @@ function gui_get_tab_buttons(current_tab, show_label, x0, y0)
         {id = "achievements", icon_img = "gui_tab_achievements.png", label = "Achievements"},
         {id = "system",       icon_img = "gui_tab_system.png",       label = "System"},
         {id = "comms",        icon_img = "gui_tab_comms.png",        label = "Comms"},
+        {id = "players",      icon_img = "gui_tab_players.png",      label = "Players"},
     }
 
     local formspec = {}
@@ -221,6 +225,15 @@ function get_unified_inventory(player)
             table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
             table.insert(formspec, "label[0.4,1.3;Comms tab loading... install system_tab.lua]")
         end
+
+    elseif current_tab == "players" then
+        if get_players_formspec then
+            local players_fs = get_players_formspec(player)
+            table.insert(formspec, players_fs)
+        else
+            table.insert(formspec, "box[0.2,1.1;11.6,9.8;#1a1a1aff]")
+            table.insert(formspec, "label[0.4,1.3;Players tab loading... install players_tab.lua]")
+        end
     end
 
     table.insert(formspec, "container_end[]")
@@ -247,6 +260,8 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         set_current_tab(player, "system");       changed_tab = true
     elseif fields.tab_comms then
         set_current_tab(player, "comms");        changed_tab = true
+    elseif fields.tab_players then
+        set_current_tab(player, "players");      changed_tab = true
     end
 
     if changed_tab then
@@ -273,6 +288,15 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
         end
     end
 
+    -- Delegate to players (roster) tab handler
+    if _G.sl_gui_players_handle_fields then
+        local handled = _G.sl_gui_players_handle_fields(player, fields)
+        if handled then
+            player:set_inventory_formspec(get_unified_inventory(player))
+            return
+        end
+    end
+
     -- Clicking the player preview overlay opens the outfit/info screen
     if fields.open_outfit then
         if get_character_outfit_formspec then
@@ -293,4 +317,4 @@ minetest.register_on_joinplayer(function(player)
     end)
 end)
 
-minetest.log("action", "[unified_inventory] Tab system loaded (5 tabs: crafting, abilities, achievements, system, comms).")
+minetest.log("action", "[unified_inventory] Tab system loaded (6 tabs: crafting, abilities, achievements, system, comms, players).")
