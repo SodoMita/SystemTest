@@ -259,15 +259,58 @@ local function command_privs_ok(name, def)
 	return #missing == 0, missing
 end
 
+-- SECURITY: a refusal must be loud, but "loud" must not be an amplifier. The
+-- engine rate-limits CHAT (chat_message_limit_per_10sec, then a kick for
+-- flooding) and applies NO rate limit to inventory-field submissions -- the
+-- empty-formname path is forwarded unconditionally
+-- (src/network/serverpackethandler.cpp:1376-1428). One forged packet therefore
+-- used to cost one chat message back plus one action-log line on disk, at
+-- whatever rate the client could send: measured, 200 packets produced 200 log
+-- lines and 200 chat messages, so a client could make the server write to its
+-- own log and answer it as fast as it could forge. Denials are now throttled
+-- per player: the first in a window is reported in full, the rest are counted,
+-- and the count rides along with the next report.
+local DENIAL_WINDOW = 2.0
+local denial_state = {}
+
+local function denial_now()
+	local gm = rawget(_G, "game_mode")
+	if gm and gm.now then return gm.now() end
+	return (minetest.get_us_time() or 0) / 1000000
+end
+
+local function report_denial(name, cmd, missing)
+	local now = denial_now()
+	local d = denial_state[name]
+	if not d then
+		d = { window_start = now, suppressed = 0 }
+		denial_state[name] = d
+	elseif now - d.window_start < DENIAL_WINDOW then
+		d.suppressed = d.suppressed + 1
+		return
+	end
+	local suppressed = d.suppressed
+	d.window_start = now
+	d.suppressed = 0
+	local detail = table.concat(missing, ", ")
+	local also = suppressed > 0
+		and S(" (+@1 more refused in the last @2s)",
+			tostring(suppressed), tostring(DENIAL_WINDOW))
+		or ""
+	minetest.chat_send_player(name, minetest.colorize("#ff5555",
+		S("Admin only - missing privilege(s): @1", detail) .. also))
+	minetest.log("action", "[sl_gui] " .. name .. " pressed /" .. cmd
+		.. " without: " .. detail
+		.. (suppressed > 0 and (" (+" .. suppressed .. " more in "
+			.. DENIAL_WINDOW .. "s)") or ""))
+end
+
 local function invoke_command(name, cmd, param)
 	local def = minetest.registered_chatcommands[cmd]
 	if not def or type(def.func) ~= "function" then return nil end
 	local allowed, missing = command_privs_ok(name, def)
 	if not allowed then
-		minetest.chat_send_player(name, minetest.colorize("#ff5555",
-			S("Admin only - missing privilege(s): @1", table.concat(missing, ", "))))
-		minetest.log("action", "[sl_gui] " .. name .. " pressed /" .. cmd
-			.. " without: " .. table.concat(missing, ", "))
+		report_denial(name, cmd, missing)
 		return false
 	end
 	return def.func(name, param)
@@ -282,6 +325,18 @@ _G.sl_gui_invoke_command = invoke_command
 -- ================================================================
 
 local comms_selection = {} -- [sender] = target
+
+-- SECURITY: per-name tables are per-client memory. This one had no leave
+-- cleanup, so every name that ever opened the comms tab stayed resident --
+-- and on a public server a client can mint fresh names as fast as it can
+-- reconnect. One line per table, and the leak is gone.
+minetest.register_on_leaveplayer(function(player)
+	local name = player and player.get_player_name and player:get_player_name()
+	if name then
+		comms_selection[name] = nil
+		denial_state[name] = nil -- per-name table, same rule
+	end
+end)
 
 local function handle_system_fields(player, fields)
 	local name = player:get_player_name()

@@ -1,6 +1,56 @@
 local S = game_mode.S
 local state = game_mode.state
 
+-- ================================================================
+-- Throttled logging for refusals (SECURITY)
+-- ================================================================
+-- A refusal should be loud -- but it must not be an amplifier. The engine
+-- rate-limits CHAT (chat_message_limit_per_10sec, then a kick for flooding)
+-- and rate-limits nothing else: an inventory-field submission with an empty
+-- formname is forwarded unconditionally, so a client can drive any
+-- client-reachable refusal path at packet rate. Each refusal used to cost one
+-- action-log line on disk; measured, 200 forged packets wrote 200 lines. One
+-- line per window per player, with the suppressed count appended to the next
+-- line that does get written, keeps the audit trail and caps the cost.
+local LOG_THROTTLE_WINDOW = 2.0
+local log_throttle = {} -- [key][name] = { at = <clock>, suppressed = <count> }
+
+function game_mode.throttled_log(level, key, name, msg)
+	local bucket = log_throttle[key]
+	if not bucket then
+		bucket = {}
+		log_throttle[key] = bucket
+	end
+	local now = game_mode.now()
+	local t = bucket[name]
+	if not t then
+		t = { at = now, suppressed = 0 }
+		bucket[name] = t
+	elseif now - t.at < LOG_THROTTLE_WINDOW then
+		-- Inside the window: count it, do not write it. The count rides along
+		-- with the next line that is written, so nothing is lost -- it is just
+		-- not written once per packet.
+		t.suppressed = t.suppressed + 1
+		return false
+	end
+	local suppressed = t.suppressed
+	t.at, t.suppressed = now, 0
+	minetest.log(level, msg .. (suppressed > 0
+		and (" (+" .. suppressed .. " more in " .. LOG_THROTTLE_WINDOW .. "s)")
+		or ""))
+	return true
+end
+
+-- Freed with the player: this is a per-name table, and disconnect is free,
+-- instant and repeatable (see the same rule in sl_gui/system_tab.lua).
+minetest.register_on_leaveplayer(function(player)
+	local name = player and player.get_player_name and player:get_player_name()
+	if not name then return end
+	for _, bucket in pairs(log_throttle) do
+		bucket[name] = nil
+	end
+end)
+
 -- Monster master helpers
 function game_mode.is_monster_master(name)
 	return state.monster_master.player == name
@@ -206,14 +256,25 @@ end
 minetest.register_chatcommand("sl_be_monster_master", {
 	description = S("Volunteer as monster master in the lobby (if none exists yet)"),
 	func = function(name)
-		if state.monster_master.player and state.monster_master.player ~= name then
+		if state.monster_master.player == name then
+			-- SECURITY: idempotent. This used to fall through and re-run
+			-- set_monster_master() + broadcast(), so one forged `sys_be_mm`
+			-- field re-spawned the caller (a position update to every player)
+			-- and re-announced "@1 is now the Monster Master!" to the whole
+			-- server -- per packet, at packet rate, with no privileges needed
+			-- beyond the open lobby volunteer path. Holding the role is a
+			-- state, not an event: claiming it twice changes nothing.
+			return true, S("You already carry the doctrine.")
+		end
+		if state.monster_master.player then
 			return false, S("Monster master is already @1", state.monster_master.player)
 		end
 
 		local allowed, why = game_mode.may_claim_monster_master(name)
 		if not allowed then
-			minetest.log("action", "[game_mode] refused /sl_be_monster_master for "
-				.. name .. ": " .. tostring(why))
+			game_mode.throttled_log("action", "mm_refused", name,
+				"[game_mode] refused /sl_be_monster_master for " .. name
+				.. ": " .. tostring(why))
 			return false, why
 		end
 
@@ -640,7 +701,20 @@ minetest.register_chatcommand("sl_map", {
 		if arg == "seed" then
 			local gate_ok, gate_err = admin_only()
 			if not gate_ok then return false, gate_err end
-			local seed = tonumber(rest or "") or 0
+			-- SECURITY: the parameter is client text and this one is
+			-- PERSISTED -- map.persist() writes it to mod storage, so a bad
+			-- value survives restart and drives mapgen for every later match.
+			-- tonumber("1e999") is +inf and tonumber("nan") is NaN; both used
+			-- to be stored as-is (verified: map.runtime.seed == inf). Same rule
+			-- as the strand seed: a finite integer within +/- 2^31, or refuse.
+			local seed = tonumber(rest or "")
+			if seed == nil then
+				return false, S("Usage: /sl_map seed <whole number> (0 unpins).")
+			end
+			if seed ~= seed or seed == math.huge or seed == -math.huge
+				or seed ~= math.floor(seed) or math.abs(seed) > 2 ^ 31 then
+				return false, S("Seed must be a whole number within +/- 2147483648.")
+			end
 			map.runtime.seed = seed ~= 0 and math.floor(seed) or nil
 			map.persist()
 			if map.runtime.seed then
