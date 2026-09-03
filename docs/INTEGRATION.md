@@ -1,6 +1,18 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-03 (rev 13)
+**Date:** 2026-09-03 (rev 14)
+**Rev 14 (owner, rev I — "Walk animations are bad"):** the ground mobs'
+WALK×3 rows are now **dedicated 1×3 front-facing walk strips** (dredger
+stride, containment heavy lurch) generated per-owner-workflow (realistic
+no-neon black strip + white twin → `pipeline/walk_sheet.py` slices,
+triangulates, neonizes, then `--splice` replaces sheet rows 3–5;
+idle/attack/death rows untouched). Loops: `docs/art_baseline/walk_dredger.gif`,
+`walk_containment.gif`; full preview `cs_mobs_v7_walkfix.png`. The
+**wraith has no walk frames**: it uses one static FRONT frame (new
+`glide` animation state) and floats via a sinusoidal code wobble
+(`apply_wobble` in `init.lua`, ±0.22 nodes, ~2 s cycle), per owner "use
+static image, but use effect to wobble that image for floating flying
+animation".
 **Rev 13 (owner workflow correction, rev G):** "generate realistic pics
 without neon, then turn into neon flatcolored". The mob grids are now
 generated as **photorealistic creatures with no neon/flat constraints**
