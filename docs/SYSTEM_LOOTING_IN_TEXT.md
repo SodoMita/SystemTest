@@ -72,12 +72,18 @@ No world data beyond it. This is the counterpart to the HUD's "identity-neutral"
 }
 ```
 
-- **A beacon cannot be damaged by its own team.** `match.beacon_a`/`beacon_b` HP are readouts
-  of an *enemy* or *monster/corrosion* action only — a player punching their own beacon is a
-  no-op (no self-damage, and no self-destruction reward for the traitor move). This keeps the
-  beacon the **one reliable read** of "who's with me" and removes the free self-objective
-  exit hatch. Own-team punch = nothing; the only ways to hurt a beacon you "should" defend are
-  a bounded sabotage charge or feeding info to the other side.
+- **A beacon is not freely damaged by its own team — it is priced, not banned.** `match.beacon_a`/
+  `beacon_b` HP are readouts of an *enemy* or *monster/corrosion* action, but an own-team punch is
+  *possible* and **costs something**: own-team hits do 1 HP (not 5) and every punch still **broadcasts
+  `X damaged beacon_a (HP: n)` server-wide** — the loudest confession in the game. A fumble costs 1 HP
+  and a warning line; a deliberate throw is a hundred-punch public performance nobody has time for.
+  The *reward* is the thing gated, not the act: `beacon_destruction` points and the MM essence credit
+  are withheld when the attacker is on the destroyed beacon's own team, so the "traitor" move is
+  legible (it testifies at 5 HP a swing) rather than a profitable exit hatch. Does this keep the beacon
+  "the only reliable read of who's with me"? Yes — but as a *consequence*, and it must be decided
+  explicitly, because an own-team-only damage broadcast now implies the attacker is **not** on that
+  team, which in a two-teams-plus-one-MM game is nearly the attacker's team published. §7j: a change
+  in one place (on_punch) re-scopes what another place (damage_beacon broadcast) implies.
 - **World tags are observation threads, NOT people (§7i).** `contact-14a` is minted when a
   contact enters perception and **retired when it leaves.** A re-sighting after losing the
   line mints a **new** tag. The same operator seen twice is two tags unless the agent kept
@@ -160,6 +166,14 @@ contain:
 **Every field in the text state is an observation, so every field may be wrong.** A field
 allowed to be a fact is a field that will become one. The negative contract is also a
 schema you can **assert against** — which is why it's a test, not prose.
+
+**Assert the schema, not a blocklist (jax §7i/§9e).** "Assert none of these eight field names
+appear" is a blocklist, and a blocklist **loses to whoever names the ninth**: `presence_summary`,
+`teammates`, `allies_nearby`, `squad` — any of them passes the test and does the roster's job.
+The test must instead be an **allowlist**: every key in the state block is declared in ONE schema
+file, and the test fails on *any* key not in it. Then the contract survives the author, not the
+author's list. This is the same move as the score's `--emit` (one truth, one file) and the whole
+reason a test beats prose.
 
 **Scanner noise is deterministic, not averaging (carmack/jax).** Bearings to 8 compass
 points, distances to bands, error deterministic per (target, time-window). The same window
