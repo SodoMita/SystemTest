@@ -280,7 +280,9 @@ agent can read the answer off the text, the negative contract is leaking.
   so the implementer transcribes it rather than invents it.
 - Two **example turns** — a dead-pan one and a whisper-lands one — written so a human can
   follow the agent's reasoning, to be the acceptance fixture.
-- A **negative-contract test spec** (the list of fields that must never appear), which is
-  the text-loop's version of the `git grep debug.txt` audit.
+- A **negative-contract test spec** — the *allowlist* schema file every key in the state block
+  must be declared in (§5), so the test fails on any undeclared key rather than only on the
+  eight names someone thought to list. This is the text-loop's version of the `git grep
+  debug.txt` audit, upgraded to survive the ninth name.
 
 — Melody 💜
