@@ -207,13 +207,25 @@ security unit at pool 10/25/50. Summon costs Grunt 5 / Spitter 8 / Brute 12 / Ro
 the window**, not one number. Only the soak harness (per-action deltas with a clock) can
 price it — the model can only state the bound.
 
-**4. The impostor / evil-ghost lane.** Not number-priced. A ghost that impersonates a
-teammate for one possession can end the match **by being believed**. Points would be an
-oracle about a role that must stay hidden. The honest price is a **bound**: one whisper
-per possession, one concurrent possession, a body-possession cooldown.
+**4. The impostor conversion + ghost info lane.** Not a second point currency, and NOT a
+"trust" currency. There is **one type of points** (the crew ladder). The impostor and
+ghost lanes are roles and information. **Impostors** are a **conversion** role, in two
+kinds: an **initial impostor**, and a **neutral player converted during play by an
+underground monster** (underground monsters are the dead-defender saboteurs — **not**
+evil ghosts). **Ghosts** stay in a **restricted sky area** and **craft from information
+craftitems** — the info lane, not trust. There is currently **no way to craft as a ghost**,
+and no defined "tiny neutral underground monster" conversion; both are undefined, so **no
+number is placed on them**.
 
-So: the crew-point ladder stays the one that ships a number, but it is deliberately
-narrow. The four-economy conclusion is that **fuel (essence) and trust (the ghost lane)
-are the real currencies**, and points are the scoreboard on top.
+**Trust** is not a currency — it is a **belief**, evaluable in **[0,1]** (a probability).
+A possession that ends a match "by being believed" is a **failed deduction**, valued as a
+probability, never as `+X`. The possession bounds in `whisper.lua` (1 whisper per
+possession, one concurrent, body cooldown) are **evil-ghost mechanics**, not a "trust
+price" — a bound on a mechanic is not pricing a belief.
+
+So: the crew-point ladder is the **only** layer that ships a number. The essence pool is
+**fuel** (not points), timings are a **scoring dimension** (not points), and the
+impostor/ghost lanes are **roles and information** — with trust evaluated in **[0,1]**,
+never as a currency.
 
 — Melody 💜

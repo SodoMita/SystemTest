@@ -22,11 +22,14 @@ THE FOUR ECONOMIES (why they cannot be priced in isolation):
      vessel for 20s, a match is 600s. The value of an action is NOT its raw effort
      — it's what it does inside a window. A sabotage placed at t=580 is nearly
      worthless; one at t=0 denies for a third of the match.
-  4. THE IMPOSTOR / EVIL-GHOST LANE. One whisper per possession, body possession has
-     a hard cooldown, one concurrent possession total. A ghost's "points" are not on
-     the crew ladder — they are the social-deduction economy: a single fabricated
-     DM, a lie through a vessel, a Betrayer who hears both sides. This is not
-     number-priced; it is priced in *trust*, which is the game's real currency.
+  4. THE IMPOSTOR CONVERSION + GHOST INFO LANE — roles and information, NOT points,
+     and NOT a "trust currency." There is ONE type of points (the crew ladder).
+     Impostors are a CONVERSION role in two kinds: an initial impostor, and a
+     neutral player converted DURING play by an UNDERGROUND MONSTER (underground
+     monsters are the dead-defender saboteurs, NOT evil ghosts). Ghosts stay in a
+     RESTRICTED SKY AREA and craft from INFORMATION CRAFTITEMS — the info lane,
+     not trust. Trust is a belief evaluable in [0,1], not a point and not a
+     currency. See audit_economy4().
 
 Run:        python3 tools/point_economy_model.py            # audit + exit code
             python3 tools/point_economy_model.py --emit OUT # write generated constants
@@ -219,31 +222,47 @@ def audit_economy3():
     print("   the only thing that can price the window: per-action deltas with a clock.")
     print()
     print("   Possession holds a vessel for %ds — one whisper per possession, hard" % poss)
-    print("   cooldown on body possession. The ghost's value is a SINGLE fabricated")
-    print("   lie inside a %ds window, not a farmable action." % poss)
+    print("   cooldown on body possession. This is an EVIL-GHOST MECHANIC bound, its")
+    print("   value is a single fabricated statement inside a %ds window — not a" % poss)
+    print("   farmable action, and not a 'trust point' price.")
 
 
 # =====================================================================
-# ECONOMY 4 — THE IMPOSTOR / EVIL-GHOST LANE. Not number-priced. This is the
-# social-deduction economy, and it is the game's real currency: TRUST.
+# ECONOMY 4 — THE IMPOSTOR CONVERSION + GHOST INFO LANE. ONE type of points.
+# Not a trust currency: impostor = conversion (2 kinds), ghost = sky info-craft,
+# trust = a belief evaluable in [0,1], undefined mechanics get no number.
 # =====================================================================
 def audit_economy4():
-    print("\nECONOMY 4 — THE IMPOSTOR / EVIL-GHOST LANE (not number-priced)")
+    print("\nECONOMY 4 — IMPOSTOR CONVERSION + GHOST INFO LANE (ONE type of points)")
     print("=" * 60)
-    print("   A ghost's 'points' are not on the crew ladder. They are priced in trust:")
-    print("     - 1 whisper per possession, one concurrent possession total (whisper.lua)")
-    print("     - a body possession has a HARD cooldown (a body is worth more than a door)")
-    print("     - the Betrayer (vessel) hears BOTH sides — complicit, not a puppet")
-    print("     - a fabricated DM can cause a murder without a single punch (melody_design_thoughts)")
+    print("   There is exactly ONE type of points: the crew ladder (--emit). The")
+    print("   impostor and ghost lanes are roles and INFORMATION, not a second")
+    print("   currency, and not a 'trust point' system.")
     print()
-    print("   >> A number model that puts the ghost on the same ladder as a kill is")
-    print("      measuring the wrong thing. An impostor who impersonates a teammate")
-    print("      for one turn can end the match — not because of points, but because")
-    print("      the crew believed them. That value is not +X; it is a failed deduction.")
+    print("   IMPOSTORS — a CONVERSION role, in two kinds (not a ladder):")
+    print("     - an INITIAL impostor (a role chosen at start)")
+    print("     - a NEUTRAL player CONVERTED during play by an UNDERGROUND MONSTER")
+    print("       (underground monsters are the dead-defender saboteurs — NOT evil")
+    print("       ghosts. They convert, ghost-haunt, bomb, feed the summon pool.)")
     print()
-    print("   The only honest price on the ghost lane is a BOUND: one whisper per")
-    print("   possession, one concurrent possession, a cooldown. Bounds are countably")
-    print("   cheap; a point value would be an oracle about a role that must stay hidden.")
+    print("   GHOSTS — the INFORMATION lane:")
+    print("     - stay in a RESTRICTED SKY AREA")
+    print("     - craft from INFORMATION CRAFTITEMS (the info economy), not from trust")
+    print()
+    print("   There is no way yet to CRAFT as a ghost, and no defined 'tiny neutral")
+    print("   underground monster' conversion — those are UNDEFINED. Do not number-")
+    print("   price an undefined mechanic.")
+    print()
+    print("   TRUST — a BELIEF, evaluable in [0,1] (a probability, not a currency):")
+    print("     - a ghost/possession that ends a match 'by being believed' is a failed")
+    print("       deduction. Value it as a probability, NOT as +X. It is in [0,1].")
+    print("     - possession bounds (whisper.lua: 1 whisper per possession, one")
+    print("       concurrent, body cooldown) are EVIL-GHOST MECHANICS, not a 'trust")
+    print("       price.' A bound on a mechanic is not pricing a belief.")
+    print()
+    print("   >> THE RULING: one point type (crew ladder); essence = fuel; timings =")
+    print("      a scoring dimension; impostor = conversion; ghost = sky info-craft;")
+    print("      trust = a [0,1] belief. Never call trust a currency.")
 
 
 def _git_head():
@@ -402,7 +421,8 @@ def main():
 THE FOUR-ECONOMY CONCLUSION:
   - Crew points are the shipped ladder; the model prices them relative to a kill.
     It is the ONLY layer that emits a number (--emit). It is deliberately narrow
-    because the other three layers are not points — they are fuel and trust.
+    because the other three layers are not points — they are fuel (essence), a
+    scoring dimension (timings), and roles/information (impostor + ghost).
   - The MM's essence pool (economy 2) is FUEL, and the crew FEEDS it. Building the
     Signal core credits the pool +3, and losing the core to an MM dig pays +5.
     So "a team cannot do all three" is not just pool contention — committing to
@@ -411,10 +431,12 @@ THE FOUR-ECONOMY CONCLUSION:
     t=0 denies %.0f%% of the match; one at t=%d is wasted. The soak harness emitting
     per-action deltas is the only thing that can price a window — the model can
     only state the bound.
-  - The impostor lane (economy 4) is NOT number-priced. A ghost that impersonates a
-    teammate for one possession can end the match by being believed. Points would be
-    an oracle about a role that must stay hidden. The honest price is a BOUND:
-    one whisper per possession, one concurrent possession, a cooldown.
+  - The impostor + ghost lanes (economy 4) are NOT a point economy. ONE type of
+    points exists: the crew ladder. Impostors are a CONVERSION (two kinds: initial,
+    and a neutral converted by an UNDERGROUND MONSTER which is NOT an evil ghost).
+    Ghosts are the information lane: a restricted sky area where they craft from
+    info craftitems. Trust is a belief evaluable in [0,1], not a currency — and no
+    points go on a mechanic that is still undefined.
 
 WHAT IT CANNOT DECIDE (the meeting's word):
   - The exact SCALE for crew points needs the soak harness to emit per-action deltas.
