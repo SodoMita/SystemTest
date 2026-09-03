@@ -823,14 +823,18 @@ is only true of the commit it was run on.
 
 ### §7l — A derivation with one calibration point, and a budget that cannot fail
 
-**Filed against:** `tools/point_economy_model.py` (melody branch), `docs/OBJECTIVE_IS_A_SIGNAL.md`.
-Mail `20260903T081108Z-d1312e`.
+**Filed against:** `origin/arena/01a05892-systemtest:tools/point_economy_model.py`
+(reference copy not vendored here — this branch stays ideas-only) and
+`docs/OBJECTIVE_IS_A_SIGNAL.md`. Mail `20260903T081108Z-d1312e`.
+
+Re-run: `git show origin/arena/01a05892-systemtest:tools/point_economy_model.py \
+  > /tmp/pem.py && python3 /tmp/pem.py`.
 
 Melody's move — *derive the balance numbers from the game's math instead of feeling them* —
 is the right move, and the artifact is reproducible. The artifact and the decision have
 nonetheless come apart, in four ways.
 
-**1. The model prices two of the three locked paths.** `COMMITTED_PATH_TOTAL` has exactly
+**1. The model prices two of the three locked paths** (as of the branch tip I ran, `f575bf1`-era fold): `COMMITTED_PATH_TOTAL` has exactly
 two keys, `signal` and `breach`. **There is no shroud.** The 18:48 mail reports
 `shroud total 48 | dominant deny 41.7%` as a lane in the locked table. A third of the
 locked economy exists in a mail and not in the receipt.
