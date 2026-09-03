@@ -11,10 +11,13 @@ the alpha channel is solved from the pair of renders:
   => a = clamp(1 - (W - B)/(bW - bK))          [triangulated alpha]
 
 The white cell is shift-registered onto the black cell (centroid + coarse
-correlation) before solving. RGB is taken from the black render so the
-neon rim / eye / effect pixels survive; dark interior pixels are
-flattened to the mob's single fill colour (owner: realistic silhouette,
-single-colour fill, scary with effects).
+correlation) before solving. Then the cell is **neonized** (owner
+2026-09-03: "generate realistic pics without neon, then turn into neon
+flatcolored"): the AI renders REALISTIC creatures; this script flattens
+the body interior to the mob's single flat colour, recolours bright
+saturated features (eyes/visor/maw/glints) to the mob's neon accents by
+hue, colours soft/AA/glow pixels with the rim colour, and strokes a
+crisp neon rim + soft glow around the silhouette.
 
 Output: 256x2304 vertical sheet, 9 rows of 256x256:
   row 0 FRONT, 1 BACK, 2 SIDE, 3-5 WALK x3, 6-7 ATTACK x2, 8 DEATH
@@ -30,9 +33,31 @@ from transpose_sprite_strip import read_png, write_png  # noqa: E402
 
 WORK = os.environ.get("SPRITE_WORK", "/tmp/sl_sprite_work")
 os.makedirs(WORK, exist_ok=True)
-FILL = {"dredger": (11, 12, 14),
-        "wraith": (7, 4, 14),
-        "containment": (8, 6, 4)}
+
+# Neon-flat style per mob (owner 2026-09-03 "generate realistic pics
+# without neon, then turn into neon flatcolored"): the AI draws a
+# REALISTIC creature (no neon/colouring constraints); this script then
+# flattens the body to a single colour, recolours the creature's bright
+# features to the mob's neon accents, and strokes a neon rim + glow
+# around the triangulated silhouette.
+#   fill    - single flat body colour
+#   rim     - neon colour of the silhouette rim / soft parts (glow)
+#   accents - neon palette used to recolour bright saturated features
+#             (eyes, visor crack, maw, sparks) - picked per pixel by hue
+MOB_STYLE = {
+    "dredger":     {"fill": (9, 10, 12), "rim": (230, 120, 40),
+                    "accents": [(230, 120, 40), (0, 255, 65)]},   # amber rim, green visor
+    "wraith":      {"fill": (8, 5, 16), "rim": (0, 235, 255),
+                    "accents": [(0, 235, 255), (150, 235, 255)]},  # cyan rim/eyes, ice
+    "containment": {"fill": (10, 7, 5), "rim": (255, 170, 0),
+                    "accents": [(255, 170, 0), (255, 70, 40)]},    # amber rim, ember eyes
+}
+
+# Feature threshold: pixels at/above this saturation (or very high
+# luminance) inside the silhouette become neon accents; everything else
+# becomes the flat fill.
+SAT_FEATURE = 0.30
+LUM_FEATURE = 205
 
 
 def im(args):
@@ -240,19 +265,60 @@ def refine_shift(aB, aW, dx0, dy0):
     return best or (dx0, dy0)
 
 
-def compose_cell(brows, wrows, bK, bW, dx, dy, fill, out_row):
-    """Triangulate alpha (white registered by dx,dy onto black), RGB from the
-    black render, flatten the dark interior to the single fill colour.
+def _sat(r, g, b):
+    mx = max(r, g, b)
+    return 0.0 if mx == 0 else (mx - min(r, g, b)) / mx
 
-    Interior rule (the AI's two renders rarely share the exact same
+
+def _hue(r, g, b):
+    """Standard 0..360 hue; -1 for neutral greys."""
+    mx, mn = max(r, g, b), min(r, g, b)
+    if mx == mn:
+        return -1.0
+    d = mx - mn
+    if mx == r:
+        h = ((g - b) / d) % 6
+    elif mx == g:
+        h = (b - r) / d + 2
+    else:
+        h = (r - g) / d + 4
+    return h * 60.0
+
+
+def _nearest_accent(r, g, b, accents):
+    """Pick the accent whose hue is closest to the pixel's hue (wrap-safe)."""
+    h = _hue(r, g, b)
+    if h < 0:
+        return accents[0]
+    best, bestd = accents[0], 999.0
+    for a in accents:
+        ha = _hue(*a)
+        d = abs(h - ha)
+        d = min(d, 360.0 - d)
+        if d < bestd:
+            bestd = d
+            best = a
+    return best
+
+
+def compose_cell(brows, wrows, bK, bW, dx, dy, style, out_row):
+    """Triangulate alpha, then neonize the pixel (owner workflow).
+
+    Pixel classes (the AI's two renders rarely share the exact same
     straight colour, so plain triangulation would leave the whole body
-    semi-transparent): pixels that are dark in the black render AND not
-    near-white in the white render are the opaque single-colour body;
-    everything else (rim light, glows, AA edge) keeps the triangulated
-    soft alpha with its bright colour from the black render.
+    semi-transparent):
+      * solid core (alpha high) - opaque:
+          - dark / low-saturation interior  -> single flat `fill`
+          - bright saturated features       -> nearest neon `accent`
+      * soft pixels (low alpha: AA edge, wisps, glows, thin effects)
+        -> `rim` colour at the triangulated soft alpha (this becomes the
+        neon aura on edges; a crisp rim is stroked afterwards).
     """
     bd = tuple(bW[k] - bK[k] for k in range(3))
     den = 0.30 * bd[0] + 0.59 * bd[1] + 0.11 * bd[2]
+    fill = style["fill"]
+    rim = style["rim"]
+    accents = style["accents"]
     for y in range(256):
         br = brows[y]
         out = bytearray(256 * 4)
@@ -265,18 +331,75 @@ def compose_cell(brows, wrows, bK, bW, dx, dy, fill, out_row):
                 bq = br[x * 4:x * 4 + 3]
                 num = 0.30 * (wq[0] - bq[0]) + 0.59 * (wq[1] - bq[1]) + 0.11 * (wq[2] - bq[2])
                 av = 1.0 - num / den if den > 0 else 0.0
-                LB = 0.2126 * bq[0] + 0.7152 * bq[1] + 0.0722 * bq[2]
-                near_white = min(wq) > 190
                 if av > 0.04:
-                    if LB < 90 and not near_white:
-                        # single-colour opaque body
-                        out[x * 4:x * 4 + 3] = bytes(fill)
+                    if av > 0.55:
+                        sat = _sat(*bq)
+                        LB = 0.2126 * bq[0] + 0.7152 * bq[1] + 0.0722 * bq[2]
+                        if sat >= SAT_FEATURE or LB >= LUM_FEATURE:
+                            c = _nearest_accent(*bq, accents)
+                        else:
+                            c = fill
+                        out[x * 4:x * 4 + 3] = bytes(c)
                         out[x * 4 + 3] = 255
                     else:
-                        a255 = int(max(0.0, min(1.0, av)) * 255)
-                        out[x * 4:x * 4 + 3] = bytes((bq[0], bq[1], bq[2]))
+                        # soft edge / wisp / glow -> neon rim at soft alpha
+                        a255 = int(max(0.0, min(1.0, av * 1.9)) * 255)
+                        out[x * 4:x * 4 + 3] = bytes(rim)
                         out[x * 4 + 3] = a255
         out_row[y] = bytes(out)
+
+
+def neon_rim(cell_rows, style):
+    """Stroke a neon rim + soft outer glow around the silhouette.
+
+    Operates on a normalised 256x256 cell (post normalize_row): the rim
+    is the 2px dilation ring of the alpha mask coloured with the mob's
+    rim colour, plus a blurred 4px halo at low alpha for the glow.
+    """
+    p = os.path.join(WORK, "rim_in.png")
+    raw = bytearray()
+    for r in cell_rows:
+        raw += r
+    open(p + ".rgba", "wb").write(bytes(raw))
+    im(["-size", "256x256", "-depth", "8", "rgba:" + p + ".rgba", "PNG32:" + p])
+    base = os.path.join(WORK, "rim_base.png")
+    mask = os.path.join(WORK, "rim_mask.png")
+    dil2 = os.path.join(WORK, "rim_d2.png")
+    dil6 = os.path.join(WORK, "rim_d6.png")
+    ring = os.path.join(WORK, "rim_ring.png")
+    halo = os.path.join(WORK, "rim_halo.png")
+    ringc = os.path.join(WORK, "rim_ringc.png")
+    haloc = os.path.join(WORK, "rim_haloc.png")
+    out = os.path.join(WORK, "rim_out.png")
+    im([p, "-alpha", "extract", mask])
+    # empty cell guard: mean of mask ~ 0
+    probe = subprocess.run(["convert", mask, "-format", "%[fx:mean]", "info:"],
+                           capture_output=True, text=True)
+    if not probe.stdout or float(probe.stdout) < 0.002:
+        return cell_rows
+    rim_hex = "#%02X%02X%02X" % style["rim"]
+    im([mask, "-morphology", "Dilate", "Disk:2", dil2])
+    im([mask, "-morphology", "Dilate", "Disk:6", dil6])
+    # ring = dil2 minus mask ; halo = dil6 minus dil2
+    im([dil2, mask, "-compose", "MinusSrc", "-composite", ring])
+    im([dil6, dil2, "-compose", "MinusSrc", "-composite", halo])
+    im(["-size", "256x256", "xc:" + rim_hex, ringc])
+    im([ringc, ring, "-alpha", "off", "-compose", "CopyOpacity", "-composite", ringc + "2.png"])
+    im(["-size", "256x256", "xc:" + rim_hex, haloc])
+    im([haloc, halo, "-alpha", "off", "-compose", "CopyOpacity", "-composite", haloc + "2.png"])
+    # halo: soft glow behind the sprite
+    im([haloc + "2.png", "-channel", "A", "-evaluate", "Multiply", "0.55", "+channel",
+        "-blur", "0x4", haloc])
+    # final compose: base (sprite) <- halo behind <- sharp ring on top
+    im(["-size", "256x256", "xc:none", base])
+    im([base, p, "-composite", haloc, "-composite", ringc + "2.png", "-composite", out])
+    _, _, rows = read_rgba(out)
+    for f in (ringc + "2.png", haloc + "2.png", ring, halo, ringc, haloc, dil2, dil6, mask, base):
+        try:
+            os.unlink(f)
+        except OSError:
+            pass
+    return rows
 
 
 def normalize_row(cell_rows):
@@ -297,9 +420,8 @@ def normalize_row(cell_rows):
                 xs.append(x)
                 ys.append(y)
     if not xs:
-        # empty cell: transparent
-        empty = [bytes(256 * 4)] * 256
-        return empty
+        # empty cell: transparent (signal None -> main writes blank rows)
+        return None
     cw = max(xs) - min(xs) + 1
     ch = max(ys) - min(ys) + 1
     target_h = 220
@@ -317,7 +439,7 @@ def normalize_row(cell_rows):
 
 def main():
     black, white, out, mob = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-    fill = FILL.get(mob, (11, 12, 14))
+    style = MOB_STYLE.get(mob, MOB_STYLE["dredger"])
     bw, bh, brows = read_rgba(black)
     ww, wh, wrows = read_rgba(white)
     # The white twin is the layout authority: its cell interiors are near
@@ -357,8 +479,14 @@ def main():
         dy0 = round(cB[1] - cW[1])
         dx, dy = refine_shift(aB, aW, dx0, dy0)
         cell_rows = [None] * 256
-        compose_cell(br2, wr2, bK, bW, dx, dy, fill, cell_rows)
+        compose_cell(br2, wr2, bK, bW, dx, dy, style, cell_rows)
         cell_rows = normalize_row(cell_rows)
+        if cell_rows is None:
+            blank = [bytes(256 * 4)] * 256
+            sheet_rows.extend(blank)
+            stats.append(0)
+            continue
+        cell_rows = neon_rim(cell_rows, style)
         sheet_rows.extend(cell_rows)
         cov = sum(1 for r in cell_rows for x in range(0, 256, 2) if r[x * 4 + 3] > 120)
         stats.append(cov)
