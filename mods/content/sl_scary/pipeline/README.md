@@ -85,11 +85,24 @@ constraints — those were what made earlier attempts look cartoonish);
 5. Keep the row order — `sprite_animations` and the `^[verticalframe:9:0`
    loot icons assume it. Verify file size < 1 MB/asset.
 
+## Walk strips (owner rev I, 2026-09-03)
+
+The ground mobs' walk rows are produced as **dedicated 1×3 strips** so
+the stride can be directed precisely (the 3×3 grids read as "bad walk"
+poses). `python3 walk_sheet.py BLACK_STRIP WHITE_STRIP WALK3_OUT MOB`
+slices a one-row/three-cell strip (border + two gutters detected on the
+white twin), triangulates + neonizes each cell, and writes 3 rows
+(256×768); `walk_sheet.py --splice SHEET9 WALK3 OUT` replaces rows 3-5
+of the 9-row sheet. The wraith has **no walk frames**: it chases on one
+static FRONT frame (`glide` state) and floats via a code wobble
+(`apply_wobble` in `init.lua`).
+
 ## Scripts
 
 - `matte_sheet.py` — the current builder: 3×3 grid slicing (border-aware
   on the white twin), per-cell two-background alpha triangulation,
   single-colour flatten, normalisation, 9-row vertical stack.
+- `walk_sheet.py` — dedicated 1×3 walk-strip matting + splice helper.
 - `build_mob_sheet.py` — **superseded** white-key panel builder; kept
   only for reference/history. Do not use for new art.
 - `process_sprite.py` — white-key + halo cleanup + 256px cell

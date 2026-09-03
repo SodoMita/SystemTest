@@ -780,6 +780,7 @@ minetest.register_node("sl_scary:hide_spot", {
 local sprite_animations = {
     idle   = {row = 0, frames = 3, framelength = 0.45},  -- slow turn
     walk   = {row = 3, frames = 3, framelength = 0.18},  -- stride cycle
+    glide  = {row = 0, frames = 1, framelength = 1.0},   -- wraith: static FRONT
     attack = {row = 6, frames = 2, framelength = 0.11},  -- lunge pair
     death  = {row = 8, frames = 1, framelength = 1/6},   -- frozen
 }
@@ -1263,12 +1264,33 @@ minetest.register_entity("sl_scary:signal_wraith", {
     timer = 0,
     attack_timer = 0,
     drift_target = nil,
+    -- Floating animation: the wraith uses ONE static sprite frame and
+    -- "wobbles" in code (owner 2026-09-03: "For wraith use static image,
+    -- but use effect to wobble that image for floating flying
+    -- animation"). A gentle sinusoidal bob rides on top of whatever
+    -- movement the state machine did this tick.
+    wobble_t = 0,
+    wobble_prev = 0,
+    wobble_freq = 3.2,   -- rad/s: a slow eerie ~2 s float cycle
+    wobble_amp = 0.22,   -- nodes of vertical bob
 
     on_activate = function(self, staticdata, dtime_s)
         self.state = "idle"
         self.last_anim_state = nil
         set_sprite_anim(self, "idle")
         self:select_drift_target()
+    end,
+
+    apply_wobble = function(self, dtime)
+        self.wobble_t = (self.wobble_t or 0) + dtime
+        local bob = math.sin(self.wobble_t * self.wobble_freq) * self.wobble_amp
+        local pos = self.object:get_pos()
+        if not pos then return end
+        -- remove the previous tick's bob, add this tick's -> the sprite
+        -- oscillates around whatever base position the movement set
+        pos.y = pos.y - (self.wobble_prev or 0) + bob
+        self.object:set_pos(pos)
+        self.wobble_prev = bob
     end,
 
     select_drift_target = function(self)
@@ -1349,7 +1371,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
                     self.attack_timer = self.attack_cooldown
                 end
             else
-                set_sprite_anim(self, "walk")
+                set_sprite_anim(self, "glide")
                 local dir = vector.normalize(vector.subtract(player_pos, pos))
                 self.object:set_pos(vector.add(pos, vector.multiply(dir, self.chase_speed * dtime)))
             end
@@ -1368,6 +1390,9 @@ minetest.register_entity("sl_scary:signal_wraith", {
                 self.target_player = nil
             end
         end
+        -- Float wobble rides on every state (idle drift, chase glide,
+        -- glitch hops): the static sprite is brought to life by the bob.
+        self:apply_wobble(dtime)
     end,
 
     on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)

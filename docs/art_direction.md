@@ -84,10 +84,23 @@ mob art. Owner decisions below are verbatim-captured.
 
 Rev G batch shipped (2026-09-03): realistic no-neon black+white 3×3
 grids generated for all three mobs, matted + neonized into the
-256×2304 sheets (dredger 359 KB, wraith 345 KB, containment 499 KB —
-all < 1 MB). Preview: `docs/art_baseline/cs_mobs_v5_revF.png`.
+256×2304 sheets. Preview: `docs/art_baseline/cs_mobs_v5_revF.png`.
 Wraith needed one regen after the model collapsed its grid to 2 rows
-(ask for a square image). Waiting on the owner eyeball gate.
+(ask for a square image).
+
+Rev I (2026-09-03, owner: "Walk animations are bad"): the walk rows
+were re-done as **dedicated 1×3 walk strips** for dredger and
+containment — three explicit FRONT-facing stride/lurch frames
+(generated realistic no-neon + white twin, triangulated + neonized via
+`pipeline/walk_sheet.py`, then spliced into rows 3-5 of each 9-row
+sheet; idle/attack/death rows untouched). Watch the loops:
+`docs/art_baseline/walk_dredger.gif`, `walk_containment.gif`; full
+sheet preview `docs/art_baseline/cs_mobs_v7_walkfix.png`.
+**Wraith: no walk frames** — owner: "For wraith use static image, but
+use effect to wobble that image for floating flying animation." Chase
+now uses ONE static FRONT frame (`glide` animation state) and
+`init.lua` bobs the entity with a sinusoidal vertical wobble
+(`apply_wobble`, ±0.22 nodes at ~3.2 rad/s) so the ghost floats.
 
 Rev H (2026-09-03): the same realistic→neonize workflow applied to the
 sl_weapons **batch A inventory icons** (16 files) via
