@@ -102,6 +102,13 @@ now uses ONE static FRONT frame (`glide` animation state) and
 `init.lua` bobs the entity with a sinusoidal vertical wobble
 (`apply_wobble`, ±0.22 nodes at ~3.2 rad/s) so the ghost floats.
 
+**OWNER GATE: PASSED (2026-09-03, "good").** The three mob sheets are
+accepted as-is: dredger / wraith / containment 256×2304 9-row strips,
+realistic-silhouette neonized look, dedicated walk strips, wraith
+static+wobble float. Sheets committed on
+`arena/01a063d9-systemtest` (`94940d0`, docs `0775fce`). No further
+mob art re-rolls pending.
+
 Rev H (2026-09-03): the same realistic→neonize workflow applied to the
 sl_weapons **batch A inventory icons** (16 files) via
 `weapon_icons.py` (per-item palettes in `ICON_STYLES`; two 3×3 grids +
