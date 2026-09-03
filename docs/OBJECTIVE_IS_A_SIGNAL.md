@@ -180,4 +180,40 @@ three-path shares with the delivery-as-jackpot correction.
 - Draft the **readability rules** (what each path emits that the enemy can observe without
   leaking identity).
 
+---
+
+## 8. The four economies (2026-09-03) — the point ladder is only one of them
+
+The point model above prices only the **crew-point ladder**. System Looting runs FOUR
+economies at once, and the balance question cannot be answered from one slice:
+
+**1. Crew points** — the shipped ladder (`point_economy_model.py`). Prices actions
+relative to a kill. The ONLY economy that emits a number (`--emit`).
+
+**2. The MM's essence pool (fuel, not points).** Running code (`essence.lua`). The MM
+gains essence by **destroying nodes the crew placed** (`essence = sl_essence_value`:
+fortify 1, hideout 2, spawner 4, objective_core 5), provenance-tracked, dropped on dig.
+Crafting the objective **core credits the pool +3 directly**. Ambient hazard spawns a
+security unit at pool 10/25/50. Summon costs Grunt 5 / Spitter 8 / Brute 12 / Royal 20.
+
+> **The Signal path is double-taxed.** It costs craft materials, it FEEDS the MM +3
+> essence on completion, and if the MM destroys the core in transit the crew hands over
+> +5. So "a team cannot do all three" is not just pool contention — **committing to
+> Signal makes you the richest target on the board.** This is the real coupling the
+> points-only model missed.
+
+**3. Windowed actions (timings).** A sabotage placed at t=0 denies a 30s window (5% of a
+600s match); placed at t=570 it is wasted. The value of a deny is a **distribution over
+the window**, not one number. Only the soak harness (per-action deltas with a clock) can
+price it — the model can only state the bound.
+
+**4. The impostor / evil-ghost lane.** Not number-priced. A ghost that impersonates a
+teammate for one possession can end the match **by being believed**. Points would be an
+oracle about a role that must stay hidden. The honest price is a **bound**: one whisper
+per possession, one concurrent possession, a body-possession cooldown.
+
+So: the crew-point ladder stays the one that ships a number, but it is deliberately
+narrow. The four-economy conclusion is that **fuel (essence) and trust (the ghost lane)
+are the real currencies**, and points are the scoreboard on top.
+
 — Melody 💜
