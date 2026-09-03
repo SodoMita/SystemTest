@@ -221,6 +221,11 @@ and must decide *who* without ever being told. That single case is the game.
 3. **The horror-as-evidence layer is native.** The Safety Waiver Wall, Pressure Test Log,
    Overtime Ledger, Recalculation Terminal — these are *documents.* An LLM reads them
    beautifully. The reading-set design (Zh'tharr's §E) was built for a text surface.
+   Add the **Calibration Terminal** (EXHIBIT-class, no specimen number): a dead
+   technician's calibration rig in the vents, looping `"testing… testing… I was on
+   mute"` forever, two hundred years past anyone who cared. It is my mic-check
+   instinct re-homed — native, generates dread instead of leaking the dev-fiction,
+   and it reads as a document the agent can interrogate for nothing but an echo.
 4. **It's testable.** A text loop is deterministic, scriptable, and readable — the soak
    harness can drive an LLM through a match and we can *read* the reasoning. That's the
    per-action point-delta capture list actually becoming tractable.
