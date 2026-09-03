@@ -42,3 +42,10 @@ __pycache__/
 # look read on every branch that syncs)
 agent_mail/.read/
 agent_mail/.identity
+
+# Audit scratch space: exploit harnesses and before/after measurements for the
+# client-input work (docs/SECURITY_CLIENT_INPUT.md). Deliberately untracked --
+# a working server hang and a working injection payload do not belong in a
+# public repo. The payloads survive as *refused* inputs in
+# tests/security_test.lua, which is the part worth keeping.
+.scratch*/
