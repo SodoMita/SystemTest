@@ -908,3 +908,131 @@ New gate **G18**: the text-state emitter's output is validated against a declare
 (allowlist), not against a list of forbidden names.
 
 -- Jax // Sky-Metal strip
+
+---
+
+### §7m — A gate that cannot fail is a decoration that prints PASS
+
+**Filed against:** four instances found by four people in one week.
+Mail `20260903T082537Z-2d2e4b`.
+
+| # | Gate | Why it could never fail | Found by |
+|---|---|---|---|
+| 1 | **G7**, identity leak | scoped to a **filename**; the violation arrived in `mods/apis/sl_gui/players_tab.lua`, a new file in a new mod (§7j) | jax |
+| 2 | **G6**, durable store | scoped to a **moment**; `sl_strand:persisted` merged after the grep was run (§7k) | jax |
+| 3 | the **40% dominance budget** | `ONCE_PER_MATCH` exemption means the budget binds on neither priced path (§7l) | melody's model |
+| 4 | every **GUI-selection test** in the repo | `tests/minetest_stub.lua:545` returns `{type = "nothing"}` unconditionally, so no selection ever arrives | security round two |
+
+The shared shape is **not a wrong assertion. It is an unreachable one.** The gate passes
+because the condition it checks never arises — vacuous truth — and from the outside it is
+indistinguishable from a gate that works: green, with a number printed on it.
+
+Two sentences from this week that are the same sentence:
+
+> carmack: *"I ran the suite, quoted the number, and the number did not mean what I
+> implied."*
+> glitch: *"a green suite is testimony about the stub."*
+
+**The general check (cheap, and it catches the whole class):**
+
+> **Every gate ships a poisoned case that must turn it red.** Not a negative control
+> sitting beside the gate — a *mutant* of the thing the gate guards.
+
+**Gate G21 (new, replaces G8's narrow form):** for every invariant gate in the table, CI
+applies the mutation in a scratch worktree — delete the guard, or make the stub return a
+real event with a hostile payload — and asserts the gate **fails**. If the mutant passes,
+the build goes red on the *gate*, not on the code. **A gate that has never been red has
+never been tested.**
+
+G8 (poisoned stub for the ambient scheduler, filed before the scheduler exists) and §7h
+(negative controls for liveness gates) were both this law, stated too small. They are now
+a property of the whole gate table rather than one row of it.
+
+**Gate G22 (new):** fail the build on any unbounded `while` inside an `on_step`. Security
+round two's G6 — `while path_found == false do`, 200,000 path searches and 200,009
+broadcasts in one step, triggered by *a player building a wall* — is the worst hole in
+either round not because it is the worst bug but because it is reachable by anyone who
+plays. Every other hole came through a chat handler and required knowing the command.
+
+**One boundary on glitch's records-surface law** ("any displayed function of a player's
+history is a records-surface readout"): **"history" must include the display's own
+persistence.** A settle-time result screen is allowed to be perfect — that is the log
+becoming evidence after it matters. A result screen that stays on screen into the next
+match is a live readout one round late (§7d). Settle-time, then gone.
+
+-- Jax // Sky-Metal strip
+
+---
+
+### §7n — Nil is a role, not an absence; and price what you would otherwise ban
+
+**Filed against:** `mods/game/sl_modebase/commands.lua:9` (`set_monster_master`),
+`mods/game/sl_modebase/nodes.lua:8/110/182/234/270`, `mods/game/sl_modebase/scoring.lua:133`.
+Mail `20260903T082537Z-50194b`.
+
+**1. `pl.team` is nil for exactly one role, and that role is the antagonist.**
+
+`game_mode.set_monster_master` sets `pl.role = "monster_master"` **and `pl.team = nil`**.
+Therefore:
+
+> **Every `if pl.team == X then` guard in this codebase is a guard the Monster Master
+> walks through.** Gate on `pl.role` explicitly. Nil is a role, not an absence.
+
+Live consequence: melody's own-beacon self-damage fix (`20260902T213950Z-666259`) gates on
+`if pl and pl.team == "beacon_a" then return end`. The MM passes it. The MM can punch any
+beacon by hand — 5 HP a swing, ~7-13 seconds for 100 HP — and `handle_beacon_destruction`
+credits them the full `beacon_destruction` reward **plus** `add_mm_essence(1, …)`. That
+bypasses the entire Essence economy the owner's design gives the MM (§7l / lore mail
+`20260903T081115Z-67e69a`): **the MM has an income with no spend.**
+
+This is the same class as `/sl_be_monster_master` carrying no `privs` (Addendum §9):
+identity adjudicated by a field with an unhandled value.
+
+**2. Don't ban it — price it.** (The counter-proposal to the own-beacon fix.)
+
+`damage_beacon(team_id, amount, attacker_name, silent)` is called by the two beacon
+`on_punch` handlers with `silent` **nil**, so every punch broadcasts server-wide:
+`broadcast(S("@1 damaged @2! (HP: @3)", attacker_name, tdef.label, tdef.hp))`. At 5 HP per
+punch a beacon is **twenty public confessions** plus a destruction line.
+
+The filed fix returns before `damage_beacon` — no damage **and no broadcast**. That
+deletes the loudest evidence in the game in order to remove an incentive that lives
+somewhere else, in `handle_beacon_destruction`.
+
+> **You do not need to make it impossible. You need to make it worthless.**
+
+Correct fix, in the file where the incentive is:
+
+```lua
+local pl = credited_name and game_mode.get_player_state(credited_name)
+if pl and pl.team ~= team_id then
+    game_mode.award_objective_points(credited_name, "beacon_destruction")
+end
+```
+
+The act stays possible, becomes worth zero, and confesses twenty times on the way down.
+For the accidental case the owner hit: **price it** — an own-team punch does 1 HP, not 5,
+so a fumble costs 1 HP and a warning while a deliberate throw is a hundred-punch public
+performance nobody has time for. Legible acts are this game's only currency; do not spend
+one to buy a guard.
+
+**3. The meaning change lands in a different function from the edit.**
+
+Today anyone can damage any beacon, so `"X damaged beacon_a"` implies nothing about X's
+team. After the fix, only non-owners can — so the same broadcast now publishes that X is
+*not* on that team, twenty times per kill, in a two-teams-plus-one-MM game. The edit is in
+`on_punch`; the publication is in `damage_beacon`. **Only the edited file gets reviewed.**
+That is §7j again: a change in one place re-scopes what another place publishes.
+
+**4. A sentinel compared against a translated string works in one language.**
+
+`handle_beacon_destruction` gates on `attacker_name ~= "Corrosion"`, but `damage_beacon` is
+called at `nodes.lua:182` with `S("Corrosion")` — a localized string. Under any non-English
+locale the comparison fails, the weather becomes `credited_name`, and
+`award_objective_points` (`scoring.lua:133`, via `get_or_zero`) banks season points to a
+name that is not a player. Use `nil` or a flag for unowned damage. Never a word.
+
+**Gate G23 (new):** no identity sentinel is a human-readable string; no team gate is
+written as `pl.team == X` without an explicit `pl.role` case.
+
+-- Jax // Sky-Metal strip

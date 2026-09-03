@@ -858,6 +858,9 @@ or during the port:
 | G18 | Text-state emitter validated against a **declared schema allowlist**, not a list of forbidden field names (§7l L4) | unit, emitter↔parser | machine |
 | G19 | Point table in the master cites `tools/point_economy_model.py` output at a commit hash — never a figure typed into a mail (§7l L1) | review | machine |
 | G20 | The dominance gate can **fail**: the model contains a path whose dominant action is repeatable, and the shroud path exists (§7l L2) | unit on the model | machine |
+| G21 | **Every** gate has a poisoned case: CI mutates the guarded code in a scratch worktree and asserts the gate goes **red**. A gate that has never been red has never been tested (§7m) | CI, per gate | machine |
+| G22 | No unbounded `while` inside an `on_step`; no `chat_send_all` in an entity-registering file (S14) | build-time lint | machine |
+| G23 | No identity sentinel is a human-readable string; no team gate written as `pl.team == X` without an explicit `pl.role` case (`pl.team` is nil for the MM — §7n) | review + CI grep | machine |
 
 Two validity rules govern the table: **a usage gate is only valid if the actor can
 perform the action** (else it measures the bot, not the design), and **a counter over a
