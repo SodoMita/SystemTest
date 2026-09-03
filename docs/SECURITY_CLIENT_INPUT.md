@@ -386,11 +386,17 @@ damage, dialogue YAML (file-backed, not client-backed), `sl_teleport`,
 metadata or test fixtures. That is the whole reason F1 was one line of code and
 a total server hang.
 
+**Out of scope, by the maintainer:** `mods/external/chest_of_everything` is a
+testing mod and will not be in production. It was therefore not audited, not
+fixed and not reported, and this branch does not touch a line of it. For the
+record, so nobody re-opens the question: it is 136 lines with no client-input
+surface at all — no `on_player_receive_fields`, no chat command, no entity
+registration, no deserializer — so the S14 static audit walks it (it walks every
+`mods/**/*.lua`) and has nothing to say about it. If that ever changes, the
+answer is still "not production", not "audit it".
+
 **Round two also checked and found nothing:**
 
-* `mods/external/chest_of_everything` — **out of scope by the maintainer**: a
-  test-only mod that does not ship to production. Not audited, not fixed, not
-  reported.
 * `/dlg_start <scene>` — the scene name is a key into a registered table
   ("Scene not found" otherwise); no filesystem path is built from client text,
   so there is no traversal.
