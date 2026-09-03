@@ -180,3 +180,59 @@ The "the crash is reported at `add_entity`" symptom of footgun 2 is
 the giveaway: if you see a stack trace pointing at `add_entity` with
 "expected number got boolean", the bug is in the entity's
 `initial_properties`, not in the ABM that called `add_entity`.
+
+---
+
+## 7. Three entity footguns that are not type bugs (and cost more)
+
+The catalog above is about types. These three are about the same underlying
+engine behaviour — the C++ side accepts what the Lua side should have rejected,
+and tells you nothing — but they do not raise an error at all, which makes them
+worse: nothing points at the file that introduced them. All three were found in
+`mods/content/sl_scary/init.lua` and are reproduced as failing tests in
+`tests/security_test.lua` (phases S13 and S14). Full write-up:
+`docs/SECURITY_CLIENT_INPUT.md` §2b, finding G6.
+
+### 7.1 A position with a missing component reads as the world origin
+
+`readV3F` reads `x`, `y` and `z` **leniently**: a missing field is `0`, not an
+error. So an array-style position does not crash — it silently means something
+else entirely:
+
+```lua
+local pos_below = {random_pos.x, random_pos.y - 1, random_pos.z}  -- WRONG
+-- .x/.y/.z are all nil, so the engine reads (0,0,0): every candidate tested
+-- the node at the WORLD ORIGIN and the check passed or failed on whatever
+-- happens to be there
+local pos_below = {x = random_pos.x, y = random_pos.y - 1, z = random_pos.z}
+```
+
+Build positions as keyed tables or with `vector.*`. If a position probe seems to
+return the same answer everywhere in the world, this is why.
+
+### 7.2 `on_step` must return
+
+`minetest.find_path` returns **nil** when no route exists inside
+`max_search_distance`. That is a normal answer — a mob walled in, standing in
+the void, or a random candidate that is simply unreachable — **not** a reason to
+retry. `while path_found == false do ... end` with no attempt counter is a
+server-thread hang, and any player can cause it with ordinary digging and
+building. Measured inside ONE `on_step`: 200,000 `find_path` calls before the
+harness aborted. A tick that does not return is a frozen server: nothing moves,
+nothing saves, the admin has to `kill -9`.
+
+Every loop in an entity step gets a counter (`mob_config.idle_wander_attempts`),
+and "could not find somewhere to go" is a legal outcome — the mob stays put and
+tries again next tick, which is what an idle mob is supposed to do anyway.
+
+### 7.3 Never `chat_send_all` from a per-tick path
+
+Debug lines in `on_step` / a state handler cost **mobs x players x tick rate**,
+and they are invisible from the author's side: the line looks helpful, the state
+it prints is real, and nothing fails until a server is full. The same hung tick
+above sent **200,009 broadcasts to every player**. Log with `minetest.log`
+(which an operator can filter) or nothing at all.
+
+`security_test.lua` phase S14 walks every `mods/**/*.lua` and fails the build if
+a file that registers an entity calls `chat_send_all` — the forbidden thing
+stated once, asserted everywhere, so the seventh mob does not ship it.
