@@ -36,3 +36,7 @@ mods/content/sl_scary/pipeline/matte_floodfill
 # Python bytecode
 __pycache__/
 *.pyc
+
+# AI-art scratch attempts (regenerable grid sources; not game assets).
+# Game assets are committed in textures/; these are the working renders.
+/.art/

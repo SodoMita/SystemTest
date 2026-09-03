@@ -746,23 +746,43 @@ minetest.register_node("sl_scary:hide_spot", {
 --   "Responsibility is horror. The scariest thing is 'I caused this.'"
 -- ============================================================
 
--- Sprite strip frame layout (144×16, 9 frames of 16×16):
---   Frames 0-2  (x: 0-48):   idle   (3 frames, ~2 fps loop)
---   Frames 3-5  (x: 48-96):  walk   (3 frames, ~4 fps loop)
---   Frames 6-7  (x: 96-128): attack (2 frames, ~6 fps loop)
---   Frame 8     (x: 128-144): death  (1 frame, no loop)
+-- Sprite strip frame layout (256×2304, 9 frames of 256×256 stacked
+-- vertically; owner 2026-09-03):
+--   Row 0 (y 0-256):     FRONT view    (idle turn pose 1)
+--   Row 1 (y 256-512):   BACK view     (idle turn pose 2)
+--   Row 2 (y 512-768):   SIDE view     (idle turn pose 3)
+--   Rows 3-5 (y 768-1536): walk cycle  (3 frames, FRONT-facing advance
+--                        — camera-facing billboard like Doom, so not a
+--                        sidescroller side-profile)
+--   Rows 6-7 (y 1536-2048): attack     (2 frames, FRONT-facing)
+--   Row 8 (y 2048-2304): death         (1 frame)
+--
+-- Luanti plays `sprite` visuals through `object:set_sprite(...)`, and the
+-- frame animation iterates along the frame *y* position only (see
+-- lua_api.md -> set_sprite).  Sheets must therefore be vertical with
+-- `spritediv = {x=1, y=9}`; a horizontal strip renders as one undivided
+-- texture, i.e. the whole sheet at once.
+--
+-- State mapping: idle slowly cycles FRONT→BACK→SIDE (a scanning turn);
+-- chase uses the walk cycle; close combat the 2-frame attack; on death
+-- the entity freezes on the death frame.
+--
+-- Art direction (owner 2026-09-03): realistic dark-horror silhouette,
+-- NOT cartoon; body interior is a single flat colour; bright neon rim +
+-- scary effects keep the mob readable; Doom-style usage (the sprite
+-- always faces the camera via billboard, so even the walk rows are
+-- drawn FRONT-facing — not sidescroller side-profiles). Sheets are
+-- produced by matte_sheet.py: every pose is rendered twice on a black
+-- and a white grid, the cells are sliced and alpha-solved from the two
+-- backgrounds (triangulation, per GENERATED_ASSETS.md), then stacked
+-- vertically into this 9-row strip.
 
 local sprite_animations = {
-    idle   = {x = 0,   y = 48},
-    walk   = {x = 48,  y = 96},
-    attack = {x = 96,  y = 128},
-    death  = {x = 128, y = 144},
-}
-local sprite_fps = {
-    idle = 2,
-    walk = 4,
-    attack = 6,
-    death = 6,
+    idle   = {row = 0, frames = 3, framelength = 0.45},  -- slow turn
+    walk   = {row = 3, frames = 3, framelength = 0.18},  -- stride cycle
+    glide  = {row = 0, frames = 1, framelength = 1.0},   -- wraith: static FRONT
+    attack = {row = 6, frames = 2, framelength = 0.11},  -- lunge pair
+    death  = {row = 8, frames = 1, framelength = 1/6},   -- frozen
 }
 
 -- Helper: find a player within a cubic range (matches existing codebase API)
@@ -805,9 +825,9 @@ local function set_sprite_anim(self, state)
     if self.last_anim_state == state then return end
     self.last_anim_state = state
     local anim = sprite_animations[state]
-    local fps = sprite_fps[state]
     if anim then
-        self.object:set_animation(anim, fps, state ~= "death" and -1 or 0)
+        self.object:set_sprite(
+            {x = 0, y = anim.row}, anim.frames, anim.framelength, false)
     end
 end
 
@@ -825,6 +845,8 @@ minetest.register_entity("sl_scary:dredger", {
         collisionbox = {-0.4, -0.5, -0.4, 0.4, 0.5, 0.4},
         visual = "sprite",
         textures = {"sl_scary_dredger_strip.png"},
+        spritediv = {x = 1, y = 9},
+        initial_sprite_basepos = {x = 0, y = 0},
         visual_size = {x=1.8, y=1.8, z=1.8},
         static_save = false,
         glow = 4,
@@ -1037,7 +1059,7 @@ minetest.register_craftitem("sl_scary:dredger_badge", {
     description = "Dredger ID Badge — 'KOWALSKI, F. — Maintenance Tech'\n" ..
                   "Overtime log: 96h continuous before incident.\n" ..
                   "'Exposed to hydraulic fluid. Personality changes noted.'",
-    inventory_image = "sl_scary_dredger_strip.png^[resize:16x16",
+    inventory_image = "sl_scary_dredger_strip.png^[verticalframe:9:0",
     stack_max = 1,
 })
 
@@ -1069,6 +1091,8 @@ minetest.register_entity("sl_scary:containment", {
         collisionbox = {-0.8, -1.0, -0.8, 0.8, 1.0, 0.8},
         visual = "sprite",
         textures = {"sl_scary_containment_strip.png"},
+        spritediv = {x = 1, y = 9},
+        initial_sprite_basepos = {x = 0, y = 0},
         visual_size = {x=3.0, y=3.0, z=3.0},
         static_save = false,
         glow = 6,
@@ -1183,7 +1207,7 @@ minetest.register_craftitem("sl_scary:containment_shard", {
                   "Security Log 0433: 'Noise reported inside Section 12. Sealed.'\n" ..
                   "Security Log 0420: 'Sealed.'\n" ..
                   "Security Log 0352: 'Section 12 sealed.'",
-    inventory_image = "sl_scary_containment_strip.png^[resize:16x16",
+    inventory_image = "sl_scary_containment_strip.png^[verticalframe:9:0",
     stack_max = 3,
 })
 
@@ -1214,6 +1238,8 @@ minetest.register_entity("sl_scary:signal_wraith", {
         collisionbox = {-0.3, -0.6, -0.3, 0.3, 0.6, 0.3},
         visual = "sprite",
         textures = {"sl_scary_wraith_strip.png"},
+        spritediv = {x = 1, y = 9},
+        initial_sprite_basepos = {x = 0, y = 0},
         visual_size = {x=2.0, y=2.0, z=2.0},
         static_save = false,
         glow = 8,
@@ -1238,12 +1264,33 @@ minetest.register_entity("sl_scary:signal_wraith", {
     timer = 0,
     attack_timer = 0,
     drift_target = nil,
+    -- Floating animation: the wraith uses ONE static sprite frame and
+    -- "wobbles" in code (owner 2026-09-03: "For wraith use static image,
+    -- but use effect to wobble that image for floating flying
+    -- animation"). A gentle sinusoidal bob rides on top of whatever
+    -- movement the state machine did this tick.
+    wobble_t = 0,
+    wobble_prev = 0,
+    wobble_freq = 3.2,   -- rad/s: a slow eerie ~2 s float cycle
+    wobble_amp = 0.22,   -- nodes of vertical bob
 
     on_activate = function(self, staticdata, dtime_s)
         self.state = "idle"
         self.last_anim_state = nil
         set_sprite_anim(self, "idle")
         self:select_drift_target()
+    end,
+
+    apply_wobble = function(self, dtime)
+        self.wobble_t = (self.wobble_t or 0) + dtime
+        local bob = math.sin(self.wobble_t * self.wobble_freq) * self.wobble_amp
+        local pos = self.object:get_pos()
+        if not pos then return end
+        -- remove the previous tick's bob, add this tick's -> the sprite
+        -- oscillates around whatever base position the movement set
+        pos.y = pos.y - (self.wobble_prev or 0) + bob
+        self.object:set_pos(pos)
+        self.wobble_prev = bob
     end,
 
     select_drift_target = function(self)
@@ -1324,7 +1371,7 @@ minetest.register_entity("sl_scary:signal_wraith", {
                     self.attack_timer = self.attack_cooldown
                 end
             else
-                set_sprite_anim(self, "walk")
+                set_sprite_anim(self, "glide")
                 local dir = vector.normalize(vector.subtract(player_pos, pos))
                 self.object:set_pos(vector.add(pos, vector.multiply(dir, self.chase_speed * dtime)))
             end
@@ -1343,6 +1390,9 @@ minetest.register_entity("sl_scary:signal_wraith", {
                 self.target_player = nil
             end
         end
+        -- Float wobble rides on every state (idle drift, chase glide,
+        -- glitch hops): the static sprite is brought to life by the bob.
+        self:apply_wobble(dtime)
     end,
 
     on_punch = function(self, hitter, time_from_last_punch, tool_capabilities, dir)
@@ -1377,7 +1427,7 @@ minetest.register_craftitem("sl_scary:corrupted_data", {
     description = "Corrupted Data Fragment\n" ..
                   "\"...breach in sector...signal integrity compromised...\"\n" ..
                   "Reliability: UNKNOWN",
-    inventory_image = "sl_scary_wraith_strip.png^[resize:16x16",
+    inventory_image = "sl_scary_wraith_strip.png^[verticalframe:9:0",
     stack_max = 5,
 })
 

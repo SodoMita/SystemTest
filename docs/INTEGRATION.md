@@ -1,6 +1,76 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-02 (rev 6)
+**Date:** 2026-09-03 (rev 14)
+**Rev 14 (owner, rev I — "Walk animations are bad"):** the ground mobs'
+WALK×3 rows are now **dedicated 1×3 front-facing walk strips** (dredger
+stride, containment heavy lurch) generated per-owner-workflow (realistic
+no-neon black strip + white twin → `pipeline/walk_sheet.py` slices,
+triangulates, neonizes, then `--splice` replaces sheet rows 3–5;
+idle/attack/death rows untouched). Loops: `docs/art_baseline/walk_dredger.gif`,
+`walk_containment.gif`; full preview `cs_mobs_v7_walkfix.png`. The
+**wraith has no walk frames**: it uses one static FRONT frame (new
+`glide` animation state) and floats via a sinusoidal code wobble
+(`apply_wobble` in `init.lua`, ±0.22 nodes, ~2 s cycle), per owner "use
+static image, but use effect to wobble that image for floating flying
+animation".
+**Rev 13 (owner workflow correction, rev G):** "generate realistic pics
+without neon, then turn into neon flatcolored". The mob grids are now
+generated as **photorealistic creatures with no neon/flat constraints**
+(square 3×3 black grid + white twin; two-background alpha
+triangulation), and the neon-flat look is applied deterministically by a
+new **neonize stage in `matte_sheet.py`**: single flat body colour,
+bright features recoloured to per-mob neon accents, crisp neon rim +
+glow stroked from the silhouette, soft wisp/AA pixels tinted with the
+rim colour. All three sheets rebuilt (dredger 359 KB, wraith 345 KB,
+containment 499 KB; wraith regen needed after a 2-row grid collapse —
+ask for a square image). Preview `docs/art_baseline/cs_mobs_v5_revF.png`.
+Palette tweaks need no regeneration (`MOB_STYLE` in matte_sheet.py).
+**Rev 12 (owner art-direction correction of rev 11):** the mob sheets
+keep the **9-frame layout — FRONT, BACK, SIDE, WALK×3, ATTACK×2,
+DEATH** (256×2304 vertical, `spritediv {x=1,y=9}`) — but the art style
+is reworked. New direction: **realistic dark-horror silhouette — NOT
+cartoon** (explicitly negate everything 2D-stylized/cartoon), **body
+fill is one single flat colour**, **bright neon rim + scary effects
+kept** ("keep neon"). Mobs are camera-facing billboards — **used like a
+Doom monster, not a sidescroller** — so WALK and ATTACK rows are
+drawn **FRONT-facing** (not side-profile locomotion). Sheets are built
+by `pipeline/matte_sheet.py` with the **two-background alpha
+triangulation** (black-grid + white-grid renders per pose; the white
+twin keeps pure-black gutters/border; alpha solved per cell from both
+backgrounds; an optional bottom text-verdict strip such as WALKOK /
+WALKRETRY sits outside the detected outer border and is cropped out).
+This supersedes the boxman wire-glow style reference and the white-key
+`build_mob_sheet.py` workflow.
+**Rev 11 (owner correction of rev 10, superseded by rev 12):** mob
+sheets are **9 frames each — FRONT, BACK, SIDE, WALK×3, ATTACK×2,
+DEATH** (256×2304 vertical, `spritediv {x=1,y=9}`) — not the rev-10
+3-frame loops. `init.lua` maps idle→front/back/side turn, chase→walk
+cycle, melee→2-frame attack, death→freeze; loot icons
+`^[verticalframe:9:0`. Style reference stayed
+`docs/art_baseline/boxman_style_render.png`; preview `cs_mobs_v4.png`.
+**Rev 10 (superseded by rev 11):** mobs were 256px 3-frame loops.
+**Rev 9 (correction of rev 8):****Rev 9 (correction of rev 8):** the owner art-gate rulings, re-read
+correctly on 2026-09-02: "no blur/AA" is a **UI-only** rule; other
+surfaces (nodes, mobs, craftitems, world) keep normal rendering and may
+use hi-res textures; **3D-model textures must not be swapped for
+AI-drawn flat art** — attempts ignore how the texture maps onto the
+model (catastrophic on the clothing b3d props and the `SimpleOutlinedBoxman`
+GLB). Rev-8's interim ports of `01a04bfa`'s clothing and
+`01a049ee`'s boxman texture are therefore **reverted** (byte-identical
+to master). The `sl_scary` strips keep the animation fix (rev 7) and
+the 64×64 re-ink — sprites are flat billboards, so hi-res art is safe.
+No wholesale pass port; per-file triage + port list:
+`docs/art_baseline_survey.md` §10.
+**Rev 7 adds:** the **art-baseline survey** (Turn 6 step 1, owner-gated):
+contact sheets + per-branch diff stats vs master + a pick recommendation
+for the four competing art passes — see `docs/art_baseline_survey.md`.
+Nothing is ported until the owner picks a pass. Also ships the **sl_scary
+sprite-mob animation fix** (master bug: sprite visuals showed their whole
+144×16 strip instead of animating): sheets transposed to the engine's
+vertical layout (16×144) via the new
+`mods/content/sl_scary/pipeline/transpose_sprite_strip.py`, entities use
+`spritediv {x=1,y=9}` + `object:set_sprite(...)`, and loot icons crop one
+frame with `^[verticalframe:9:0` (rev-D sheets later made it `^[verticalframe:3:0`, rev 10).
 **Rev 4 adds:** the map system and the MM-essence ruling (see §0.4).
 **Rev 5 adds:** the MM essence engine (the §13.3 ruling, shipped): node
 provenance, `groups.sl_essence_value` pricing on the craftable output defs, the
@@ -170,7 +240,7 @@ here is a history merge across roots.
 | `luajit tests/soak_stub_turbo.lua` | PASS (40 matches × 3 seeds: no weapon > 30 % kill share; Lash ≥ non-holder death rate; zero Lua errors; map RNG pinned for a deterministic bot stream) |
 | `luajit tests/essence_test.lua` | 69/69 (rev 5: provenance, pricing, pool reset, +3 core craft — now routed through the Forge, ambient hazard thresholds, scoreboard untouched, readouts) |
 | `luajit tests/objective_loop_test.lua` | 128/128 (rev 6: forge anchor + materialization, salvage veins on **both** the test and procedural arenas, inventory refuses every placeable, single-job/time-gated/loud forge runs, refine + core assembly, +3 essence on the core, delivery refusals, winning delivery, reset, forfeit, access control, `/sl_test_objective` performs the chain, hardening regressions, the Core survives death, output spill, stations as forge outputs) |
-| sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 37 textures are 16×16 solid-colour placeholders (art baseline still deferred) |
+| sl_weapons assets | 39/39 sounds generated through `generate_sounds.py` (SPEC §13); 30 of 37 textures are hi-res (rev H: 16 icons, pad rings, trace decals, FX sprites); only the 7 batch-B node faces (fabricator/turret) remain as 16×16 placeholders (docs/art_baseline/weapons_hires_plan.md) |
 
 CI runs the new suites: `agent-mail` workflow (lint + unit tests) and the `soak`
 workflow now gates smoke, strand, weapons, the stub turbo soak and the live-engine
