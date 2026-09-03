@@ -46,7 +46,17 @@ local handlers = {
 }
 
 local function vhash(p)
-	return string.format("%d,%d,%d", math.floor(p.x + 0.5), math.floor(p.y + 0.5), math.floor(p.z + 0.5))
+	-- FIDELITY: the engine reads positions with readV3F(), which does
+	-- lua_getfield("x"/"y"/"z") + lua_tonumber -- a MISSING component reads as
+	-- 0 rather than raising. sl_scary's idle wander builds
+	-- `{random_pos.x, random_pos.y-1, random_pos.z}` (array-style, so .x/.y/.z
+	-- are all nil) and the engine quietly answers "the node at (0,0,0)".
+	-- Erroring here instead hid that bug -- and behind it the unguarded loop
+	-- that only runs once the position read succeeds.
+	local x = tonumber(p.x) or 0
+	local y = tonumber(p.y) or 0
+	local z = tonumber(p.z) or 0
+	return string.format("%d,%d,%d", math.floor(x + 0.5), math.floor(y + 0.5), math.floor(z + 0.5))
 end
 M.vhash = vhash
 
@@ -350,21 +360,44 @@ end
 -- ---------------------------------------------------------------
 -- Time control
 -- ---------------------------------------------------------------
-function M.step(dtime)
-	M.clock_us = M.clock_us + math.floor(dtime * 1000000)
-	-- Fire due after() callbacks (repeat: callbacks can schedule more).
-	local fired = true
-	while fired do
-		fired = false
-		for i, entry in ipairs(M.afters) do
-			if entry.due <= M.clock_us then
-				table.remove(M.afters, i)
-				entry.fn()
-				fired = true
-				break
-			end
+-- FIDELITY: one drain helper, because M.step is defined twice in this file
+-- (the entity-driving wrapper further down re-implements it) and a fix in one
+-- copy silently does not apply to the other.
+function M.drain_afters()
+	-- Collect every expired job FIRST, then run the callbacks.
+	-- builtin/common/after.lua does exactly this and says why:
+	--   "Run the callbacks afterward to prevent infinite loops with
+	--    core.after(0, ...)."
+	-- A job that re-schedules itself with after(0) therefore runs once per
+	-- step in the engine. The old rescan-until-quiet loop fired those
+	-- re-schedules inside the same step, turning a per-step leak into a hang
+	-- -- the harness lying in both directions at once.
+	local due, kept = {}, {}
+	for _, entry in ipairs(M.afters) do
+		if entry.cancelled then
+			-- dropped: the engine keeps cancelled jobs queued but swaps
+			-- their func for a dummy, which is observationally the same
+		elseif entry.due <= M.clock_us then
+			due[#due + 1] = entry
+		else
+			kept[#kept + 1] = entry
 		end
 	end
+	M.afters = kept
+	for _, entry in ipairs(due) do entry.fn() end
+end
+
+function M.step(dtime)
+	M.clock_us = M.clock_us + math.floor(dtime * 1000000)
+	-- FIDELITY: collect every expired job FIRST, then run the callbacks.
+	-- builtin/common/after.lua does exactly this and says why:
+	--   "Run the callbacks afterward to prevent infinite loops with
+	--    core.after(0, ...)."
+	-- A job that re-schedules itself with after(0) therefore runs once per
+	-- step in the engine. The old rescan-until-quiet loop here fired those
+	-- re-schedules inside the same step, which turns a per-step leak into a
+	-- hang -- the harness lying in both directions at once.
+	M.drain_afters()
 	for _, fn in ipairs(M.globalsteps) do
 		fn(dtime)
 	end
@@ -380,6 +413,12 @@ end
 -- minetest table
 -- ---------------------------------------------------------------
 minetest = {}
+-- FIDELITY: the engine exposes the same table under two names -- mods may use
+-- `core.` or `minetest.` interchangeably (builtin sets core = minetest).
+-- Without the alias, any mod that calls core.sound_stop / core.chat_send_all
+-- (sl_scary does, in four places) dies with "index global 'core' (a nil
+-- value)" under the stub and looks broken when it is not.
+core = minetest
 
 minetest.registered_nodes = {}
 minetest.registered_craftitems = {}
@@ -493,6 +532,20 @@ function M.fire_punchplayer(player, hitter, time_from_last_punch, tool_capabilit
 	return canceled
 end
 
+-- Drive a chat command the way the engine does: look the definition up,
+-- enforce its declared `privs`, then call func(name, param). Mods must never
+-- call `def.func` themselves for a client-driven action -- that skips the
+-- privilege gate (see tests/security_test.lua and sl_gui's invoke_command).
+function M.fire_chatcommand(name, cmd, param)
+	local def = minetest.registered_chatcommands[cmd]
+	if not def then return false, "command not found: " .. tostring(cmd) end
+	local ok, missing = minetest.check_player_privs(name, def.privs or {})
+	if not ok then
+		return false, "missing privileges: " .. table.concat(missing or {}, ", ")
+	end
+	return def.func(name, param)
+end
+
 function M.fire_receive_fields(name, formname, fields)
 	local player = M.players[name]
 	for _, fn in ipairs(handlers.player_receive_fields) do
@@ -502,6 +555,18 @@ end
 
 function M.fire_joinplayer(p)
 	for _, fn in ipairs(handlers.joinplayer) do fn(p) end
+end
+
+--- Disconnect. The engine fires on_leaveplayer with the player object and
+--- then drops it; suites that only call remove_player() never exercise the
+--- cleanup path, which is exactly where per-name state and pending timers
+--- leak. Pass a player object or a name.
+function M.fire_leaveplayer(who)
+	local p = who
+	if type(who) == "string" then p = M.players[who] end
+	if p then
+		for _, fn in ipairs(handlers.leaveplayer) do fn(p) end
+	end
 end
 
 -- Deaths normally come from set_hp(0); this fires the dieplayer chain
@@ -525,9 +590,36 @@ function minetest.get_player_privs(name)
 	return M.player_privs[name]
 end
 function minetest.set_player_privs(name, privs) M.player_privs[name] = privs end
-function minetest.check_player_privs(name, _)
+-- FIDELITY: the engine answers the question that was asked. The old stub
+-- ignored the requested set and answered "does this player hold `server`?",
+-- which makes every privilege gate in the game untestable: an sl_admin-only
+-- command failed for an sl_admin, and a `server`-holding player passed gates
+-- they were never meant to pass. Accepts both spellings the engine accepts
+-- ({ priv = true } and { "priv" }).
+function minetest.check_player_privs(name, ...)
+	-- The engine accepts a player object or a name (core.is_player).
+	if type(name) ~= "string" then
+		if type(name) == "table" and name.is_player and name:is_player() then
+			name = name:get_player_name()
+		else
+			error("minetest.check_player_privs expects a player or playername as argument")
+		end
+	end
 	local privs = minetest.get_player_privs(name)
-	return privs.server == true
+	local requested = { ... }
+	local missing = {}
+	if type(requested[1]) == "table" then
+		for priv, value in pairs(requested[1]) do
+			if value and not privs[priv] then missing[#missing + 1] = priv end
+		end
+	else
+		for _, priv in pairs(requested) do
+			if not privs[priv] then missing[#missing + 1] = priv end
+		end
+	end
+	table.sort(missing)
+	if #missing > 0 then return false, missing end
+	return true, ""
 end
 
 -- Chat
@@ -537,12 +629,99 @@ function minetest.chat_send_player(name, msg)
 	table.insert(M.chat_player[name], msg)
 end
 function minetest.colorize(_, text) return text end
-function minetest.formspec_escape(s) return tostring(s or "") end
+-- FIDELITY: the engine escapes six metacharacters, not just the brackets
+-- (builtin/common/misc_helpers.lua): `\ [ ] ; , $`. `;` and `,` are the
+-- formspec element and textlist separators and `$` starts a ${meta}
+-- substitution, so an identity stub makes every "is this escaped?" test pass
+-- vacuously -- the exact failure mode that hid the strand deserialize bug.
+local FORMSPEC_ESCAPES = {
+	["\\"] = "\\\\",
+	["["] = "\\[",
+	["]"] = "\\]",
+	[";"] = "\\;",
+	[","] = "\\,",
+	["$"] = "\\$",
+}
+function minetest.formspec_escape(text)
+	return text and string.gsub(text, "[\\%[%];,$]", FORMSPEC_ESCAPES)
+end
 function minetest.show_formspec(name, formname, form)
 	M.formspecs[name] = M.formspecs[name] or {}
 	table.insert(M.formspecs[name], { formname = formname, form = form })
 end
-function minetest.explode_textlist_event(_) return { type = "nothing" } end
+-- Field-event parsing, verbatim from the engine (builtin/common/misc_helpers.lua).
+-- These used to be stubs that returned {type="nothing"} for every input, which
+-- silently disabled every textlist/table/scrollbar field in the suites: a GUI
+-- selection could never be tested, so a handler that mishandles one could not
+-- fail a test either. A client sends "CHG:<index>" for a selection change and
+-- "DCL:<index>" for a double click; anything else parses to {type="INV"}.
+if not string.split then
+	function string.split(str, delim, include_empty, max_splits, sep_is_pattern)
+		delim = delim or ","
+		if delim == "" then error("string.split separator is empty", 2) end
+		max_splits = max_splits or -2
+		local items = {}
+		local pos, len = 1, #str
+		local plain = not sep_is_pattern
+		max_splits = max_splits + 1
+		repeat
+			local np, npe = string.find(str, delim, pos, plain)
+			np, npe = (np or (len + 1)), (npe or (len + 1))
+			if (not np) or (max_splits == 1) then
+				np = len + 1
+				npe = np
+			end
+			local s = string.sub(str, pos, np - 1)
+			if include_empty or (s ~= "") then
+				max_splits = max_splits - 1
+				items[#items + 1] = s
+			end
+			pos = npe + 1
+		until (max_splits == 0) or (pos > (len + 1))
+		return items
+	end
+end
+if not string.trim then
+	function string.trim(s) return s:match("^%s*(.-)%s*$") end
+end
+
+function minetest.explode_table_event(evt)
+	if evt ~= nil then
+		local parts = evt:split(":")
+		if #parts == 3 then
+			local t = parts[1]:trim()
+			local r = tonumber(parts[2]:trim())
+			local c = tonumber(parts[3]:trim())
+			if type(r) == "number" and type(c) == "number" and t ~= "INV" then
+				return { type = t, row = r, column = c }
+			end
+		end
+	end
+	return { type = "INV", row = 0, column = 0 }
+end
+
+function minetest.explode_textlist_event(evt)
+	if evt ~= nil then
+		local parts = evt:split(":")
+		if #parts == 2 then
+			local t = parts[1]:trim()
+			local r = tonumber(parts[2]:trim())
+			if type(r) == "number" and t ~= "INV" then
+				return { type = t, index = r }
+			end
+		end
+	end
+	return { type = "INV", index = 0 }
+end
+
+function minetest.explode_scrollbar_event(evt)
+	local retval = minetest.explode_textlist_event(evt)
+	retval.value = retval.index
+	retval.index = nil
+	return retval
+end
+function minetest.sound_stop(_) end
+function minetest.close_formspec(_, _) end
 
 -- Settings
 minetest.settings = {
@@ -553,11 +732,47 @@ minetest.settings = {
 
 -- Time
 function minetest.get_us_time() return M.clock_us end
+-- Engine API (src/api.cpp: get_current_modname/get_version). Mods use it to
+-- branch on server version at load time, so a stub without it fails to load
+-- them at all -- which is how aaa_botmatch stayed out of the security suite.
+if not minetest.get_version then
+	function minetest.get_version()
+		return {
+			string = "5.9.0-stub", hash = "stub", irreversible = false,
+			protocol_version_min = 37, protocol_version_max = 44,
+			dev = false, build_info = { string = "stub" },
+		}
+	end
+end
 function minetest.after(seconds, fn)
-	table.insert(M.afters, { due = M.clock_us + math.floor(seconds * 1000000), fn = fn })
+	-- FIDELITY: the engine returns a handle whose cancel() neuters the job
+	-- (builtin/common/after.lua). Returning nil here made every
+	-- `if timer then timer:cancel() end` cleanup path a silent no-op, so
+	-- orphaned timer chains could not be tested at all.
+	seconds = tonumber(seconds) or 0
+	local entry = {
+		due = M.clock_us + math.floor(seconds * 1000000),
+		fn = fn,
+		cancelled = false,
+	}
+	table.insert(M.afters, entry)
+	return setmetatable({}, { __index = {
+		cancel = function(_) entry.cancelled = true end,
+	} })
 end
 
 -- Serialize/deserialize (Lua-source based; enough for spawn tables)
+--
+-- FIDELITY: these mirror the engine contract, not a convenient shorthand.
+-- `core.serialize` returns a CHUNK (its text starts with "local _={}" or
+-- "return"), and `core.deserialize(str, safe)` loadstring()s that text AS-IS
+-- and runs it inside a sandbox env holding only `inf`, `nan` and `loadstring`
+-- (builtin/common/serialize.lua). The previous pair here prepended "return "
+-- on deserialize instead, which is self-consistent but engine-incompatible in
+-- both directions: it accepts a bare expression the engine would reject, and
+-- it hides every "deserialize untrusted input" bug from the headless suites
+-- (a payload chunk runs with the mod's full globals here, and not at all
+-- there). Keep them faithful -- tests/security_test.lua depends on it.
 function minetest.serialize(value)
 	local function ser(v)
 		local t = type(v)
@@ -575,16 +790,34 @@ function minetest.serialize(value)
 		end
 		error("cannot serialize type " .. t)
 	end
-	return ser(value)
+	return "return " .. ser(value)
 end
-function minetest.deserialize(str)
-	if not str or str == "" then return nil end
-	local fn, err = loadstring("return " .. str)
+function minetest.deserialize(str, safe)
+	if str == nil or str == "" then return nil end
+	if type(str) ~= "string" then return nil, "expected a string" end
+	local fn, err = loadstring(str)
 	if not fn then
 		minetest.log("error", "deserialize failed: " .. tostring(err))
-		return nil
+		return nil, err
 	end
-	return fn()
+	-- Engine sandbox: no _G, no minetest, no io/os/string -- only these three.
+	local env = { inf = math.huge, nan = 0 / 0 }
+	if safe then
+		env.loadstring = function() end
+	else
+		env.loadstring = function(inner, ...)
+			local f, e = loadstring(inner, ...)
+			if f then
+				setfenv(f, env)
+				return f
+			end
+			return nil, e
+		end
+	end
+	setfenv(fn, env)
+	local ok, value_or_err = pcall(fn)
+	if ok then return value_or_err end
+	return nil, value_or_err
 end
 
 -- World
@@ -889,6 +1122,21 @@ end
 vector.dot = function(a, b)
 	return a.x * b.x + a.y * b.y + a.z * b.z
 end
+-- Engine parity (builtin/common/vector.lua): component-wise floor/divide and
+-- the shared `zero` constant. sl_scary's idle wander uses vector.floor and
+-- compares against vector.zero; without them the mob's on_step dies on the
+-- first tick and the whole entity looks broken under the stub.
+vector.floor = function(v)
+	return { x = math.floor(v.x), y = math.floor(v.y), z = math.floor(v.z) }
+end
+vector.divide = function(a, b)
+	if type(b) == "table" then
+		return { x = a.x / b.x, y = a.y / b.y, z = a.z / b.z }
+	end
+	return { x = a.x / b, y = a.y / b, z = a.z / b }
+end
+vector.zero = { x = 0, y = 0, z = 0 }
+
 vector.offset = function(v, x, y, z)
 	return { x = v.x + x, y = v.y + y, z = v.z + z }
 end
@@ -1126,18 +1374,7 @@ end
 local raw_step = M.step
 M.step = function(dtime)
 	M.clock_us = M.clock_us + math.floor(dtime * 1000000)
-	local fired = true
-	while fired do
-		fired = false
-		for i, entry in ipairs(M.afters) do
-			if entry.due <= M.clock_us then
-				table.remove(M.afters, i)
-				entry.fn()
-				fired = true
-				break
-			end
-		end
-	end
+	M.drain_afters()
 	for _, fn in ipairs(M.globalsteps) do
 		local ok, err = pcall(fn, dtime)
 		if not ok then minetest.log("error", "globalstep: " .. tostring(err)) end

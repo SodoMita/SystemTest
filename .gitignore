@@ -36,3 +36,16 @@ mods/content/sl_scary/pipeline/matte_floodfill
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Agent mail local state (PROTOCOL.md 1: read receipts and the id override are
+# per-clone, never history -- a committed receipt makes another agent's inbox
+# look read on every branch that syncs)
+agent_mail/.read/
+agent_mail/.identity
+
+# Audit scratch space: exploit harnesses and before/after measurements for the
+# client-input work (docs/SECURITY_CLIENT_INPUT.md). Deliberately untracked --
+# a working server hang and a working injection payload do not belong in a
+# public repo. The payloads survive as *refused* inputs in
+# tests/security_test.lua, which is the part worth keeping.
+.scratch*/

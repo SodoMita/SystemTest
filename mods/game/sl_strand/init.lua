@@ -42,7 +42,30 @@ end
 
 function strand.stop_solo()
 	strand.run = nil
+	strand.active_player = nil
 	return true
+end
+
+-- SECURITY: the run is a single global slot, and `strand.active_player` used
+-- to be written on start and never read again. On a server with more than one
+-- player that made the whole mode anybody's property: a second client could
+-- vote in someone else's run (verified -- a forged `/sl_strand_act vote ...`
+-- ejected a crew bot from a run it did not own), abort it with
+-- `/sl_strand_stop`, and read its hidden state with `/sl_strand_status`
+-- ("YOU ARE THE ECHO (...)" is the run's secret). Ownership is now checked on
+-- every command that reads or drives a run; sl_admin/server can still step in
+-- to clear a stuck one.
+function strand.is_run_owner(name)
+	if not name then return false end
+	if strand.active_player == nil then
+		-- No run, or a run started before this check existed: the commands
+		-- below fail on their own terms ("no active strand run").
+		return true
+	end
+	if strand.active_player == name then return true end
+	local ok = minetest.check_player_privs(name, { sl_admin = true })
+	if ok then return true end
+	return minetest.check_player_privs(name, { server = true })
 end
 
 -- Feed one action from the player into the live run, then broadcast a
@@ -88,7 +111,20 @@ minetest.register_chatcommand("sl_strand_start", {
 	params = "[seed]",
 	description = "Start a Simulacrum Strand singleplayer run",
 	func = function(name, param)
-		local seed = tonumber(param) or nil
+		-- SECURITY: the seed is client text. `tonumber("1e999")` is +inf and
+		-- `inf % 0xFFFFFFFF` is NaN, which silently degenerates the whole
+		-- run's RNG; only a finite integer is a seed.
+		local seed
+		local raw = tonumber((param or ""):match("^%s*(%-?[%d%.eE%+]+)%s*$") or "")
+		if raw then
+			if raw ~= raw or raw == math.huge or raw == -math.huge or raw ~= math.floor(raw) then
+				return false, "seed must be a whole number"
+			end
+			if math.abs(raw) > 2 ^ 31 then
+				return false, "seed must be within +/- 2147483648"
+			end
+			seed = math.floor(raw)
+		end
 		local run, err = strand.start_solo(seed)
 		if not run then return false, tostring(err) end
 		strand.active_player = name
@@ -97,17 +133,33 @@ minetest.register_chatcommand("sl_strand_start", {
 })
 
 minetest.register_chatcommand("sl_strand_act", {
-	params = "<action>",
+	params = "<action> [key=value ...]",
 	description = "Issue a strand action (read_tell/confide/observe/build/vote/choose/reveal)",
 	func = function(name, param)
-		local a = minetest.deserialize("return " .. param) or {}
+		-- SECURITY: the action is parsed, never evaluated. This used to be
+		-- `minetest.deserialize("return " .. param)`, which ran attacker Lua
+		-- on the server thread: an infinite loop in a chat line hangs the
+		-- whole server (pcall cannot interrupt it) and an allocation loop
+		-- exhausts its memory. See strand.parse_action.
+		if not strand.is_run_owner(name) then
+			return false, "that strand belongs to " .. tostring(strand.active_player)
+		end
+		local a, err = strand.parse_action(param)
+		if not a then
+			return false, tostring(err or "unparsable action")
+		end
 		local result, extra = strand.do_solo(a)
 		if result == nil then return false, tostring(extra) end
 		local msg = strand.describe_result(result)
 		-- When the action closed the run, show the Chain Ledger settlement.
 		local run = strand.run
-		if run and not run.active and run.ledger_result then
-			msg = msg .. "\n" .. strand.describe_settlement(run.ledger_result)
+		if run and not run.active then
+			-- The run is over: nobody owns it any more, so the next player can
+			-- start their own instead of inheriting a dead slot.
+			strand.active_player = nil
+			if run.ledger_result then
+				msg = msg .. "\n" .. strand.describe_settlement(run.ledger_result)
+			end
 		end
 		return true, msg
 	end,
@@ -128,7 +180,10 @@ end
 
 minetest.register_chatcommand("sl_strand_status", {
 	description = "Show the current strand run status",
-	func = function()
+	func = function(name)
+		if not strand.is_run_owner(name) then
+			return false, "that strand belongs to " .. tostring(strand.active_player)
+		end
 		local run = strand.run
 		if not run then return false, "no active run" end
 		local msg = strand.describe_run(run)
@@ -164,7 +219,12 @@ minetest.register_chatcommand("sl_strand_ledger", {
 
 minetest.register_chatcommand("sl_strand_stop", {
 	description = "Abort the active strand run",
-	func = function()
+	func = function(name)
+		-- SECURITY: aborting is the cheapest grief there is -- one chat line
+		-- from any client used to delete whoever was playing.
+		if not strand.is_run_owner(name) then
+			return false, "that strand belongs to " .. tostring(strand.active_player)
+		end
 		strand.stop_solo()
 		return true, "Strand stopped."
 	end,

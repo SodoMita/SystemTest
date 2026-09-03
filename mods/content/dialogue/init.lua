@@ -41,6 +41,22 @@ end
 -- Always attempt to load; get_dir_list returns empty if missing
 load_dialogues_from_dir(dialogues_dir)
 
+-- SECURITY/RELIABILITY: the dialogue runtime and the UI state are keyed by
+-- player name, and nothing cleaned them up on disconnect. `/dlg_start` needs
+-- no privileges, so any client could start a scene and leave: the auto-advance
+-- chain kept ticking and "printing" lines to a player who was gone (verified in
+-- the harness -- messages were still being produced for a departed name), and
+-- the state stayed allocated forever. On a public server, where anybody can
+-- pick a fresh name and reconnect, that is unbounded growth driven entirely by
+-- a client. stop_for_player already does the right thing -- cancel the timer,
+-- stop the sound, drop the runtime, close the form -- it just was never called
+-- on the one event that always happens.
+minetest.register_on_leaveplayer(function(player)
+  local name = player and player.get_player_name and player:get_player_name()
+  if not name then return end
+  if dlg.stop_for_player then dlg.stop_for_player(name) end
+end)
+
 -- Chat commands to control dialogues
 minetest.register_chatcommand("dlg_start", {
   params = "<scene>",

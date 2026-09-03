@@ -51,6 +51,14 @@ local player_highest_y = {}
 local player_looped = {}
 local player_last_y = {}
 
+-- SECURITY: tracked per name on every globalstep, never freed. See the same
+-- note in sl_gui/system_tab.lua -- a reconnecting client with fresh names
+-- grows this forever.
+minetest.register_on_leaveplayer(function(player)
+    local name = player and player.get_player_name and player:get_player_name()
+    if name then player_last_y[name] = nil end
+end)
+
 minetest.register_on_joinplayer(function(player)
     local name = player:get_player_name()
     local pos = player:get_pos()

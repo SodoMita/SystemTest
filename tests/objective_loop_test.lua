@@ -174,7 +174,19 @@ minetest.settings:set("sl_map.seed", "1")
 minetest.settings:set("sl_machine.forge_time", "6")
 
 -- Objective mode through the real matchmaking control, not a poke at
--- internal state: the lobby terminal's win-condition checkbox.
+-- internal state: the lobby terminal's win-condition checkbox. The terminal's
+-- mutating fields are admin-gated (a forged packet from any client used to be
+-- able to flip win conditions), so the operator here holds sl_admin -- and the
+-- two checks below that a priv-less client is refused are what keeps that gate
+-- honest.
+H.player_privs.alpha = { sl_admin = true }
+local elim_before = state.win_conditions.elimination
+local obj_before = state.win_conditions.objective
+H.fire_receive_fields("beta", "sl_modebase:matchmaking",
+	{ cond_objective = "true", cond_elimination = "false" })
+check(state.win_conditions.objective == obj_before
+	and state.win_conditions.elimination == elim_before,
+	"a priv-less client cannot flip win conditions through the terminal")
 H.fire_receive_fields("alpha", "sl_modebase:matchmaking", { cond_objective = "true" })
 H.fire_receive_fields("alpha", "sl_modebase:matchmaking", { cond_elimination = "false" })
 check(state.win_conditions.objective == true, "objective win condition enabled from the terminal")

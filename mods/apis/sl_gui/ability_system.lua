@@ -759,9 +759,17 @@ minetest.register_chatcommand("givestatpoints", {
     func = function(name, param)
         local player = minetest.get_player_by_name(name)
         if not player then return false, "Player not found" end
+        -- SECURITY: param is client text. inf/NaN here would poison the
+        -- persisted ability table (and `stat_points < cost` is false for inf,
+        -- i.e. every unlock in the tree for free), so only a bounded integer
+        -- is ever added.
         local points = tonumber(param) or 0
+        if points ~= points or points == math.huge or points == -math.huge then
+            return false, "Points must be a finite number."
+        end
+        points = math.max(-10000, math.min(10000, math.floor(points)))
         local data = get_ability_data(player)
-        data.stat_points = data.stat_points + points
+        data.stat_points = math.max(0, data.stat_points + points)
         save_ability_data(player, data)
         return true, "Gave " .. points .. " stat points."
     end

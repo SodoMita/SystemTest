@@ -277,6 +277,10 @@ local mob_config = {
     search_wait_time = 0.5,
     idle_random_select_time = 1,
     idle_wander_radius = 3,
+    -- Hard bound on wander candidates per idle tick. See handle_idle: an
+    -- unbounded retry loop here is a server-thread hang the moment
+    -- find_path returns nil.
+    idle_wander_attempts = 4,
 
     animations = {
         idle = {start = 0, stop = 20, speed = 15},
@@ -412,30 +416,62 @@ minetest.register_entity("sl_scary:nerobot", {
 
         if self.timer > mob_config.idle_random_select_time then
             self.timer = 0
-            local path_found = false
-            local sradius = 1
-            while path_found == false do
-                local is_inside_node = false
-                local is_outside_node = false
+            -- Both loops here are BOUNDED, and that is load-bearing.
+            --
+            -- This used to be `while path_found == false do ... end` with no
+            -- attempt counter. `update_path` assigns self.path from
+            -- minetest.find_path, which returns NIL whenever no route exists
+            -- inside max_search_distance -- a mob that is walled in, standing
+            -- in the void, or whose random candidate is simply unreachable.
+            -- path_found then never becomes true, sradius is never reset (so
+            -- from the second pass the inner loop breaks immediately and the
+            -- candidate never changes), and the server thread spins here
+            -- forever. Measured in the headless harness: 200,000 find_path
+            -- calls and 200,009 chat_send_all broadcasts INSIDE ONE on_step.
+            -- A tick that does not return is a frozen server, and any player
+            -- can wall a mob in with ordinary digging and building.
+            --
+            -- Bounded instead: try a few candidates, and if none is reachable
+            -- the mob stays put and tries again on the next idle tick -- which
+            -- is what an idle mob is supposed to do anyway.
+            for _ = 1, (mob_config.idle_wander_attempts or 4) do
                 local random_pos = vector.zero
-                while (is_inside_node == false and is_outside_node == false) or random_pos == vector.zero do
+                local is_inside_node, is_outside_node = false, false
+                local sradius = 1
+                -- A wander target needs BOTH: somewhere to stand (the target
+                -- node is not walkable) and ground to stand on (the node below
+                -- is). The old condition accepted a candidate when either one
+                -- held, i.e. it happily picked a spot inside a wall or in mid
+                -- air and then asked for a path to it.
+                while sradius <= mob_config.idle_wander_radius
+                        and not (is_inside_node and is_outside_node) do
                     random_pos = vector.add(vector.floor(pos), {
                         x = math.random(-sradius, sradius),
                         y = math.random(1, 2),
                         z = math.random(-sradius, sradius),
                     })
-                    local pos_below = {random_pos.x, random_pos.y-1, random_pos.z}
+                    -- BUGFIX: this was `{random_pos.x, random_pos.y-1,
+                    -- random_pos.z}` -- array-style, so .x/.y/.z were all nil.
+                    -- The engine reads positions with readV3F, which turns a
+                    -- missing component into 0 instead of erroring, so the
+                    -- "is there floor below me" test was silently reading the
+                    -- node at the world origin for every candidate.
+                    local pos_below = {
+                        x = random_pos.x, y = random_pos.y - 1, z = random_pos.z,
+                    }
                     local node = minetest.get_node(random_pos)
                     local node_below = minetest.get_node(pos_below)
-                    is_outside_node = minetest.registered_nodes[node.name] and not minetest.registered_nodes[node.name].walkable
-                    is_inside_node = minetest.registered_nodes[node_below.name] and minetest.registered_nodes[node_below.name].walkable
-                    sradius = sradius+1
-                    if sradius > mob_config.idle_wander_radius then break end
+                    local ndef = minetest.registered_nodes[node.name]
+                    local below_def = minetest.registered_nodes[node_below.name]
+                    is_outside_node = ndef and not ndef.walkable
+                    is_inside_node = below_def and below_def.walkable
+                    sradius = sradius + 1
                 end
-                self:update_path(random_pos)
-                minetest.chat_send_all(random_pos.x, random_pos.y, random_pos.z)
-                if self.path ~= nil and self.path[self.path_index] ~= nil then
-                    path_found = true
+                if is_inside_node and is_outside_node then
+                    self:update_path(random_pos)
+                    if self.path ~= nil and self.path[self.path_index] ~= nil then
+                        break
+                    end
                 end
             end
         end
@@ -473,7 +509,6 @@ minetest.register_entity("sl_scary:nerobot", {
     handle_searching = function(self, pos)
         self:set_animation("walk")
         self:play_sound("walk")
-        minetest.chat_send_all("search")
 
         if not self.search_spots then
             self.search_spots = minetest.find_nodes_in_area(
@@ -520,7 +555,6 @@ minetest.register_entity("sl_scary:nerobot", {
     handle_attacking = function(self, pos)
         self:set_animation("attack")
         self:play_sound("attack")
-        minetest.chat_send_all("attack")
 
         if not self.target_player or not self.target_player:is_player() then
             self.state = "idle"
@@ -578,7 +612,6 @@ minetest.register_entity("sl_scary:nerobot", {
             -- No valid path or reached the end of the path
 --             self.object:set_velocity({x = 0, y = 0, z = 0})
             self:set_animation("idle")
-            core.chat_send_all("no path")
             return
         end
 

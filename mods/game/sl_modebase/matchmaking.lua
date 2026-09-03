@@ -2,10 +2,16 @@ local S = game_mode.S
 local state = game_mode.state
 
 -- Format a pool entry for the Bots listbox (Name, Team, status).
+local F = minetest.formspec_escape
+
+-- SECURITY: bot names are game-generated, not connect-validated, and this line
+-- goes straight into a `textlist` -- where `,` separates rows and `]` closes
+-- the element. Escaping is what makes a hostile name inert (the engine's
+-- formspec_escape covers \ [ ] ; , $).
 local function format_bot_pool_line(entry)
 	if not entry then return "" end
 	local status = (rawget(_G, "botmatch") and botmatch.bots and botmatch.bots[entry.name]) and "in" or "out"
-	return string.format("%s | %s | %s", entry.name, entry.team, status)
+	return F(string.format("%s | %s | %s", entry.name, entry.team, status))
 end
 
 -- Read the bot pool from the aaa_botmatch mod. Returns a list, or an
@@ -85,7 +91,8 @@ local function get_matchmaking_formspec(player_name)
 	-- Role Section
 	table.insert(fs, "box[0.5,5.1;9,1.5;#1a1a1aff]")
 	local mm_name = state.monster_master.player or "None"
-	table.insert(fs, "label[0.7,5.4;Monster Master: " .. minetest.colorize("#ffaa00", mm_name) .. "]")
+	table.insert(fs, "label[0.7,5.4;Monster Master: "
+		.. minetest.colorize("#ffaa00", F(mm_name)) .. "]")
 
 	if not state.match_active then
 		if mm_name == player_name then
@@ -110,7 +117,12 @@ local function get_matchmaking_formspec(player_name)
 		elseif pstate.team then
 			role_str = " [" .. game_mode.get_team_label(pstate.team) .. "]"
 		end
-		table.insert(names, n .. role_str)
+		-- SECURITY: a connected bot shows up in this list under its
+		-- game-generated name, and an unescaped `]` inside a textlist entry
+		-- closes the element -- everything after it parses as new formspec.
+		-- Escape per entry, never the joined string (that would escape the
+		-- row separators too).
+		table.insert(names, F(n .. role_str))
 	end
 	table.insert(fs, "textlist[0.7,7.45;8.6,1.05;player_list;" .. table.concat(names, ",") .. "]")
 
@@ -172,6 +184,13 @@ end
 -- target.
 local bot_selection = {}
 
+-- SECURITY: same rule as every per-name table -- free it when the player
+-- leaves, or a client that reconnects under fresh names grows it without bound.
+minetest.register_on_leaveplayer(function(player)
+	local name = player and player.get_player_name and player:get_player_name()
+	if name then bot_selection[name] = nil end
+end)
+
 -- Handle formspec fields
 minetest.register_on_player_receive_fields(function(player, formname, fields)
 	if formname ~= "sl_modebase:matchmaking" then return end
@@ -219,7 +238,17 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 		if not is_admin then
 			minetest.chat_send_player(name, "[System Looting] admin only")
 		else
-			state.settings.beacon_hp = tonumber(fields.sett_beacon_hp) or 100
+			-- SECURITY: the field value is client text even when the sender
+			-- is an admin. `tonumber("1e999")` is +inf and a negative or
+			-- non-finite beacon HP makes the elimination condition
+			-- unwinnable/unlosable for the whole session, so it is clamped to
+			-- a finite integer before it becomes match state.
+			local hp = tonumber(fields.sett_beacon_hp)
+			if not hp or hp ~= hp or hp ~= math.floor(hp)
+				or hp == math.huge or hp == -math.huge then
+				hp = 100
+			end
+			state.settings.beacon_hp = math.max(1, math.min(100000, hp))
 			state.settings.mm_auto_assign = (fields.sett_mm_auto == "true")
 			state.settings.auto_start = (fields.sett_auto_start == "true")
 			minetest.chat_send_player(name, S("Match settings updated."))

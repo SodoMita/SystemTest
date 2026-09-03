@@ -205,8 +205,11 @@ check(prop_offences == 0, "entity defs carry engine props in initial_properties 
 -- even in comments; the tree should stop teaching the pattern. MT CTF
 -- calls get_velocity / add_velocity directly, and so do we.
 local legacy = 0
-local vgrep = io.popen("grep -rn player_velocity mods/game mods/content 2>/dev/null")
-if vgrep then
+-- pcall: lupa's embedded Lua 5.1 (tests/run_lua51.py, the local fallback
+-- runner) has no io.popen support; luajit in CI does. The audit is a
+-- tree-wide grep, so a runner without a shell simply skips it.
+local popen_ok, vgrep = pcall(io.popen, "grep -rn player_velocity mods/game mods/content 2>/dev/null")
+if popen_ok and vgrep then
 	for line in vgrep:lines() do
 		if line:find("get_player_velocity") or line:find("add_player_velocity")
 			or line:find("set_player_velocity") then
@@ -1044,17 +1047,46 @@ section("PHASE W2e — fabricator pilgrimage & the Grapple Lash")
 local fpos = { x = 600, y = 60, z = 0 }
 H.voxels[H.vhash(fpos)] = "sl_weapons:fabricator"
 alpha._wielded = ""
+-- The pilgrimage is the gate (spec §10.1): the operator stands AT the station.
+alpha:set_pos({ x = fpos.x, y = fpos.y, z = fpos.z - 1 })
 minetest.registered_nodes["sl_weapons:fabricator"].on_rightclick(fpos,
 	{ name = "sl_weapons:fabricator" }, alpha, nil)
 check(#H.formspecs.alpha > 0, "fabricator formspec opens")
 
--- MM refused at the machine
+-- MM refused at the machine (standing at it, so the refusal is the doctrine
+-- and not the reach gate below)
 gamma._wielded = ""
+gamma:set_pos({ x = fpos.x, y = fpos.y, z = fpos.z + 1 })
 minetest.registered_nodes["sl_weapons:fabricator"].on_rightclick(fpos,
 	{ name = "sl_weapons:fabricator" }, gamma, nil)
 H.fire_receive_fields("gamma", "sl_weapons:fabricator_600,60,0", { make_lash = "true" })
 check(gamma:get_inventory():contains_item("main", ItemStack("sl_weapons:grapple")) == false,
 	"MM cannot fabricate the lash")
+
+-- SECURITY: the station's position travels inside the FORMNAME, which is
+-- client text. The engine forwards a submission whenever the formname matches
+-- the last form it sent that peer (and forwards formname "" unconditionally),
+-- so the mod has to re-prove the station on every submission -- otherwise one
+-- right-click buys remote fabrication from anywhere in the world, forever.
+local no_station = { x = 601, y = 60, z = 0 }
+H.voxels[H.vhash(no_station)] = nil
+local mats_before = alpha:get_inventory():get_list("main")
+H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(no_station),
+	{ make_lash = "true" })
+check(W.fab_jobs[W.phash(no_station)] == nil,
+	"submission for a position with no fabricator node is refused")
+alpha:set_pos({ x = fpos.x, y = fpos.y, z = fpos.z - 40 })
+H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(fpos), { make_lash = "true" })
+check(W.fab_jobs[W.phash(fpos)] == nil,
+	"submission from 40 nodes away is refused (the pilgrimage is the gate)")
+local mats_after = alpha:get_inventory():get_list("main")
+check(#mats_after == #mats_before, "a refused remote fabrication consumes nothing")
+-- Absurd coordinates must not reach the map lookup either.
+H.fire_receive_fields("alpha", "sl_weapons:fabricator_99999999999999999999,0,0",
+	{ make_lash = "true" })
+check(W.fab_jobs["1e+20,0,0"] == nil and W.fab_jobs[W.phash(fpos)] == nil,
+	"oversized formname coordinates are dropped")
+alpha:set_pos({ x = fpos.x, y = fpos.y, z = fpos.z - 1 })
 
 -- Missing materials
 H.fire_receive_fields("alpha", "sl_weapons:fabricator_" .. W.phash(fpos), { make_lash = "true" })

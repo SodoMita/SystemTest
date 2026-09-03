@@ -38,6 +38,12 @@ jobs:
           done
           exit $fail
 
+      # Runs FIRST, before any suite that starts a match: a client-input hole
+      # is reachable by an unprivileged player and does not need a running
+      # match to matter. See docs/SECURITY_CLIENT_INPUT.md.
+      - name: Client-input security suite (priv-less player, six holes, tree-wide eval scan)
+        run: luajit tests/security_test.lua
+
       - name: Headless stub smoke test
         run: luajit tests/smoke_test.lua
 

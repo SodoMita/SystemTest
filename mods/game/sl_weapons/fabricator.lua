@@ -194,9 +194,57 @@ minetest.register_node(W.modname .. ":fabricator", {
 	end,
 })
 
+-- ----------------------------------------------------------------
+-- Station proof (SECURITY)
+-- ----------------------------------------------------------------
+-- The submission's position arrives inside the FORMNAME, which is client
+-- text. The engine only checks that a submitted formname equals the last one
+-- it sent that peer -- it never re-validates the coordinates baked into it,
+-- and it passes an empty formname straight through. So a client that opened
+-- the station once could keep submitting `make_*` for that position forever:
+-- from the other side of the map, after the station was destroyed, after the
+-- match ended. The pilgrimage is the whole gate on this machine (spec §10.1),
+-- which means the gate has to be re-checked on every submission: the node
+-- must still be a fabricator and the operator must still be standing at it.
+-- The engine's own interact rule is tool range + ~2.6 nodes; the station is
+-- furniture you stand in front of, so 8 nodes is generous.
+local FAB_REACH = 8.0
+
+local function operator_at_station(clicker, pos)
+	if not clicker or not clicker.is_player or not clicker:is_player() then
+		return false, "not a player"
+	end
+	local node = minetest.get_node_or_nil(pos)
+	if not node or node.name ~= W.modname .. ":fabricator" then
+		return false, "no fabricator at that position"
+	end
+	local ppos = clicker:get_pos()
+	if not ppos then
+		return false, "operator has no position"
+	end
+	local d = vector.distance(ppos, pos)
+	if not d or d ~= d or d > FAB_REACH then
+		return false, "operator is " .. tostring(d) .. " nodes away (reach " .. FAB_REACH .. ")"
+	end
+	return true
+end
+W.operator_at_station = operator_at_station
+
 local function start_job(pos, recipe_id, clicker)
 	local name = clicker:get_player_name()
 	local h = W.phash(pos)
+
+	local at_station, why = operator_at_station(clicker, pos)
+	if not at_station then
+		-- Say nothing to a forger beyond the generic refusal; say everything
+		-- to the log, because this is the engine's own "possible exploitation
+		-- attempt" class of event.
+		minetest.log("action", "[sl_weapons] refused fabrication for " .. name
+			.. " at " .. h .. ": " .. tostring(why))
+		minetest.chat_send_player(name, S("The machine is not there."))
+		return
+	end
+
 	if W.fab_jobs[h] then
 		minetest.chat_send_player(name, S("The machine is busy."))
 		return
@@ -247,7 +295,15 @@ minetest.register_on_player_receive_fields(function(player, formname, fields)
 	local pos_str = formname:sub(#(W.modname .. ":fabricator_") + 1)
 	local x, y, z = pos_str:match("^(%-?%d+),(%-?%d+),(%-?%d+)$")
 	if not x then return end
-	local pos = { x = tonumber(x), y = tonumber(y), z = tonumber(z) }
+	x, y, z = tonumber(x), tonumber(y), tonumber(z)
+	-- SECURITY: formname text is client text. Reject anything that is not a
+	-- finite map coordinate before it reaches the engine (a 30-digit number
+	-- parses to a float the mapblock lookup cannot use).
+	local LIMIT = 31000
+	for _, v in ipairs({ x, y, z }) do
+		if not v or v ~= v or v ~= math.floor(v) or math.abs(v) > LIMIT then return end
+	end
+	local pos = { x = x, y = y, z = z }
 	for id in pairs(W.FAB_RECIPES) do
 		if fields["make_" .. id] then start_job(pos, id, player) end
 	end
