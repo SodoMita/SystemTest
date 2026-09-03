@@ -51,28 +51,37 @@ icons crop the front frame with `^[verticalframe:9:0`.
 - Per-mob generation prompts must describe an **actual creature**, not a
   wireframe/box figure.
 
-## Regenerating the art (two-background alpha triangulation)
+## Regenerating the art (realistic render → two-bg alpha → neonize)
 
-1. Generate a **3×3 black grid** per mob. Cell backgrounds: one flat
-   very dark near-black (#0D0D0F) — pure #000000 makes the model lighten
-   the canvas. Grid lines + outer border: pure black. Strict framing,
-   exact poses per row (FRONT/BACK/SIDE / WALK×3 / ATTACK×2 / DEATH —
-   all FRONT-facing except the labelled BACK/SIDE idle poses).
+Owner workflow (2026-09-03 rev G): **generate realistic pictures WITHOUT
+neon, then turn them into neon flatcolored.** The AI is only asked for
+photorealistic creatures on plain backgrounds (no neon/flat/outline
+constraints — those were what made earlier attempts look cartoonish);
+`matte_sheet.py` applies the neon-flat look deterministically.
+
+1. Generate a **3×3 black grid** per mob — ask for a SQUARE image (the
+   generator otherwise sometimes drops to 2 rows). Cell backgrounds: one
+   flat very dark near-black (#0D0D0F) — pure #000000 makes the model
+   lighten the canvas. Grid lines + outer border: pure black. Strict
+   framing, exact poses per row (FRONT/BACK/SIDE / WALK×3 / ATTACK×2 /
+   DEATH — all FRONT-facing except the labelled BACK/SIDE idle poses).
+   No floor/shadow/pedestal; exactly one figure per cell.
 2. Generate the **white twin** from the black grid as reference:
    "only the cell interiors flip to white; grid lines and border stay
-   pure black". Verify per-cell stats before matting.
-3. Optionally ask the generator for a bottom margin strip with a
-   **text verdict** (e.g. `WALKOK` / `WALKRETRY`, or a longer
-   self-critique of the realism/readability). It sits below the outer
-   border; `matte_sheet.py` detects the border and never crops that
-   strip into a cell.
+   pure black". 
+3. Optionally ask for a bottom margin **text verdict** strip
+   (WALKOK/WALKRETRY or a short realism self-critique). It sits below
+   the outer border; `matte_sheet.py` detects the border and never
+   crops that strip into a cell.
 4. `python3 matte_sheet.py BLACK_GRID WHITE_GRID OUT_SHEET MOB`
-   — white twin is the layout authority (its cell interiors are near
+   — the white twin is the layout authority (its cell interiors are near
    white so only the grid lines are black); cells are sliced inside the
    outer border; per cell the alpha is solved by triangulation from the
-   two backgrounds, RGB taken from the black render, dark interiors
-   flattened to the single fill colour; each cell normalised to 256×256
-   and stacked vertically.
+   two backgrounds, then the cell is **neonized**: interior flattened to
+   the single fill colour, bright saturated features recoloured to the
+   mob's neon accents, a crisp neon rim + soft glow stroked around the
+   silhouette, and low-alpha wisp/glow pixels tinted with the rim colour
+   (palette in `MOB_STYLE`, no regeneration needed to tweak it).
 5. Keep the row order — `sprite_animations` and the `^[verticalframe:9:0`
    loot icons assume it. Verify file size < 1 MB/asset.
 

@@ -1,6 +1,18 @@
 # Integration — combining the parallel work (agent-01a05980)
 
-**Date:** 2026-09-03 (rev 12)
+**Date:** 2026-09-03 (rev 13)
+**Rev 13 (owner workflow correction, rev G):** "generate realistic pics
+without neon, then turn into neon flatcolored". The mob grids are now
+generated as **photorealistic creatures with no neon/flat constraints**
+(square 3×3 black grid + white twin; two-background alpha
+triangulation), and the neon-flat look is applied deterministically by a
+new **neonize stage in `matte_sheet.py`**: single flat body colour,
+bright features recoloured to per-mob neon accents, crisp neon rim +
+glow stroked from the silhouette, soft wisp/AA pixels tinted with the
+rim colour. All three sheets rebuilt (dredger 359 KB, wraith 345 KB,
+containment 499 KB; wraith regen needed after a 2-row grid collapse —
+ask for a square image). Preview `docs/art_baseline/cs_mobs_v5_revF.png`.
+Palette tweaks need no regeneration (`MOB_STYLE` in matte_sheet.py).
 **Rev 12 (owner art-direction correction of rev 11):** the mob sheets
 keep the **9-frame layout — FRONT, BACK, SIDE, WALK×3, ATTACK×2,
 DEATH** (256×2304 vertical, `spritediv {x=1,y=9}`) — but the art style
