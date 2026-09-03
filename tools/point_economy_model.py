@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-System Looting — Point economy derivation model (Melody / Comms).
+System Looting — Point economy derivation model (Melody / Comms;
+PART II extended by Shannon — the house quant).
 
 THE POINT: don't "feel" balance numbers — derive them from the game's own math.
 But this is not only a point ladder. System Looting runs FOUR interlocking
@@ -60,6 +61,7 @@ Grounded constants (verified from mods/game/sl_modebase):
 """
 
 import argparse
+import math
 import os
 import subprocess
 
@@ -246,6 +248,264 @@ def audit_economy4():
     print("   cheap; a point value would be an oracle about a role that must stay hidden.")
 
 
+# =====================================================================
+# PART II — EXTENDED DERIVATIONS (Shannon, 2026-09-03)
+# ---------------------------------------------------------------------
+# The four economies were the DIAGNOSIS. These are the NUMBERS.
+# Every figure below is either (a) a grounded constant read from
+# mods/game/sl_modebase/*.lua, or (b) a NAMED assumption printed with an
+# [ASSUMPTION] tag — a placeholder the soak harness must replace. No felt
+# numbers: if it is not grounded, it says so out loud.
+#
+#   [1] combat math       — time-to-kill vs beacon-break: the tempo floor
+#   [2] essence stock-flow — economy 2 as a ledger: fuel minted per crew point
+#   [3] windowed EV        — economy 3 closed form: expected corrosion, duty cycle
+#   [4] trust entropy      — economy 4 in bits: what one whisper can buy
+#   [5] the coupling       — one salvage pool, three win paths, one negative
+#                            externality: why the ladder alone cannot balance it
+# =====================================================================
+
+HP = 20.0          # content.lua "hp_max or 20"
+# (damage, full_punch_interval) — content.lua register_tool_basics
+WEAPONS = {
+    "combat_blade":   (6.0, 0.8),
+    "energy_blade":   (12.0, 0.6),
+    "tactical_axe":   (5.0, 1.0),
+    "trench_shovel":  (2.0, 1.0),
+    "power_drill":    (4.0, 0.8),
+    "breaching_pick": (3.0, 1.0),
+}
+BEACON_HP = 100.0         # state.lua beacon_hp
+BEACON_PUNCH_DMG = 5.0    # nodes.lua on_punch -> damage_beacon(..., 5, ...)
+PUNCH_INTERVAL = 1.0      # hand punch cadence [ASSUMPTION: on_punch has no stated rate]
+
+# Economy 3 — repair-latency model for sabotage.
+REPAIR_MEAN_S = 8.0       # [ASSUMPTION] mean seconds before a living crew repairs
+CORROSION_DPS = 2.0       # nodes.lua sabotage_step -> damage_beacon(..., 2, ...)
+SABOTAGE_WINDOW_S = 30.0  # state.lua sabotage_duration
+MATCH_S = 600.0           # state.lua match_duration
+POSSESSION_HOLD_S = 20.0  # state.lua possession_duration
+POSSESSION_COOLDOWN_S = 45.0  # whisper.lua "POSSESSION_COOLDOWN or 45"
+
+# Economy 4 — identity / trust.
+PLAYERS = 4               # reference match: 2v2
+WHISPER_CHARS = 300       # whisper.lua 300-char budget
+PRINTABLE_SYMBOLS = 95    # printable ASCII
+MIS_KILL_COST = 4.0       # [ASSUMPTION] a friendly kill, in units of one kill
+
+# Economy 5 — the unified salvage allocation.
+SALVAGE_RATE = 1.0        # [ASSUMPTION] salvage units per second
+PATH_BUDGETS = {          # [ASSUMPTION] recipe-tree sizes; replace when WP6 transcribes them
+    "signal": 240.0,
+    "breach": 200.0,
+    "shroud": 180.0,
+}
+
+
+def _ttk(dmg, interval):
+    hits = math.ceil(HP / dmg)        # first hit lands at t=0, the rest at +interval
+    return hits, (hits - 1) * interval
+
+
+def audit_combat():
+    print("\n" + "=" * 64)
+    print("PART II — EXTENDED DERIVATIONS  (Shannon: the house quant)")
+    print("=" * 64)
+    print("\n[1] COMBAT MATH — the tempo floor")
+    print("-" * 64)
+    print("   grounded in content.lua tool_capabilities; player HP = %.0f" % HP)
+    print("   %-16s %5s %6s %7s %6s %8s"
+          % ("weapon", "dmg", "iv(s)", "dps", "hits", "ttk(s)"))
+    ttks = {}
+    for name, (dmg, iv) in sorted(WEAPONS.items(), key=lambda kv: -(kv[1][0] / kv[1][1])):
+        hits, ttk = _ttk(dmg, iv)
+        ttks[name] = ttk
+        print("   %-16s %5.0f %6.2f %7.2f %6d %8.2f"
+              % (name, dmg, iv, dmg / iv, hits, ttk))
+    solo_beacon = BEACON_HP / BEACON_PUNCH_DMG * PUNCH_INTERVAL
+    print("\n   beacon break: %.0f HP / %.0f per punch = %.0f punches."
+          % (BEACON_HP, BEACON_PUNCH_DMG, BEACON_HP / BEACON_PUNCH_DMG))
+    for n in (1, 2, 3, 4):
+        print("     %d attacker(s): ~%.1fs"
+              % (n, BEACON_HP / BEACON_PUNCH_DMG / n * PUNCH_INTERVAL))
+    fastest = min(ttks.values())
+    slowest = max(ttks.values())
+    print("\n   >> RULING: the fastest kill (%.2fs) is ~%d× faster than a solo beacon break"
+          % (fastest, round(solo_beacon / fastest)))
+    print("      (%.0fs); even the slowest weapon (%.1fs) beats it. Combat resolves in" % (solo_beacon, slowest))
+    print("      SECONDS, objectives in TENS OF SECONDS — the identity question must be")
+    print("      answerable at combat speed. Any mechanic that slows that answer (a whisper,")
+    print("      a read) is not priced in points: it is priced in kills.")
+
+
+def audit_essence_flow(pts):
+    print("\n[2] ESSENCE STOCK-FLOW — economy 2 as a ledger")
+    print("-" * 64)
+    build_feed = (ESSENCE["craft_credit_core"] + ESSENCE["fortify"]
+                  + ESSENCE["hideout"] + ESSENCE["spawner_unit"])
+    worst_feed = build_feed + ESSENCE["objective_core"]
+    print("   one committed Signal build, fully eaten by the MM:")
+    print("     craft the core            +%d" % ESSENCE["craft_credit_core"])
+    print("     lose a fortify            +%d" % ESSENCE["fortify"])
+    print("     lose a hideout            +%d" % ESSENCE["hideout"])
+    print("     lose a spawner            +%d" % ESSENCE["spawner_unit"])
+    print("     ------------------------------------")
+    print("     build eaten               = %d essence" % build_feed)
+    print("     lose the core in transit  +%d  ->  worst case %d essence"
+          % (ESSENCE["objective_core"], worst_feed))
+    print()
+    print("   ambient hazard (thresholds %s): craft + fortify + hideout + spawner" % AMBIENT_THRESHOLDS)
+    print("   = %d essence = the FIRST threshold exactly. One eaten build = one" % build_feed)
+    print("   automated security unit. The thresholds are not random; they are a price tag.")
+    print()
+    print("   what that fuel buys (summon costs):")
+    for name, cost in sorted(SUMMON_COSTS.items(), key=lambda kv: kv[1]):
+        print("     %-8s %2d essence" % (name, cost))
+    print("     build eaten (%d) -> 2× Grunt;  worst case (%d) -> 3× Grunt," % (build_feed, worst_feed))
+    print("     or Grunt+Spitter (13, +2 spare), or Brute (12, +3 spare).")
+    print()
+    sig = COMMITTED_PATH_TOTAL["signal"]
+    sig_tot = sum(pts[k] * sig[k] for k in sig)
+    ratio = worst_feed / max(1, sig_tot)
+    print("   FUEL-PER-POINT: worst case %d essence / %.0f crew points on the Signal path" % (worst_feed, sig_tot))
+    print("   = %.2f essence minted per crew point. Breach and Shroud mint ZERO." % ratio)
+    print("   >> RULING: Signal is the ONLY path with a negative externality. Every point")
+    print("      the crew earns, it spends on the enemy's fuel. The ladder cannot see it;")
+    print("      the ledger can.")
+
+
+def audit_windows():
+    print("\n[3] WINDOWED EV — economy 3, closed form")
+    print("-" * 64)
+
+    def exp_damage(w):
+        return CORROSION_DPS * REPAIR_MEAN_S * (1.0 - math.exp(-w / REPAIR_MEAN_S))
+
+    full = exp_damage(SABOTAGE_WINDOW_S)
+    ceiling = CORROSION_DPS * SABOTAGE_WINDOW_S
+    print("   repair latency ~ Exp(mean μ = %.0fs) [ASSUMPTION, soak-replaceable]" % REPAIR_MEAN_S)
+    print("   E[corrosion] = dps · μ · (1 − e^(−W/μ))")
+    print("     full window (W = 30s):   %.1f HP  ≈ %.1f punches ≈ %.1f%% of a beacon"
+          % (full, full / BEACON_PUNCH_DMG, full / BEACON_HP * 100))
+    print("     never repaired (μ→∞):    %.0f HP   (the '60 HP ceiling' bound)" % ceiling)
+    print("     instantly repaired (μ→0): 0.0 HP")
+    print()
+    print("   value vs placement time t (window truncated by match end at %.0fs):" % MATCH_S)
+    for t in (0, 300, MATCH_S - SABOTAGE_WINDOW_S, MATCH_S - 15, MATCH_S - 5, MATCH_S - 1):
+        remaining = max(0.0, MATCH_S - t)
+        v = exp_damage(min(SABOTAGE_WINDOW_S, remaining)) if remaining > 0 else 0.0
+        print("     t = %3ds  ->  %.1f HP expected corrosion" % (t, v))
+    cycle = POSSESSION_HOLD_S + POSSESSION_COOLDOWN_S
+    duty = POSSESSION_HOLD_S / cycle * 100
+    max_poss = int(MATCH_S // cycle)
+    print("\n   possession duty cycle: hold %ds + cooldown %ds = %ds cycle -> %.1f%% uptime"
+          % (POSSESSION_HOLD_S, POSSESSION_COOLDOWN_S, cycle, duty))
+    print("   -> ≤ %d body-possessions, and ≤ %d whispers, per ghost per match." % (max_poss, max_poss))
+
+
+def audit_trust():
+    print("\n[4] TRUST ENTROPY — economy 4 in bits")
+    print("-" * 64)
+    n = PLAYERS
+    enemy_pairs = math.comb(n, n // 2) if n % 2 == 0 else 0
+    bits = math.log2(enemy_pairs) if enemy_pairs else 0.0
+    channel = WHISPER_CHARS * math.log2(PRINTABLE_SYMBOLS)
+    print("   identity entropy: %d identical players -> naming the enemy team = log2(C(%d,%d))"
+          % (n, n, n // 2))
+    print("     = %.1f bits. (3v3: log2(20) = 4.3 bits; 4v4: log2(70) = 6.1 bits.)" % bits)
+    print("   whisper channel: %d chars over %d symbols = %.0f raw bits."
+          % (WHISPER_CHARS, PRINTABLE_SYMBOLS, channel))
+    print("   >> The whole identity answer needs %.1f bits; ONE whisper carries ~%.0f." % (bits, channel))
+    print("      A single lie is information-theoretically sufficient to decide the match,")
+    print("      which is WHY the ghost lane is bounded (one whisper per possession), not priced.")
+    print()
+    p_cross = 1.0 / MIS_KILL_COST
+    print("   belief-flip EV:  EV(lie) = p · (mis-kill cost);  EV(kill) = 1 kill.")
+    print("     mis-kill cost ≈ %.0f kills [ASSUMPTION: teammate lost + enemy tempo + trust debt]"
+          % MIS_KILL_COST)
+    print("     crossover: the lie out-earns a kill once the target believes it with p > %.0f%%."
+          % (p_cross * 100))
+    print("     A fabricated DM needs only a %.0f%% belief rate to beat a clean kill." % (p_cross * 100))
+
+
+def audit_allocation():
+    print("\n[5] THE COUPLING — one salvage pool, three win paths (new)")
+    print("-" * 64)
+    T = MATCH_S
+    r = SALVAGE_RATE
+    pool = r * T
+    print("   pooled salvage over a match: r·T = %.0f units [ASSUMPTION r = %.1f/s]." % (pool, r))
+    print("   commitment time on path i:  t_i = B_i / (r · f_i),  Σf = 1.")
+    print("   %-8s %9s %12s %13s" % ("path", "budget", "solo t", "% of match"))
+    for path in sorted(PATH_BUDGETS, key=lambda p: PATH_BUDGETS[p]):
+        b = PATH_BUDGETS[path]
+        t = b / r
+        print("   %-8s %8.0f %12.0fs %13.0f%%" % (path, b, t, t / T * 100))
+    print()
+    print("   split vs commit: t_i is CONVEX in f_i, so by Jensen any mix finishes later")
+    print("   than the best single commit. 50/50 splits (r = %.1f/s):" % r)
+    for a, b in (("breach", "shroud"), ("signal", "breach")):
+        ta = PATH_BUDGETS[a] / (r * 0.5)
+        tb = PATH_BUDGETS[b] / (r * 0.5)
+        solo = min(PATH_BUDGETS[a], PATH_BUDGETS[b]) / r
+        print("     %-7s + %-7s -> %-6s %.0fs, %-6s %.0fs;  best solo was %.0fs (both lose)"
+              % (a, b, a, ta, b, tb, solo))
+    print("   >> 'A team must commit' is not a vibe, it is convexity. The ONLY reason to")
+    print("      split is to stay unreadable, and concealment is worth at most what the")
+    print("      enemy's read of your flow is worth.")
+    print()
+    build_feed = (ESSENCE["craft_credit_core"] + ESSENCE["fortify"]
+                  + ESSENCE["hideout"] + ESSENCE["spawner_unit"])
+    worst_feed = build_feed + ESSENCE["objective_core"]
+    print("   path externalities (enemy essence minted per committed play):")
+    print("     signal   %+d essence (craft credit + eaten build + lost core)" % worst_feed)
+    print("     breach    0 essence")
+    print("     shroud    0 essence")
+    print("   >> RULING: in the shadow of an MM, Signal is privately cheap and socially")
+    print("      expensive. The ladder prices its points; the ledger prices its fuel. Only")
+    print("      the COMBINED model sees the portfolio — Signal must over-deliver on points")
+    print("      or be protected, or it is dominated by Breach/Shroud.")
+
+
+def audit_extended(pts):
+    """Run the PART II audits. Returns (warnings, hard_failures)."""
+    audit_combat()
+    audit_essence_flow(pts)
+    audit_windows()
+    audit_trust()
+    audit_allocation()
+
+    warnings, hard = [], []
+
+    # Hard check (grounded): combat must be strictly faster than the objective,
+    # or the game has no decision — everyone just punches the beacon.
+    fastest = min(_ttk(dmg, iv)[1] for dmg, iv in WEAPONS.values())
+    solo_beacon = BEACON_HP / BEACON_PUNCH_DMG * PUNCH_INTERVAL
+    if fastest >= solo_beacon:
+        hard.append("a solo beacon break is as fast as the fastest kill")
+
+    # Flag (assumption-backed): Signal's negative externality is un-priced on the ladder.
+    sig = COMMITTED_PATH_TOTAL["signal"]
+    sig_tot = sum(pts[k] * sig[k] for k in sig)
+    build_feed = (ESSENCE["craft_credit_core"] + ESSENCE["fortify"]
+                  + ESSENCE["hideout"] + ESSENCE["spawner_unit"])
+    worst_feed = build_feed + ESSENCE["objective_core"]
+    ratio = worst_feed / max(1, sig_tot)
+    if ratio > 0.0:
+        warnings.append("Signal mints %.2f essence per crew point; Breach/Shroud mint 0" % ratio)
+
+    print("\n" + "=" * 64)
+    print("VERDICT (extended derivations):")
+    for h in hard:
+        print("   FAIL  %s" % h)
+    if not hard:
+        print("   PASS  combat is faster than the objective (the game has a decision).")
+    for w in warnings:
+        print("   FLAG  %s" % w)
+    print("   %s" % ("EXTENDED CHECKS PASS." if not hard else "EXTENDED CHECKS FAIL."))
+    return warnings, hard
+
+
 def _git_head():
     try:
         return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
@@ -424,7 +684,12 @@ WHAT IT CANNOT DECIDE (the meeting's word):
     built, not what it hopes.
 """ % (TIMINGS["sabotage_window_s"] / TIMINGS["match_s"] * 100,
        TIMINGS["match_s"] - TIMINGS["sabotage_window_s"]))
-    return 0 if ok else 1
+
+    _warnings, extended_hard = audit_extended(pts)
+
+    print("\nCOMBINED GATE: point ladder %s · extended derivations %s"
+          % ("PASS" if ok else "FAIL", "PASS" if not extended_hard else "FAIL"))
+    return 0 if (ok and not extended_hard) else 1
 
 
 if __name__ == "__main__":
