@@ -23,14 +23,15 @@ THE FOUR ECONOMIES (why they cannot be priced in isolation):
      — it's what it does inside a window. A sabotage placed at t=580 is nearly
      worthless; one at t=0 denies for a third of the match.
   4. THE BRAINWORM + GHOST LANE — roles and information, NOT points. ONE type of
-     points (the crew ladder). The BRAINWORM is the small neutral monster (1 heart,
-     no inventory): leap-attacks into a body; Exp -> SP to upgrade abilities (walk
-     walls/ceilings); inside a host it can kill, write on the host UI, see all the
-     host sees, or freeze the host; if the host kills other players BOTH parasite
-     and host win. GHOSTS craft PURE INFORMATIONAL craftitems only (no pickup, no
-     inventory, no nodes/tools/non-informational craftitems) — the info lane.
-     Voting is a MEETING to do important actions. No number on roles. See
-     audit_economy4().
+     points (the crew ladder). The BRAINWORM is the small NEUTRAL monster, Super-Sus-
+     style: 1 heart, no inventory; leap-attacks into a body; Exp -> SP to upgrade
+     (walk walls/ceilings); inside a host it can kill (or exit), write on the host
+     UI, see all the host sees, or freeze the host. It is the TEAM OF SELF — it wins
+     its own game, and on EXIT it returns to being a CREWMATE (temporary take-over,
+     not conversion). GHOSTS fly somewhere HIGH IN THE SKY in place, nothing around
+     them, and CANNOT read or write chat unless SUMMONED; they craft PURE
+     INFORMATIONAL craftitems only. Voting has DIFFERENT TOPICS, lynch primary. No
+     number on roles. See audit_economy4().
 
 Run:        python3 tools/point_economy_model.py            # audit + exit code
             python3 tools/point_economy_model.py --emit OUT # write generated constants
@@ -238,22 +239,26 @@ def audit_economy4():
     print("=" * 60)
     print("   ONE type of points: the crew ladder (--emit). Roles are not points.")
     print()
-    print("   THE BRAINWORM — small neutral monster, DEFINED:")
-    print("     - 1 heart of health, NO inventory, hard to see (white neon in a")
-    print("       white environment, like a silverfish / parasite worm)")
-    print("     - leap-attacks a player to ENTER their body")
+    print("   THE BRAINWORM — SMALL NEUTRAL MONSTER, Super-Sus-style (team of self):")
+    print("     - 1 heart, NO inventory, white-neon so it is hard to see")
+    print("     - leap-attacks a player to ENTER their body (temporary take-over)")
     print("     - gains Exp -> SP to upgrade abilities (walk on walls and ceilings)")
-    print("     - inside a host: kill the victim (staying, may exit), write a message")
-    print("       on the host UI, see everything the host sees in the UI, freeze the")
-    print("       host's movement")
-    print("     - if the HOST kills other players -> BOTH parasite AND host win")
+    print("     - inside a host: kill the victim (or exit), write on the host UI, see")
+    print("       everything the host sees in the UI, freeze the host's movement")
+    print("     - it is the TEAM OF SELF — it wins its OWN game, on its own terms")
+    print("     - ON EXIT it RETURNS to being a CREWMATE (not a permanent conversion)")
     print()
-    print("   GHOSTS — the INFORMATION lane:")
-    print("     - can NOT pick up, have no inventory, can NOT craft nodes, tools, or")
+    print("   GHOSTS — the INFORMATION lane, high in the sky:")
+    print("     - fly SOMEWHERE HIGH IN THE SKY in place — NO cage, nothing around")
+    print("       them except the other ghosts")
+    print("     - CANNOT read or write CHAT unless SUMMONED (summoning is the ONLY")
+    print("       channel; floating is otherwise silent)")
+    print("     - can NOT pick up or have an inventory; can NOT craft nodes, tools, or")
     print("       non-informational craftitems")
     print("     - craft ONLY PURE INFORMATIONAL craftitems (the info economy)")
     print()
-    print("   VOTING — a MEETING to do important actions. Not a lynch, not a point.")
+    print("   VOTING — has DIFFERENT TOPICS, and the LYNCH is the PRIMARY topic.")
+    print("     Not a single-purpose meeting; not a point.")
     print()
     print("   >> THE RULING: one point type (crew ladder); essence = fuel; timings =")
     print("      a scoring dimension; the Brainworm + ghost lane are ROLES priced in")
@@ -427,11 +432,11 @@ THE FOUR-ECONOMY CONCLUSION:
     per-action deltas is the only thing that can price a window — the model can
     only state the bound.
   - The Brainworm + ghost lanes (economy 4) are NOT a point economy. ONE type of
-    points exists: the crew ladder. The Brainworm (1 heart, no inventory, leap-
-    attack into a body, Exp->SP abilities, host kills -> both win) and the ghost
-    info lane (informational craftitems ONLY) are ROLES — priced in what they DO,
-    not in +X. Trust is not a currency and no longer part of the model; there is no
-    invented hidden-role score.
+    points exists: the crew ladder. The Brainworm is a Super-Sus NEUTRAL — 1 heart,
+    no inventory, leap-attack, Exp->SP abilities, the TEAM OF SELF (wins its own
+    game; on exit returns to being a crewmate). The ghost info lane — high in the
+    sky, NO cage, can't read/write chat unless SUMMONED, informational craftitems
+    ONLY. Both are ROLES priced in what they DO, not in +X. No invented score.
 
 WHAT IT CANNOT DECIDE (the meeting's word):
   - The exact SCALE for crew points needs the soak harness to emit per-action deltas.

@@ -212,15 +212,19 @@ price it — the model can only state the bound.
 
 **4. The Brainworm + ghost lane (roles and information).** Not a point economy. There is
 **one type of points** (the crew ladder). These are **roles**, priced in what they **do**,
-not in `+X`. The **Brainworm** is the small **neutral monster**, *now defined*: **1 heart
-of health, no inventory**; it **leap-attacks a player to enter their body**; it gains
-**Exp → SP** to upgrade abilities (walk on walls/ceilings); inside a host it can **kill the
-victim** (staying, or exit), **write a message on the host UI**, **see everything the host
-sees in the UI**, or **freeze the host's movement**; and if the **host kills other players,
-both parasite and host win** (white-neon, so it's hard to spot in the white environment).
-**Ghosts** craft **pure informational craftitems only** — they **can't pick up, have no
-inventory, and can't craft nodes, tools, or non-informational craftitems**. **Voting** is a
-**meeting to do important actions**, not a lynch and not a point.
+not in `+X`. The **Brainworm** is the small **neutral monster**, Super-Sus-style (the
+**team of self**): **1 heart, no inventory**; it **leap-attacks a player to enter their
+body** (a *temporary* take-over, not a conversion); it gains **Exp → SP** to upgrade
+abilities (walk walls/ceilings); inside a host it can **kill the victim** (or exit), **write
+a message on the host UI**, **see everything the host sees in the UI**, or **freeze the
+host's movement**; it **wins its own game** on its own terms, and **on exit it returns to
+being a crewmate** (white-neon, so it's hard to spot in the white environment). **Ghosts**
+**fly somewhere high in the sky in place — no cage, nothing around them except the other
+ghosts**; they **cannot read or write chat unless they are summoned** (summoning is the only
+channel; otherwise they are silent); they **can't pick up, have no inventory, and can't
+craft nodes, tools, or non-informational craftitems** — only **pure informational
+craftitems**. **Voting** has **different topics, with the lynch as the primary topic** — not
+a single-purpose meeting and not a point.
 
 There is **no trust score** and no invented hidden-role point. A role is priced in its
 effect — a Brainworm can *remove a body*; a ghost can *corrupt an info chain* — never as a
