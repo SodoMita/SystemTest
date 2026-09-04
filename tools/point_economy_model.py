@@ -7,6 +7,21 @@ But this is not only a point ladder. System Looting runs FOUR interlocking
 economies at once, and a points model that only prices the crew's kill/objective
 ladder is modelling a third of the game. This revision folds the other three in.
 
+METHOD / SCOPE (what this file is and is NOT — the honest boundary):
+  This is a CLOSED-FORM ANALYTIC model. It is the RIGHT tool for:
+    - combat system (damage per hit, TTK, kill value), and
+    - ability-unlock cost (Exp->SP scaling) — local, derivable, no spatial
+      dynamics. For those it "works fine" (user's word).
+  It is the WRONG tool for the WHOLE-GAME emerging statistics — win-rate
+  distributions, role balance, how often the worm win actually lands. A path
+  "share" here (e.g. signal@61%) is a hand-ADDED tally on an assumed path, NOT
+  a measured win rate. To SEE the game you need a NUMERIC SIMULATION: recreate
+  the rules with just numbers (no 3D/2D space), run many matches, read the
+  win-rate distributions. That is for MANUAL ITERATION over values, NOT
+  automatic optimization — the value space is huge and the objective (win rate)
+  is noisy + discrete, so there is no gradient to descend; you change one value,
+  re-run, and read the distribution. Human in the loop.
+
 THE FOUR ECONOMIES (why they cannot be priced in isolation):
   1. CREW POINTS. The ladder we've been locking. Effort x win-progress x RISK.
      Traded on the beacon/objective win. Put in the §13.3 owner rule: points come
@@ -464,6 +479,14 @@ WHAT IT CANNOT DECIDE (the meeting's word):
     the Forge runs one job at a time; the trees draw a common substrate). Until that
     is built, "a team can't do all three" is a wish, and the model says what glitch
     built, not what it hopes.
+  - The WHOLE GAME. This analytic model cannot produce a win rate. The four
+    economies interact with space, ordering, and randomness, and the only honest
+    way to SEE them is a NUMERIC SIMULATION (rules recreated with just numbers, no
+    2D/3D) run over many matches. The simulation is for MANUAL iteration over
+    values, not automatic optimization: the value space is huge and the objective
+    (win rate) is noisy/discrete, so there is no surface to optimize. One variable,
+    one run, read the distribution, repeat. This model's job ends at the derivable
+    layer (combat + ability unlock); emergence is a simulation's job.
 """ % (TIMINGS["sabotage_window_s"] / TIMINGS["match_s"] * 100,
        TIMINGS["match_s"] - TIMINGS["sabotage_window_s"]))
     return 0 if ok else 1

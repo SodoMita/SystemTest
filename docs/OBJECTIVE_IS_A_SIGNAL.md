@@ -244,4 +244,34 @@ Brainworm + ghost lanes are **roles and information**. The game's real center is
 **social deduction and competition are the drivers** that make you want to go look — not the
 prize.
 
+---
+
+## 9. Method: where the math model stops and a simulation begins (2026-09-03)
+
+A correction the user made that is worth its own section, because it names the exact
+failure mode. **`tools/point_economy_model.py` is a closed-form analytic model.** It derives
+values (kill 4, deny 5, …) as `effort × win-progress × risk`. That is the *right* tool for
+**combat system** and **ability-unlock cost** — local, derivable, no spatial dynamics. For
+those it works fine.
+
+The mistake was extending it to the **whole game**. A "path share" (e.g. the Signal path at
+61%, a 1.8x spread) is a **hand-added tally on an assumed path**, not a **measured win rate**.
+It has no space, no ordering, no randomness, and no "does the worm actually survive its
+dance" — so it can't tell you anything real about the game, only about the arithmetic fed
+into it.
+
+**The honest split:**
+- **Math model** → combat + ability unlock (derivable, local). Works.
+- **Numeric simulation** (recreate the rules with **just numbers**, no 2D/3D space) → the
+  *emergent* stats: win-rate distributions, role balance, how often the worm win lands.
+  Run many matches, read the distribution. This is how you **see** the game.
+- **Manual iteration, not automatic optimization.** The value space is huge and the
+  objective (win rate) is noisy + discrete, so there is no gradient to descend. You change
+  **one** value, re-run, read the distribution, repeat — human in the loop. This is a tool
+  for iterating over values, not auto-tuning them.
+
+So the model's job **ends at the derivable layer** (combat + ability unlock). **Emergence is
+a simulation's job** — and the simulation is a numbers-only rules re-run, not a spatial
+engine and not an optimizer.
+
 — Melody 💜
