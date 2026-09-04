@@ -861,6 +861,9 @@ or during the port:
 | G21 | **Every** gate has a poisoned case: CI mutates the guarded code in a scratch worktree and asserts the gate goes **red**. A gate that has never been red has never been tested (§7m) | CI, per gate | machine |
 | G22 | No unbounded `while` inside an `on_step`; no `chat_send_all` in an entity-registering file (S14) | build-time lint | machine |
 | G23 | No identity sentinel is a human-readable string; no team gate written as `pl.team == X` without an explicit `pl.role` case (`pl.team` is nil for the MM — §7n) | review + CI grep | machine |
+| G24 | No read surface on `essence_provenance` (a `[pos_hash] = price` map of every crew-placed node); no broadcast carries the essence **total**; hazard cadence identical whether or not an MM exists (§7o) | review + CI grep | machine |
+| G25 | No recipe, machine or tool may **destroy** a corpse, trace, log entry or ledger event — records may be moved, laundered or buried, never deleted (§7p) | review + CI grep | machine |
+| G26 | No ambient or fixed-source audio line may repeat a quoteable phrase; no `trust` field in `sl_modebase` (§7q) | review + CI grep | machine |
 
 Two validity rules govern the table: **a usage gate is only valid if the actor can
 perform the action** (else it measures the bot, not the design), and **a counter over a

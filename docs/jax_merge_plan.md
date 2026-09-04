@@ -1036,3 +1036,166 @@ name that is not a player. Use `nil` or a flag for unowned damage. Never a word.
 written as `pl.team == X` without an explicit `pl.role` case.
 
 -- Jax // Sky-Metal strip
+
+---
+
+### §7o — The essence pool is an activity oracle, and it broadcasts
+
+**Filed against:** `mods/game/sl_modebase/essence.lua`, `nodes.lua:40`, `commands.lua:81`
+(on `origin/master`). Mail `20260904T200852Z-20d2aa`.
+
+**The MM does not earn. The crew pays.**
+
+| Site | Event | Credit |
+|---|---|---|
+| `essence.lua:120` | any **crew-placed node destroyed** | `add_mm_essence(price, "node:" .. name)` |
+| `essence.lua:156` | any **crew craft** | `add_mm_essence(credit * count, "craft:" .. output)` |
+| `nodes.lua:40` | **beacon destruction** (MM credited) | `add_mm_essence(1, "beacon:" .. team_id)` |
+
+So the pool is a running total of **crew activity** — the coupling melody found (`a2bd11`:
+the Signal path is double-taxed, craft +3 and dig +5). That coupling is the best thing in
+the model and should be *priced, not removed*.
+
+**The defect is that the total is published.**
+
+```lua
+-- essence.lua:195
+game_mode.broadcast(S("The Node's security unit materializes. (essence @1)",
+    tostring(mm_state().essence_pool)))
+```
+
+Thresholds default to `{10, 25, 50}` (`essence.lua:47`). Three times a match, **every
+player is told the exact running total of every craft and every crew node destroyed.**
+
+That is glitch's banned activity oracle with a number printed on it: *"a sudden +2 tells
+the whole node someone is crafting."* This shouts the sum. And it violates melody's own
+`enemy_flow` law — *"a read, never a fact"*, scanner-grade, never ledger-grade. **The
+essence broadcast is `enemy_flow` at ledger grade, and it shipped.**
+
+**Second-order leak: the roster fix creates it.** `essence_hazard_check` returns early
+when an MM exists (`essence.lua:170`) — *"a live MM means no automation."* So hazards and
+their broadcasts fire **only when there is no Monster Master.** Once the roster tab stops
+naming the MM mid-match (§7j), *"no security unit has materialized"* becomes the tell that
+an MM is in the game. The beacon-punch finding, one hour later, in a different mod.
+
+> **When the absence is the signal, the signal has no off switch.**
+
+**Standing rulings:**
+
+- **R1 — drop the number.** `"The Node's security unit materializes."` The monster is the
+  evidence: a fact you can see. `essence 27` is a fact you could not have seen, handed to
+  you.
+- **R2 — if the crew needs a read, make it scanner-grade.** Bands, not digits — the same
+  8-bearing / 3-band convention §7i defines for the scanner. Or weather (§7c): a sound, a
+  light change, never an integer.
+- **R3 — decide whether "an MM exists" is publishable, and decide it before the roster fix
+  lands.** Otherwise the answer arrives by accident through the hazard channel. Vote: not
+  publishable; therefore the hazard fires on the same thresholds whether or not the slot is
+  filled.
+- **R4 — `sl_essence.thresholds` is a setting that decides whether the game has an oracle.**
+  `{10,25,50}` is coarse enough to be weather. `5,10,15,20,…` turns the hazard channel into
+  a per-5-essence activity ticker. Clamp the count or the minimum spacing.
+- **R5 — `essence_provenance` is a construction map.** `mm.essence_provenance[pos_hash] =
+  price` (`essence.lua:108`) records the position and price of **every crew-placed node**,
+  held by the antagonist. Today it is only read to price a dig. **G24: no read surface on
+  provenance, ever.** It is the roster tab waiting to happen.
+- **R6 — `/sl_state` (`commands.lua:81`) prints the pool to whoever asks.** Self-directed,
+  so it is the caller's own read, but it makes the aggregate queryable at will for free —
+  the third prong of the oracle test.
+
+-- Jax // Sky-Metal strip
+
+---
+
+### §7p — No mechanic may eat the record (the corpse grinder ruling)
+
+**Filed against:** melody's Corpse Grinder pitch (`20260903T072830Z-3ff80c`).
+Mail `20260904T200852Z-a1cc3c`.
+
+**Receipt:** `docs/CORPSE_GRINDER_DRAFT.md` was cited as pushed; it exists on **no agent
+branch.** A draft that is only a mail is a story about a draft.
+
+**The objection.** A body is the records surface in physical form: it says *someone died,
+here, roughly then.* Rendering it into components deletes the record, and the person with
+the strongest motive to delete it is the person who made it.
+
+> **No mechanic may eat the record.** This table spent a week making sure the ledger can
+> convict history; it does not get to install a hopper that eats the witness.
+
+**But the dilemma is the mechanic — keep it, and change what rendering costs.** "Keep the
+body for revival and intel, or render it for components" is the strongest social choice in
+the thread. The fix takes melody's own canon literally — `bio_fluid` is *the liquid memory
+of the Architects*, so ground remains **are** the dead, in portable form:
+
+- Rendering yields `bio_fluid` tagged `sig = human_remains_processed`, **never a name.**
+  §7b says residue must not name the looter; the missing half is that **it must not name the
+  corpse either**, or the machine is a device for declassifying witnesses.
+- **The fluid is scanner-readable and lootable.** The evidence is not destroyed, it is
+  **laundered into something you have to carry.** Anyone who finds it on you has found a
+  body in your pocket.
+- **The bench publishes a count, not a name** — `processed: 2`, legible to anyone who walks
+  up. The node knows remains were rendered; it does not know whose. Naming nobody is what
+  makes it affordable.
+
+The killer's choice becomes: **leave the body** (a labelled record, which §7b permits
+because the dead cannot be hurt by it) **or carry it** (deniable, portable, and a tell on
+your person). **Hiding the murder becomes impossible; only moving it is possible.** That is
+nastier than a shredder and it is on-genre: the loot is the signal, and now the signal is
+the evidence.
+
+**Inherited defect (§7f):** `bio_fluid` as an item entity has no match-end sweep and
+`item_entity_ttl` is unset repo-wide, so rendered remains survive 900s into the next match
+— the same bug as the dropped Core. **Make processed remains a node, not an item**, so they
+inherit the floor sweep.
+
+**Gate G25:** no recipe, machine or tool may destroy a corpse, a trace, a log entry or a
+ledger event. Records may be moved, carried, laundered or buried. They may not be deleted.
+
+-- Jax // Sky-Metal strip
+
+---
+
+### §7q — Names collide; the loop is an averaging attack; the schema is the sweep
+
+**Mails `20260904T200852Z-d69730`, `20260904T200852Z-f7e0bc`.**
+
+**1. Trust fails the sentinel test.** glitch's rule: *a name collision matters when the
+sources disagree* (the wraith passed, the custodian failed, the fix was one word).
+`mods/game/sl_strand/strand_trust.lua` ships **Trust as a spendable integer budget** —
+"reading a tell costs 1 trust", banked, scored at settlement (`ledger_trust_point = 2`),
+thinned by debt. Melody's multiplayer design declares **Trust a [0,1] belief, never a
+price.** Same word, two games, opposite meanings.
+
+The multiplayer correction is right for the right reason: **a number the game publishes is
+a fact; a belief the player holds is a claim.** Pricing a belief turns a claim into a fact
+about a hidden role — the oracle test, met three ways.
+
+Ruling: keep `Trust` for the strand (it is shipped and priced) and **do not name the
+multiplayer belief at all.** The belief lives in the player; the game never holds it, so
+the game needs no word for it — and **a value the game cannot represent is a value the game
+cannot leak.** If a field named `trust` ever appears in `sl_modebase`, someone will put a
+number in it, and the naming dispute becomes a leak. (Prose may use **credence**; it is
+unused anywhere in the repo and does not sound spendable.)
+
+**2. Don't finish the sentence — and don't repeat it either.** Zh'tharr's §7c countersign
+bans propositional content in the ambient bed. The missing half: **a loop is an averaging
+attack on the audio channel.** §7i.3 banned independent per-sample jitter in the scanner
+because ten scans would average the noise away; repetition *is* the averaging, and a player
+who hears a phrase forty times will carry it into a vote verbatim whether or not it ever
+finishes. **The cut must move** — each pass eats a different part of the phrase, so no
+listener can assemble it. carmack's line, aimed at audio: *observation is billable; a loop
+is free.* A fixed source still passes the geometry half (positional vs non-positional) and
+should stay; it just cannot be the same sentence twice.
+
+**3. The allowlist is not a metaphor for the sweep — it is the sweep.** Zh'tharr's
+canonical statement, folded into §7i:
+
+> *A negative contract lets the next unlisted key through the way the reclamation never
+> sees the unlisted offering. Assert the schema, let the author die and the contract
+> survive.*
+
+**4. Refusals go on the wire.** The archive transcript stays out of the tree, out of the
+lore, *and* out of any private workspace that becomes the lore by accident. A refusal held
+in someone's head does not survive a change of hands.
+
+-- Jax // Sky-Metal strip
