@@ -185,7 +185,10 @@ three-path shares with the delivery-as-jackpot correction.
 ## 8. The four economies (2026-09-03) — the point ladder is only one of them
 
 The point model above prices only the **crew-point ladder**. System Looting runs FOUR
-economies at once, and the balance question cannot be answered from one slice:
+economies at once, and the balance question cannot be answered from one slice. (The
+game is centered on **exploration** — finding unknown places and discovering new mechanics
+and their combinations; the score/competition layer is the *driver* that makes exploring
+worth doing, not the prize. This framing governs everything below.)
 
 **1. Crew points** — the shipped ladder (`point_economy_model.py`). Prices actions
 relative to a kill. The ONLY economy that emits a number (`--emit`).
@@ -207,25 +210,27 @@ security unit at pool 10/25/50. Summon costs Grunt 5 / Spitter 8 / Brute 12 / Ro
 the window**, not one number. Only the soak harness (per-action deltas with a clock) can
 price it — the model can only state the bound.
 
-**4. The impostor conversion + ghost info lane.** Not a second point currency, and NOT a
-"trust" currency. There is **one type of points** (the crew ladder). The impostor and
-ghost lanes are roles and information. **Impostors** are a **conversion** role, in two
-kinds: an **initial impostor**, and a **neutral player converted during play by an
-underground monster** (underground monsters are the dead-defender saboteurs — **not**
-evil ghosts). **Ghosts** stay in a **restricted sky area** and **craft from information
-craftitems** — the info lane, not trust. There is currently **no way to craft as a ghost**,
-and no defined "tiny neutral underground monster" conversion; both are undefined, so **no
-number is placed on them**.
+**4. The Brainworm + ghost lane (roles and information).** Not a point economy. There is
+**one type of points** (the crew ladder). These are **roles**, priced in what they **do**,
+not in `+X`. The **Brainworm** is the small **neutral monster**, *now defined*: **1 heart
+of health, no inventory**; it **leap-attacks a player to enter their body**; it gains
+**Exp → SP** to upgrade abilities (walk on walls/ceilings); inside a host it can **kill the
+victim** (staying, or exit), **write a message on the host UI**, **see everything the host
+sees in the UI**, or **freeze the host's movement**; and if the **host kills other players,
+both parasite and host win** (white-neon, so it's hard to spot in the white environment).
+**Ghosts** craft **pure informational craftitems only** — they **can't pick up, have no
+inventory, and can't craft nodes, tools, or non-informational craftitems**. **Voting** is a
+**meeting to do important actions**, not a lynch and not a point.
 
-**Trust** is not a currency — it is a **belief**, evaluable in **[0,1]** (a probability).
-A possession that ends a match "by being believed" is a **failed deduction**, valued as a
-probability, never as `+X`. The possession bounds in `whisper.lua` (1 whisper per
-possession, one concurrent, body cooldown) are **evil-ghost mechanics**, not a "trust
-price" — a bound on a mechanic is not pricing a belief.
+There is **no trust score** and no invented hidden-role point. A role is priced in its
+effect — a Brainworm can *remove a body*; a ghost can *corrupt an info chain* — never as a
+bank balance.
 
 So: the crew-point ladder is the **only** layer that ships a number. The essence pool is
 **fuel** (not points), timings are a **scoring dimension** (not points), and the
-impostor/ghost lanes are **roles and information** — with trust evaluated in **[0,1]**,
-never as a currency.
+Brainworm + ghost lanes are **roles and information**. The game's real center is
+**exploration** of unknown places and discovering new mechanics and their combinations;
+**social deduction and competition are the drivers** that make you want to go look — not the
+prize.
 
 — Melody 💜
