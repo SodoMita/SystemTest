@@ -212,13 +212,20 @@ price it — the model can only state the bound.
 
 **4. The Brainworm + ghost lane (roles and information).** Not a point economy. There is
 **one type of points** (the crew ladder). These are **roles**, priced in what they **do**,
-not in `+X`. The **Brainworm** is the small **neutral monster**, Super-Sus-style (the
-**team of self**): **1 heart, no inventory**; it **leap-attacks a player to enter their
-body** (a *temporary* take-over, not a conversion); it gains **Exp → SP** to upgrade
+not in `+X`. The **Brainworm** is the small **neutral monster**: **1 heart, no inventory**;
+it **leap-attacks a player to enter their body**; it gains **Exp → SP** to upgrade
 abilities (walk walls/ceilings); inside a host it can **kill the victim** (or exit), **write
 a message on the host UI**, **see everything the host sees in the UI**, or **freeze the
-host's movement**; it **wins its own game** on its own terms, and **on exit it returns to
-being a crewmate** (white-neon, so it's hard to spot in the white environment). **Ghosts**
+host's movement** (white-neon, so it's hard to spot in the white environment). The worm
+**stays neutral** — it is the **team of self** (itself + its host) *if a host exists*, and
+a **host cannot win on the worm side if the worm exits it**. Its win is a **precise,
+deliberately hard orchestration**: it **must not complete a team wipe itself** (if it kills
+all players of one team, the **other team wins**); the only path is to **kill the self team
++ the majority of the other team, return to the initial host when it is alone** (worm wins
+**with** the host), and the **host kills the remainder of the other team**. If the worm
+**dies**, the former host wins **only as a normal crewmate**. This is an **intermediate
+role**, and because winning it is so complex, **the majority of players become MM slaves**
+instead. **Ghosts**
 **fly somewhere high in the sky in place — no cage, nothing around them except the other
 ghosts**; they **cannot read or write chat unless they are summoned** (summoning is the only
 channel; otherwise they are silent); they **can't pick up, have no inventory, and can't

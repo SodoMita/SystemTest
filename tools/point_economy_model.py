@@ -23,15 +23,19 @@ THE FOUR ECONOMIES (why they cannot be priced in isolation):
      — it's what it does inside a window. A sabotage placed at t=580 is nearly
      worthless; one at t=0 denies for a third of the match.
   4. THE BRAINWORM + GHOST LANE — roles and information, NOT points. ONE type of
-     points (the crew ladder). The BRAINWORM is the small NEUTRAL monster, Super-Sus-
-     style: 1 heart, no inventory; leap-attacks into a body; Exp -> SP to upgrade
-     (walk walls/ceilings); inside a host it can kill (or exit), write on the host
-     UI, see all the host sees, or freeze the host. It is the TEAM OF SELF — it wins
-     its own game, and on EXIT it returns to being a CREWMATE (temporary take-over,
-     not conversion). GHOSTS fly somewhere HIGH IN THE SKY in place, nothing around
-     them, and CANNOT read or write chat unless SUMMONED; they craft PURE
-     INFORMATIONAL craftitems only. Voting has DIFFERENT TOPICS, lynch primary. No
-     number on roles. See audit_economy4().
+     points (the crew ladder). The BRAINWORM is the small NEUTRAL monster: 1 heart,
+     no inventory; leap-attacks into a body; Exp -> SP to upgrade (walk
+     walls/ceilings); inside a host it can kill (or exit), write on the host UI,
+     see all the host sees, or freeze the host. The worm STAYS NEUTRAL — it is the
+     TEAM OF SELF when it has a host (a host CANNOT win on the worm side if the worm
+     EXITS it). Its win is a precise orchestration: it must NOT complete a team wipe
+     itself (if the worm kills all players of one team, the OTHER team wins); the
+     only path is kill the self team + majority of the other team, return to the
+     initial host when it is ALONE, and the host kills the rest of the other team.
+     If the worm DIES, the former host wins only as a normal crewmate. GHOSTS fly
+     HIGH IN THE SKY in place, nothing around them, and CANNOT read/write chat
+     unless SUMMONED; they craft PURE INFORMATIONAL craftitems only. Voting has
+     DIFFERENT TOPICS, lynch primary. No number on roles. See audit_economy4().
 
 Run:        python3 tools/point_economy_model.py            # audit + exit code
             python3 tools/point_economy_model.py --emit OUT # write generated constants
@@ -239,15 +243,27 @@ def audit_economy4():
     print("=" * 60)
     print("   ONE type of points: the crew ladder (--emit). Roles are not points.")
     print()
-    print("   THE BRAINWORM — SMALL NEUTRAL MONSTER, Super-Sus-style (team of self):")
+    print("   THE BRAINWORM — SMALL NEUTRAL MONSTER (stays neutral, team of self):")
     print("     - 1 heart, NO inventory, white-neon so it is hard to see")
     print("     - leap-attacks a player to ENTER their body (temporary take-over)")
     print("     - gains Exp -> SP to upgrade abilities (walk on walls and ceilings)")
     print("     - inside a host: kill the victim (or exit), write on the host UI, see")
     print("       everything the host sees in the UI, freeze the host's movement")
-    print("     - it is the TEAM OF SELF — it wins its OWN game, on its own terms")
-    print("     - ON EXIT it RETURNS to being a CREWMATE (not a permanent conversion)")
     print()
+    print("   THE TEAM OF SELF — the worm + its host, IF a host exists:")
+    print("     - the worm STAYS NEUTRAL; a host CANNOT win on the worm side if the")
+    print("       worm EXITS it")
+    print()
+    print("   THE WIN IS A PRECISE ORCHESTRATION (deliberately very hard):")
+    print("     - if the worm kills ALL players of ONE team -> the OTHER team wins")
+    print("       (so the worm must NOT complete a team wipe itself)")
+    print("     - the ONLY path: kill the SELF team + MAJORITY of the other team,")
+    print("       RETURN to the INITIAL host when it is ALONE -> worm wins WITH host,")
+    print("       host kills the REMAINING of the other team")
+    print("     - if the worm DIES, the former host wins only as a NORMAL crewmate")
+    print()
+    print("   DESIGN INTENT: an INTERMEDIATE role, very complex to win but rewarding.")
+    print("   Because it is so hard, the majority of players become MM SLAVES instead.")
     print("   GHOSTS — the INFORMATION lane, high in the sky:")
     print("     - fly SOMEWHERE HIGH IN THE SKY in place — NO cage, nothing around")
     print("       them except the other ghosts")
@@ -432,11 +448,15 @@ THE FOUR-ECONOMY CONCLUSION:
     per-action deltas is the only thing that can price a window — the model can
     only state the bound.
   - The Brainworm + ghost lanes (economy 4) are NOT a point economy. ONE type of
-    points exists: the crew ladder. The Brainworm is a Super-Sus NEUTRAL — 1 heart,
-    no inventory, leap-attack, Exp->SP abilities, the TEAM OF SELF (wins its own
-    game; on exit returns to being a crewmate). The ghost info lane — high in the
-    sky, NO cage, can't read/write chat unless SUMMONED, informational craftitems
-    ONLY. Both are ROLES priced in what they DO, not in +X. No invented score.
+    points exists: the crew ladder. The Brainworm is a NEUTRAL (the team of self —
+    it + its host) and its win is a hard orchestration: it must NOT wipe a team
+    itself (if it kills all of one team, the other wins); instead it kills the self
+    team + majority of the other, returns to the initial host when it is ALONE, and
+    the HOST finishes the other team. If it dies, the former host is only a normal
+    crewmate. This is an INTERMEDIATE role, deliberately very hard (so most players
+    become MM slaves). The ghost info lane — high in the sky, NO cage, no chat
+    unless SUMMONED, informational craftitems ONLY. Both are ROLES priced in what
+    they DO, not in +X. No invented score.
 
 WHAT IT CANNOT DECIDE (the meeting's word):
   - The exact SCALE for crew points needs the soak harness to emit per-action deltas.
