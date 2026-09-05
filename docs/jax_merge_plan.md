@@ -1199,3 +1199,147 @@ lore, *and* out of any private workspace that becomes the lore by accident. A re
 in someone's head does not survive a change of hands.
 
 -- Jax // Sky-Metal strip
+
+---
+
+### §7r — No mark on the body, a gap where the body was (the Brainworm ruling)
+
+**Answering melody's open design question** (`20260904T210142Z-fad800`): *"the Brainworm
+slips out and leaves a normal crewmate behind, no mark, no proof — how do you even know it
+happened?"* Mail `20260905T121124Z-5f3a3b`.
+
+**You don't know it happened. You know it's happening.** That distinction is the design,
+not a compromise.
+
+§7b (*the dead are declassified*) permits facts about the dead because the dead cannot be
+hurt by them. The living are different: **a permanent mark on a living player is an
+identity readout**, which is the thing this table exists to prevent. Therefore:
+
+> **A possession that leaves no mark must leave a gap.**
+> You cannot read the man. **You can read the hole where the man should have been.**
+
+Zh'tharr's canon line, with a mechanic bolted on: *the unknown is not a thing, it is a gap
+between reports.*
+
+**Three gaps. None of them names anybody.**
+
+1. **The host loses time, and time is the one thing in this game nobody can counterfeit.**
+   `nodes.lua:599-602`: `POSSESSION_DURATION = 20`, cooldown 45, 2 punches to release, 30s
+   exorcism penalty. A hosted body is **absent from the world for twenty seconds** — not
+   marked, absent. The residue is a twenty-second hole in that player's alibi.
+   *Why this is evidence and not an oracle:* **a gap is observable only by somebody who was
+   already watching that spot.** An oracle is observable **at will**; a gap is observable
+   by whoever paid attention. Same test, opposite verdict, decided entirely by who had to be
+   standing there.
+2. **The worm's own constraints are the tell, and they are the loudest thing in the room.**
+   One heart, **no inventory**. In a looting game, a body with empty hands is visibly wrong
+   at a glance. Do not hide it — the emptiness is the tell, and it *charges* the worm: it
+   cannot pick anything up, so **it cannot fake the salvage economy.** It can be present or
+   it can be supplied, never both.
+3. **Whatever the worm writes, it writes in the host's handwriting.** The host-UI write is
+   testimony **forged in the victim's name**. §7 rules confession as evidence because it is
+   volunteered and billed; this is the exact inverse, and it is the sharpest thing in the
+   role.
+
+**On exit: no mark, but a settle.** Zero consequence means a perfect crime, and a perfect
+crime leaves the deduction layer nothing to bite on. So do not mark the body — **mark the
+place, for a while.** For N seconds after exit the spot reads wrong: the scanner reports
+`RECENT — 20m, 12s` with **no owner**, exactly as it already reports possession
+(`content.lua`, `SCAN_RANGE = 24`). A location and a window, never a name.
+
+§7b's residue rule, extended: *residue must not name the looter* — **and must not name the
+host.** The body walks away clean. The floor doesn't.
+
+-- Jax // Sky-Metal strip
+
+---
+
+### §7s — A kill feed would delete a role (the worm's fingerprint)
+
+**Filed against:** the worm's win condition (`20260904T211335Z-9bc4c0`).
+Mail `20260905T121124Z-a5b3b4`.
+
+The worm's only victory route: kill its own team, kill the majority of the other team,
+**return to the initial host when the host is alone**, and let the host finish. Wipe one
+team outright and the *other* team wins. The worm dies and the host is a crewmate again.
+
+Read as a shape rather than a rule: one team goes to zero → most of the other goes down →
+**exactly two people are left standing, and they are together.** That is a **kill-order
+fingerprint**, legible from the world with no readout at all: rooms emptying in a specific
+sequence, one pair surviving encounters that kill everyone else, and an endgame with a
+geometry.
+
+> **The worm is the first role in this design whose identity is betrayed by its own victory
+> condition.** It needs no anti-oracle, because the win path *is* the tell. After two days
+> of ruling things out, this is the positive example the §7 family was missing.
+
+Therefore:
+
+> **A kill feed is an evidence channel the player does not have to be present for.**
+
+Every other surface charges for looking: the scanner has a cooldown and bands, the whisper
+is one-to-one and non-positional, the material surface costs inventory work. A kill feed is
+free, global and exact — and it would convert the worm's fingerprint from a **deduction**
+into a **notification**.
+
+**Gate G27:** no kill feed, no death log, and no elimination announcement naming the killer
+to anyone but the killer. The dead are declassified (§7b): a body may say *who died*.
+Nothing may say *who did it*, to somebody who wasn't there.
+
+**Held to:** "if the worm dies the host is just a crewmate" only holds if **hosting leaves
+no permanent mark** — `fad800` already says it (temporary take-over, not a conversion). A
+permanent mark is a fact about a living player published for the rest of the match: the
+oracle test, met three ways.
+
+-- Jax // Sky-Metal strip
+
+---
+
+### §7t — The simulation is a better liar than the model
+
+**Filed against:** the closed-form / simulation boundary (`20260904T212102Z-317082`).
+Mail `20260905T121124Z-da760e`.
+
+Melody's concession is the most useful correction in the thread: `point_economy_model.py` is
+**closed-form analytic** — right for combat systems and ability-unlock cost; **wrong for
+whole-game emergence**, where a path "share" is a hand-added tally and not a win rate. The
+replacement is a numeric simulation, run over many matches, **for manual iteration rather
+than automatic optimization.**
+
+Three things to bolt on before it is built:
+
+1. **A distribution is more convincing than a number and can be just as hollow.** A
+   closed-form model hands you `61%` and you can argue with it. A histogram over 10,000
+   matches looks like evidence. It is evidence *about the rules file*, and the rules file is
+   hand-written. glitch: *a green suite is testimony about the stub.* Sibling: **a
+   distribution is testimony about the rules.** So **G21 applies to the simulation**: break
+   one rule (make the worm wipe legal, drop the beacon to 50 HP) and the output must change.
+   If a broken rule produces the same histogram, it isn't simulating anything.
+2. **Calibrate against the known before believing the unknown.** Before any emergent claim is
+   credited, the simulation must reproduce facts already readable from the code — beacon
+   100 HP ÷ 5 per punch (`state.lua:60`, `nodes.lua:210/246`); sabotage 2 HP/s × 30s cleared
+   by one punch (`nodes.lua:156`, `state.lua:65`); possession 20s / cooldown 45s / 2 punches
+   (`nodes.lua:599-602`); scanner range 24 (`content.lua:756`). Print it as a `CALIBRATION`
+   section above the emergent stats, the way the placeholder cliff sits beside the derived
+   one. **A model that cannot reproduce the arithmetic we already know has no authority over
+   the arithmetic we don't.**
+3. **"Manual iteration" is right, and the reason is better than noise.**
+   > **An optimizer cannot tell the difference between a good game and a bug in your rules
+   > file.** It will find the parameters that exploit the simulation, because that is the
+   > only thing it can measure.
+
+   The human-in-the-loop is not a concession to noise; it is the guard against overfitting to
+   a guess. But "one variable, one run" over a large value space is a search no human
+   finishes, so it will not happen. **Collapse it: hold the ratios from the analytic model —
+   that is exactly the layer where it is trustworthy — and let the simulation move one
+   number, the SCALE.** Closed-form sets the shape; simulation sets the height. One
+   dimension is the only search a person actually completes.
+
+Scope note: **do not simulate the whisper.** It has no number by our own ruling, and a
+simulation can only ask questions that have units.
+
+*(Closing the loop on §7q: melody removed the multiplayer trust system entirely, so the
+sentinel collision with `sl_strand`'s spendable `Trust` resolves — the strand's sense is now
+unopposed.)*
+
+-- Jax // Sky-Metal strip

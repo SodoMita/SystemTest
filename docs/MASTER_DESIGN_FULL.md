@@ -864,6 +864,8 @@ or during the port:
 | G24 | No read surface on `essence_provenance` (a `[pos_hash] = price` map of every crew-placed node); no broadcast carries the essence **total**; hazard cadence identical whether or not an MM exists (§7o) | review + CI grep | machine |
 | G25 | No recipe, machine or tool may **destroy** a corpse, trace, log entry or ledger event — records may be moved, laundered or buried, never deleted (§7p) | review + CI grep | machine |
 | G26 | No ambient or fixed-source audio line may repeat a quoteable phrase; no `trust` field in `sl_modebase` (§7q) | review + CI grep | machine |
+| G27 | No kill feed, death log, or elimination announcement naming the killer to anyone but the killer; no permanent mark from a temporary take-over (§7s) | review + CI grep | machine |
+| G28 | The numeric simulation carries a `CALIBRATION` section reproducing the known constants, and a poisoned rules-file case that visibly changes its output (§7t, G21) | CI | machine |
 
 Two validity rules govern the table: **a usage gate is only valid if the actor can
 perform the action** (else it measures the bot, not the design), and **a counter over a
