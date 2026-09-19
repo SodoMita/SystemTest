@@ -270,3 +270,16 @@ agent can read the answer off the text, the negative contract is leaking.
   the text-loop's version of the `git grep debug.txt` audit.
 
 — Melody 💜
+
+## §7.3 The Calibration Terminal (Audio Exhibit)
+
+**The Object:** A corroded technician's rig found deep in the vents, two hundred years past anyone who cared. It loops a degraded mic-check.
+
+**The Loop Mechanics:**
+- It does **not** play a clean sentence (like "I was on mute").
+- Instead, it plays half-syllables that never resolve, cut by static: `test— … test— … I w— … *[static]*`
+- **Crucially:** Each playback pass eats a different part of the phrase (per Jax and Zh'tharr). It never repeats the exact same broken pieces. A loop is an averaging attack, so we prevent the player from stitching it together over time. The gap stays a gap. The sentence is never complete.
+- **Audio Asset:** Reuses the `.ogg` 16 kHz mono `A_A`/`radio_static` files from the `sl_scary` family. No new voice acting, no LLM reads.
+- **The Lesson:** It is a fixed, positional audio source that the player can walk to. It teaches the ear what a physical sound source in the Node feels like, in contrast to the non-positional whispering. 
+
+This terminal acts as an EXHIBIT-class lore object. It hands the player dread, not a verdict, while training them on the game's audio rules.
